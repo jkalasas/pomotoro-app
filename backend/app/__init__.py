@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from .config import settings
 from .db import create_db_and_tables
+from .auth.router import router as auth_router
 from .recommendations.router import router as recommendations_router
 from .sessions.router import router as sessions_router
 from .scheduler.router import router as scheduler_router
@@ -25,6 +26,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth_router)
 app.include_router(recommendations_router)
 app.include_router(sessions_router)
 app.include_router(scheduler_router)

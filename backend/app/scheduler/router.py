@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from typing import List, Dict
 import numpy
 import pygad
 from sqlmodel import select
 
-from ..db import get_session
-from ..models import Task, PomodoroSession
+from ..auth.deps import ActiveUserDep
+from ..db import SessionDep
+from ..models import PomodoroSession, Task
 from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse
 
 router = APIRouter(prefix="/scheduler", tags=["Scheduler"])
@@ -191,7 +192,20 @@ def schedule_tasks_with_ga(session_ids: List[int], db) -> ScheduleResponse:
 
 
 @router.post("/generate-schedule", response_model=ScheduleResponse)
-def generate_schedule(request: ScheduleRequest, db=Depends(get_session)):
+def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUserDep):
+    query = (
+        select(PomodoroSession)
+        .where(PomodoroSession.id.in_(request.session_ids))
+        .where(PomodoroSession.user_id != user.id)
+        .exists()
+    )
+
+    if db.exec(query).first():
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot schedule tasks from sessions not owned by the user.",
+        )
+
     if not request.session_ids:
         raise HTTPException(status_code=400, detail="Session IDs list cannot be empty.")
     return schedule_tasks_with_ga(request.session_ids, db)

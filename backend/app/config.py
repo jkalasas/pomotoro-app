@@ -9,11 +9,16 @@ class Settings(BaseSettings):
     (if present) and the environment. Use the exported `settings` instance.
     """
 
-    gemini_api_key: str
-    gemini_model: str = "gemini-2.0-flash-lite"
     database_url: str = "sqlite:///database.db"
     environment: str = "development"
     log_level: str = "info"
+    secret_key: str = "please_change_this"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    gemini_api_key: str
+    gemini_model: str = "gemini-2.0-flash-lite"
 
     # pydantic-settings configuration
     model_config = SettingsConfigDict(

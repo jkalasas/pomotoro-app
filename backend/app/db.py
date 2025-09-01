@@ -1,8 +1,13 @@
+from typing import Annotated
+
+from fastapi import Depends
 from sqlmodel import SQLModel, create_engine, Session, select
 from app.config import settings
 
 DATABASE_URL = settings.database_url
-engine = create_engine(DATABASE_URL, echo=True, connect_args={"check_same_thread": False})
+engine = create_engine(
+    DATABASE_URL, echo=True, connect_args={"check_same_thread": False}
+)
 
 
 def get_session():
@@ -15,6 +20,7 @@ def create_db_and_tables():
 
     # seed basic categories if empty
     from .models import Category
+
     with Session(engine) as session:
         existing = session.exec(select(Category)).first()
         if not existing:
@@ -25,3 +31,6 @@ def create_db_and_tables():
             doc_cat = Category(name="Documentation")
             session.add_all([backend_dev, auth_cat, security_cat, db_cat, doc_cat])
             session.commit()
+
+
+SessionDep = Annotated[Session, Depends(get_session)]

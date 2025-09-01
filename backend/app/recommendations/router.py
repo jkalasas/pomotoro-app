@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+import statistics
 from typing import List
-from pydantic import BaseModel
 
-from ..db import get_session
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from sqlmodel import Session, select
+
+from ..auth.deps import ActiveUserDep
+from ..services.llm import call_gemini_for_tasks
+from ..db import SessionDep
 from ..models import Category, Task, TaskCategoryLink
 from .schemas import (
     SessionDescriptionRequest,
@@ -10,14 +15,11 @@ from .schemas import (
     TaskResponse,
     PomodoroConfig,
 )
-from ..services.llm import call_gemini_for_tasks
-from sqlmodel import select
-import statistics
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
 
-async def get_recommendations(description: str, db) -> RecommendationResponse:
+async def get_recommendations(description: str, db: Session) -> RecommendationResponse:
     llm_output = await call_gemini_for_tasks(description)
 
     class LlmTask(BaseModel):
@@ -74,7 +76,7 @@ async def get_recommendations(description: str, db) -> RecommendationResponse:
 
 @router.post("/generate-tasks", response_model=RecommendationResponse)
 async def generate_task_recommendations(
-    request: SessionDescriptionRequest, db=Depends(get_session)
+    request: SessionDescriptionRequest, db: SessionDep, _: ActiveUserDep
 ):
     if not request.description.strip():
         raise HTTPException(status_code=400, detail="Description cannot be empty.")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
-from ..db import get_session
+from ..db import SessionDep, get_session
 from ..models import PomodoroSession, Task, Category
 from .schemas import (
     SessionCreate,
@@ -11,14 +11,21 @@ from .schemas import (
     SessionUpdate,
 )
 from sqlmodel import select
+from ..auth.deps import ActiveUserDep
+from ..users.models import User
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 
 @router.post("/", response_model=SessionWithTasksPublic)
-def create_session(session_data: SessionCreate, db=Depends(get_session)):
+def create_session(
+    db: SessionDep,
+    session_data: SessionCreate,
+    current_user: ActiveUserDep,
+):
     db_session = PomodoroSession(
         description=session_data.description,
+        user_id=current_user.id,
         **session_data.pomodoro_config.model_dump()
     )
 
@@ -66,15 +73,24 @@ def create_session(session_data: SessionCreate, db=Depends(get_session)):
 
 
 @router.get("/", response_model=List[SessionPublic])
-def read_sessions(db=Depends(get_session)):
-    sessions = db.exec(select(PomodoroSession)).all()
+def read_sessions(
+    db: SessionDep,
+    current_user: ActiveUserDep,
+):
+    sessions = db.exec(
+        select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    ).all()
     return sessions
 
 
 @router.get("/{session_id}", response_model=SessionWithTasksPublic)
-def read_session(session_id: int, db=Depends(get_session)):
+def read_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session:
+    if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     tasks_public = [
@@ -100,10 +116,13 @@ def read_session(session_id: int, db=Depends(get_session)):
 
 @router.put("/{session_id}", response_model=SessionPublic)
 def update_session(
-    session_id: int, session_update: SessionUpdate, db=Depends(get_session)
+    db: SessionDep,
+    session_id: int,
+    session_update: SessionUpdate,
+    current_user: ActiveUserDep,
 ):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session:
+    if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
     if session_update.description is not None:
         db_session.description = session_update.description
@@ -114,9 +133,13 @@ def update_session(
 
 
 @router.delete("/{session_id}", response_model=dict)
-def delete_session(session_id: int, db=Depends(get_session)):
+def delete_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session:
+    if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
     db.delete(db_session)
     db.commit()
