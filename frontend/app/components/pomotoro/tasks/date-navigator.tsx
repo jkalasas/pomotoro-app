@@ -34,7 +34,7 @@ export function DateNavigator({
         onClick={onNavigateBack}
         aria-label="Previous week"
       >
-        <ChevronLeft className="h-5 w-5 text-gray-500" />
+        <ChevronLeft className="h-5 w-5 text-muted-foreground" />
       </Button>
       {days.map((day) => (
         <Button
@@ -43,8 +43,8 @@ export function DateNavigator({
           className={cn(
             "flex flex-col items-center justify-center h-14 w-14 rounded-md p-1 text-xs font-medium",
             day.id === selectedDayId
-              ? "bg-amber-700 text-white hover:bg-amber-800"
-              : "text-gray-600 hover:bg-gray-100"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "text-foreground hover:bg-accent"
           )}
           onClick={() => onDateSelect(day.id)}
         >
@@ -59,7 +59,7 @@ export function DateNavigator({
         onClick={onNavigateForward}
         aria-label="Next week"
       >
-        <ChevronRight className="h-5 w-5 text-gray-500" />
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
       </Button>
     </div>
   );

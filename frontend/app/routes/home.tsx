@@ -458,15 +458,15 @@ export default function Home() {
                     <div
                       key={task.id}
                       className={`p-3 border rounded-lg ${
-                        task.completed ? "bg-green-50 border-green-200" : "bg-white"
+                        task.completed ? "bg-muted border-border/50 opacity-75" : "bg-card border-border"
                       }`}
                     >
                       <div className="flex justify-between items-center">
-                        <span className={task.completed ? "line-through text-gray-500" : ""}>
+                        <span className={task.completed ? "line-through text-muted-foreground" : ""}>
                           {task.name}
                         </span>
                         <div className="flex gap-2">
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-muted-foreground">
                             {task.estimated_completion_time} min
                           </span>
                           {!task.completed && (
@@ -479,14 +479,14 @@ export default function Home() {
                           )}
                         </div>
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         Category: {task.category}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   {tasksStore.currentSession ? "Loading tasks..." : "Select a session to view tasks"}
                 </div>
               )}
@@ -508,13 +508,13 @@ export default function Home() {
                         }
                       }}
                     />
-                    <span className={task.completed ? "line-through text-gray-500" : ""}>
+                    <span className={task.completed ? "line-through text-muted-foreground" : ""}>
                       {task.name}
                     </span>
                   </div>
                 ))
               ) : (
-                <span className="text-gray-500">No tasks available</span>
+                <span className="text-muted-foreground">No tasks available</span>
               )}
             </div>
           </CardContent>

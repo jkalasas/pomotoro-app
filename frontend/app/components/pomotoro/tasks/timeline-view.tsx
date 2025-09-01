@@ -96,7 +96,7 @@ export function TimelineView({
       ref={timelineRef}
     >
       {/* Time Column */}
-      <div className="w-16 pr-2 flex flex-col items-end text-xs text-gray-500 shrink-0">
+      <div className="w-16 pr-2 flex flex-col items-end text-xs text-muted-foreground shrink-0">
         {hours.map((hour) => (
           <div
             key={hour}
@@ -111,12 +111,12 @@ export function TimelineView({
       </div>
 
       {/* Timeline Grid & Tasks Area */}
-      <div className="flex-grow relative border-l border-gray-200">
+      <div className="flex-grow relative border-l border-border/50">
         {/* Horizontal Lines - Draw lines at the hour marks for all 24 hours */}
         {hours.map((hour, index) => (
           <div
             key={`line-${hour}`}
-            className="absolute w-full border-t border-gray-200"
+            className="absolute w-full border-t border-border/30"
             // Position line exactly at the hour mark
             style={{
               top: `${index * hourHeight}px`,
@@ -126,7 +126,7 @@ export function TimelineView({
         ))}
         {/* Add a final line at the 24:00 mark */}
         <div
-          className="absolute w-full border-t border-gray-200"
+          className="absolute w-full border-t border-border/30"
           style={{ top: `${24 * hourHeight}px` }}
         />
 

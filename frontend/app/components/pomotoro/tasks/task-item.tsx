@@ -31,13 +31,13 @@ export function TaskItem({ isDoneValue, isDoneChange, task }: Props) {
           />
           <Label
             htmlFor={task.id}
-            className={cn(isDoneMemo && ["line-through", "text-gray-500"])}
+            className={cn(isDoneMemo && ["line-through", "text-muted-foreground"])}
           >
             {task.name} ({task.pomodoros})
           </Label>
         </div>
         {task.description && (
-          <p className="text-sm text-gray-500 ml-6">{task.description}</p>
+          <p className="text-sm text-muted-foreground ml-6">{task.description}</p>
         )}
       </div>
       {task.subtasks && task.subtasks.length > 0 && (
