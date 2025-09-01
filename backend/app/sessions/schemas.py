@@ -35,6 +35,8 @@ class TaskPublic(BaseModel):
     name: str
     estimated_completion_time: int
     category: str
+    completed: bool
+    actual_completion_time: Optional[int] = None
 
 
 class SessionWithTasksPublic(SessionPublic):
@@ -43,3 +45,25 @@ class SessionWithTasksPublic(SessionPublic):
 
 class SessionUpdate(BaseModel):
     description: Optional[str] = None
+
+
+class ActiveSessionCreate(BaseModel):
+    session_id: int
+
+
+class ActiveSessionPublic(BaseModel):
+    id: int
+    session_id: int
+    current_task_id: Optional[int]
+    is_running: bool
+    time_remaining: int
+    phase: str
+    pomodoros_completed: int
+
+
+class ActiveSessionUpdate(BaseModel):
+    is_running: Optional[bool] = None
+    time_remaining: Optional[int] = None
+    phase: Optional[str] = None
+    current_task_id: Optional[int] = None
+    pomodoros_completed: Optional[int] = None

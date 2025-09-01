@@ -24,6 +24,8 @@ import {
 import AppSidebar from "./components/pomotoro/navs/AppSidebar";
 import { Button } from "./components/ui/button";
 import { VolumeOff } from "lucide-react";
+import { AuthForm } from "./components/auth/AuthForm";
+import { useAuthStore } from "./stores/auth";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -39,31 +41,18 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const setIsRunning = usePomodoroStore((state) => state.setIsRunning);
-  const setOnTimesUp = usePomodoroStore((state) => state.setOnTimesUp);
+  const authStore = useAuthStore();
+  const pomodoroStore = usePomodoroStore();
   const initWindow = useWindowStore((state) => state.initWindow);
 
   const [tray, setTray] = useState<TrayIcon>();
 
   useEffect(() => {
-    setIsRunning(false);
-    setOnTimesUp(() => {
-      const audio = new Audio("/audio/teleleleng.mp3");
-      const toastId = toast.info("Time's up!", {
-        duration: 10000,
-        action: {
-          label: <VolumeOff className="size-3"/>,
-          onClick: () => {
-            audio.pause();
-            audio.removeAttribute("src");
-            audio.load();
+    // Load user on app start
+    if (authStore.token && !authStore.user) {
+      authStore.loadUser();
+    }
 
-            toast.dismiss(toastId);
-          }
-        }
-      });
-      audio.play().catch((err) => console.error("Failed to play audio:", err));
-    });
     initWindow();
 
     (async () => {
@@ -77,7 +66,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       setTray(await TrayIcon.new(trayOptions));
     })();
-  }, [setIsRunning, setOnTimesUp, initWindow]);
+  }, [authStore, pomodoroStore, initWindow]);
+
+  // Show auth form if not authenticated
+  if (!authStore.user && !authStore.isLoading) {
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <Meta />
+          <Links />
+        </head>
+        <body onContextMenu={(e) => e.preventDefault()}>
+          <AuthForm />
+          <Toaster />
+          <ScrollRestoration />
+          <Scripts />
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">

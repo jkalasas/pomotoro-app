@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import type { Route } from "./+types/home";
 import { useTaskStore } from "~/stores/tasks";
@@ -10,8 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { TaskForm } from "~/components/pomotoro/forms/TaskForm";
-import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
 import { Button } from "~/components/ui/button";
 import {
   Check,
@@ -25,10 +23,10 @@ import {
 import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
 import { Checkbox } from "~/components/ui/checkbox";
 import TaskCheckItem from "~/components/pomotoro/tasks/task-check-item";
-import { generateTasks, refineSessionPrompt } from "~/lib/ai";
 import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
 import { SessionInfoForm } from "~/components/pomotoro/forms/SessionInfoForm";
 import type { Session } from "~/types/session";
+import { TaskDifficulty } from "~/types/task";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +40,28 @@ import { toast } from "sonner";
 import { formatMinutes } from "~/lib/time";
 import { usePomodoroStore } from "~/stores/pomodoro";
 import { SidebarTrigger } from "~/components/ui/sidebar";
+import { useAuthStore } from "~/stores/auth";
+import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
+import { apiClient } from "~/lib/api";
+
+interface GeneratedTask {
+  name: string;
+  category: string;
+  estimated_completion_time: number;
+}
+
+interface PomodoroConfig {
+  focus_duration: number;
+  short_break_duration: number;
+  long_break_duration: number;
+  long_break_per_pomodoros: number;
+}
+
+interface RecommendationResponse {
+  generated_tasks: GeneratedTask[];
+  pomodoro_config: PomodoroConfig;
+  total_estimated_time: number;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -50,26 +70,72 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-const tasks = ["Refactor date function", "Debugging"];
-
 export default function Home() {
   const tasksStore = useTaskStore();
   const pomodoroStore = usePomodoroStore();
+  const authStore = useAuthStore();
 
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<Session>();
 
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load user data and sessions on mount
+  useEffect(() => {
+    if (authStore.token && !authStore.user) {
+      authStore.loadUser();
+    }
+    if (authStore.user) {
+      tasksStore.loadSessions();
+    }
+  }, [authStore.token, authStore.user]);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (pomodoroStore.isRunning && pomodoroStore.time > 0) {
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => {
+          pomodoroStore.setTime(pomodoroStore.time - 1);
+        }, 1000);
+      }
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [pomodoroStore.isRunning, pomodoroStore.time, pomodoroStore.setTime]);
+
+  // Sync with backend periodically and handle timer completion
+  useEffect(() => {
+    if (pomodoroStore.time > 0 && pomodoroStore.time % 10 === 0 && pomodoroStore.isRunning) {
+      // Sync time with backend every 10 seconds
+      apiClient.updateActiveSession({ time_remaining: pomodoroStore.time }).catch(console.error);
+    }
+
+    if (pomodoroStore.time === 0 && pomodoroStore.isRunning) {
+      // Timer completed
+      apiClient.updateActiveSession({ is_running: false }).catch(console.error);
+      toast.success("Pomodoro completed!");
+    }
+  }, [pomodoroStore.time, pomodoroStore.isRunning]);
+
   const totalPomodoros = useMemo(() => {
     if (!sessionInfo) return 0;
-
     return sessionInfo.tasks.reduce((acc, task) => acc + task.pomodoros, 0);
   }, [sessionInfo]);
 
   const totalTimeMinutes = useMemo(() => {
     if (!sessionInfo) return 0;
-
     return sessionInfo.pomodoroSetup.duration * totalPomodoros;
   }, [totalPomodoros, sessionInfo]);
 
@@ -83,31 +149,90 @@ export default function Home() {
     if (isGenerating) return;
     setIsGenerating(true);
 
-    const toastId = toast.loading("Refining user request...", {
+    const toastId = toast.loading("Generating tasks...", {
       duration: Infinity,
     });
 
     try {
-      const refinedPrompt = await refineSessionPrompt(projectDetails);
-
-      toast.loading("Generating tasks...", {
-        id: toastId,
-        duration: Infinity,
+      // First generate recommendations
+      const recommendations = await apiClient.getRecommendations(projectDetails) as RecommendationResponse;
+      
+      const result = await tasksStore.createSession({
+        description: projectDetails,
+        pomodoro_config: recommendations.pomodoro_config,
+        tasks: recommendations.generated_tasks.map((task: GeneratedTask) => ({
+          name: task.name,
+          category: task.category,
+          estimated_completion_time: task.estimated_completion_time,
+        })),
       });
-      const result = await generateTasks(refinedPrompt);
-      setSessionInfo(result);
 
-      toast.success("Tasks generated successfully!", {
+      // Convert backend format to frontend format for display
+      const sessionInfo = {
+        sessionDetails: {
+          title: projectDetails,
+          description: projectDetails,
+        },
+        pomodoroSetup: {
+          duration: result.focus_duration,
+          shortBreakTime: result.short_break_duration,
+          longBreakTime: result.long_break_duration,
+          pomodorosBeforeLongBreak: result.long_break_per_pomodoros,
+        },
+        tasks: result.tasks.map(task => ({
+          id: task.id.toString(),
+          name: task.name,
+          description: "",
+          difficulty: TaskDifficulty.MEDIUM,
+          pomodoros: Math.ceil(task.estimated_completion_time / result.focus_duration),
+          category: task.category,
+        })),
+      };
+
+      setSessionInfo(sessionInfo);
+
+      toast.success("Session created successfully!", {
         id: toastId,
         duration: 5000,
       });
     } catch (error) {
-      toast.error("Failed to generate tasks", {
+      console.error("Failed to create session:", error);
+      toast.error("Failed to create session", {
         id: toastId,
         duration: 5000,
       });
     }
     setIsGenerating(false);
+  };
+
+  const createSessionFromGenerated = async () => {
+    if (!sessionInfo || !authStore.user) return;
+
+    try {
+      const sessionData = {
+        description: sessionInfo.sessionDetails.title,
+        pomodoro_config: {
+          focus_duration: sessionInfo.pomodoroSetup.duration,
+          short_break_duration: sessionInfo.pomodoroSetup.shortBreakTime,
+          long_break_duration: sessionInfo.pomodoroSetup.longBreakTime,
+          long_break_per_pomodoros: sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
+        },
+        tasks: sessionInfo.tasks.map((task) => ({
+          name: task.name,
+          category: "General", // Default category
+          estimated_completion_time: task.pomodoros * sessionInfo.pomodoroSetup.duration,
+        })),
+      };
+
+      const createdSession = await tasksStore.createSession(sessionData);
+      tasksStore.setCurrentSession(createdSession);
+      await pomodoroStore.setSession(createdSession.id);
+      setIsSessionDialogOpen(false);
+      toast.success("Session created and started!");
+    } catch (error) {
+      console.error("Failed to create session:", error);
+      toast.error("Failed to create session");
+    }
   };
 
   return (
@@ -195,6 +320,13 @@ export default function Home() {
           >
             Regenerate Tasks
           </Button>
+          <Button
+            type="button"
+            className="mt-3 w-full"
+            onClick={createSessionFromGenerated}
+          >
+            Create Session from Tasks
+          </Button>
         </DialogContent>
       </Dialog>
       <div className="flex justify-between w-full">
@@ -206,7 +338,11 @@ export default function Home() {
           <CardContent>
             <div className="flex flex-col items-center">
               <span className="font-bold text-center">Current Task</span>
-              <span className="font-thin text-center">Debugging</span>
+              <span className="font-thin text-center">
+                {pomodoroStore.currentTaskId
+                  ? `Task ${pomodoroStore.currentTaskId}`
+                  : "No active task"}
+              </span>
             </div>
             <div className="mx-aut">
               <PomodoroTimer
@@ -214,15 +350,26 @@ export default function Home() {
                 endTime={pomodoroStore.maxTime}
               />
             </div>
-            <p className="text-center">Stay Focus for 10 minutes</p>
+            <p className="text-center">
+              {pomodoroStore.phase === "focus"
+                ? "Stay focused!"
+                : pomodoroStore.phase === "short_break"
+                ? "Short break"
+                : "Long break"}
+            </p>
 
             <div className="mt-3 flex flex-col gap-3">
               <Button
                 className="flex items-center gap-3"
                 variant="ghost"
                 onClick={() => {
-                  pomodoroStore.startTimer();
+                  if (pomodoroStore.isRunning) {
+                    pomodoroStore.pauseTimer();
+                  } else {
+                    pomodoroStore.startTimer();
+                  }
                 }}
+                disabled={pomodoroStore.isLoading}
               >
                 {pomodoroStore.isRunning ? (
                   <>
@@ -236,14 +383,27 @@ export default function Home() {
                   </>
                 )}
               </Button>
-              <Button className="flex items-center gap-3">
+              <Button
+                className="flex items-center gap-3"
+                onClick={() => pomodoroStore.resetTimer()}
+                disabled={pomodoroStore.isLoading}
+              >
                 <CloudLightning />
-                <span>Extend Task</span>
+                <span>Reset Timer</span>
               </Button>
-              <Button className="flex items-center gap-3">
-                <Check />
-                <span>Finish Task</span>
-              </Button>
+              {pomodoroStore.currentTaskId && (
+                <Button
+                  className="flex items-center gap-3"
+                  onClick={() => {
+                    if (pomodoroStore.currentTaskId) {
+                      tasksStore.completeTask(pomodoroStore.currentTaskId);
+                    }
+                  }}
+                >
+                  <Check />
+                  <span>Finish Task</span>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -275,13 +435,61 @@ export default function Home() {
           <CardContent>
             <div className="flex justify-between items-center">
               <span className="font-bold">Tasks</span>
-              <Button>
-                <PlusCircle />
-                Add New Task
-              </Button>
+              <div className="flex gap-2">
+                {tasksStore.sessions.map((session) => (
+                  <Button
+                    key={session.id}
+                    variant={tasksStore.currentSession?.id === session.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={async () => {
+                      await tasksStore.loadSession(session.id);
+                      pomodoroStore.setSession(session.id);
+                    }}
+                  >
+                    {session.description}
+                  </Button>
+                ))}
+              </div>
             </div>
-            <div className="h-96">
-              <TaskScheduler />
+            <div className="h-96 overflow-y-auto">
+              {tasksStore.currentSession && tasksStore.currentSession.tasks ? (
+                <div className="space-y-2">
+                  {tasksStore.currentSession.tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`p-3 border rounded-lg ${
+                        task.completed ? "bg-green-50 border-green-200" : "bg-white"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className={task.completed ? "line-through text-gray-500" : ""}>
+                          {task.name}
+                        </span>
+                        <div className="flex gap-2">
+                          <span className="text-sm text-gray-500">
+                            {task.estimated_completion_time} min
+                          </span>
+                          {!task.completed && (
+                            <Button
+                              size="sm"
+                              onClick={() => tasksStore.completeTask(task.id)}
+                            >
+                              <Check className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Category: {task.category}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  {tasksStore.currentSession ? "Loading tasks..." : "Select a session to view tasks"}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -289,9 +497,25 @@ export default function Home() {
           <CardContent>
             <p className="font-bold">Checklist</p>
             <div className="flex flex-col gap-1">
-              {tasks.map((task, index) => (
-                <TaskCheckItem task={task} key={index} />
-              ))}
+              {tasksStore.currentSession?.tasks ? (
+                tasksStore.currentSession.tasks.map((task) => (
+                  <div key={task.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={task.completed}
+                      onCheckedChange={() => {
+                        if (!task.completed) {
+                          tasksStore.completeTask(task.id);
+                        }
+                      }}
+                    />
+                    <span className={task.completed ? "line-through text-gray-500" : ""}>
+                      {task.name}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <span className="text-gray-500">No tasks available</span>
+              )}
             </div>
           </CardContent>
         </Card>

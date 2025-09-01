@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
-    from ..models import PomodoroSession  # noqa: F401
+    from ..models import PomodoroSession, ActivePomodoroSession  # noqa: F401
 
 
 class User(SQLModel, table=True):
@@ -15,3 +15,4 @@ class User(SQLModel, table=True):
     password: str
 
     sessions: List["PomodoroSession"] = Relationship(back_populates="user")
+    active_session: Optional["ActivePomodoroSession"] = Relationship(back_populates="user")
