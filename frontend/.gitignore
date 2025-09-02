@@ -6,3 +6,9 @@
 /build/
 
 .env
+
+# Log files
+tauri_dev.log
+
+# Vite temporary files
+vite.config.ts.timestamp-*.mjs
