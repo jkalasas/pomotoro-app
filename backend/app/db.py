@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlmodel import SQLModel, create_engine, Session, select
 from app.config import settings
+from app.models import PomodoroSession
 
 DATABASE_URL = settings.database_url
 engine = create_engine(
@@ -17,6 +18,20 @@ def get_session():
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+
+    # Migrate existing sessions to add name field if missing
+    with Session(engine) as session:
+        try:
+            # Check if name column exists by trying to query it
+            session.exec(select(PomodoroSession).where(PomodoroSession.name == "")).first()
+        except Exception:
+            # If there's an error, the column might not exist, try to add it
+            try:
+                session.exec("ALTER TABLE session ADD COLUMN name TEXT DEFAULT ''")
+                session.commit()
+                print("Added name column to session table")
+            except Exception as e:
+                print(f"Could not add name column: {e}")
 
     # seed basic categories if empty
     from .models import Category

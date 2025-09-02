@@ -110,16 +110,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
         session_id: number;
         pomodoros_completed: number;
       };
-      set((state) => ({
+      set({
         time: activeSession.time_remaining,
-        // Only set maxTime if it's not already set (to preserve original duration)
-        maxTime: state.maxTime > 0 ? state.maxTime : activeSession.time_remaining,
+        maxTime: activeSession.time_remaining, // Reset maxTime to current session's duration
         isRunning: activeSession.is_running,
         phase: activeSession.phase,
         currentTaskId: activeSession.current_task_id,
         sessionId: activeSession.session_id,
         pomodorosCompleted: activeSession.pomodoros_completed,
-      }));
+      });
     } catch (error) {
       console.error("Failed to load active session:", error);
       // Reset to default state if no active session

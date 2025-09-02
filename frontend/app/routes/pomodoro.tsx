@@ -19,6 +19,7 @@ import { usePomodoroStore } from "~/stores/pomodoro";
 import { useEffect, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import { apiClient } from "~/lib/api";
+import { SessionSelector } from "~/components/pomotoro/session-selector";
 
 const chartData = [
   { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
@@ -107,6 +108,10 @@ export default function Pomodoro() {
 
   return (
     <main className="container mx-auto">
+      <div className="flex justify-center mb-4">
+        <SessionSelector />
+      </div>
+
       <PomodoroTimer time={time} endTime={maxTime} />
 
       <div className="text-center mb-4">

@@ -12,6 +12,7 @@ export interface Task {
 
 export interface Session {
   id: number;
+  name: string;
   description: string;
   focus_duration: number;
   short_break_duration: number;
@@ -40,6 +41,7 @@ interface TaskState {
       estimated_completion_time: number;
     }>;
   }) => Promise<Session>;
+  updateSession: (sessionId: number, updates: { name?: string; description?: string }) => Promise<void>;
   completeTask: (taskId: number) => Promise<void>;
   setCurrentSession: (session: Session | null) => void;
 }
@@ -81,6 +83,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       return session;
     } catch (error) {
       console.error("Failed to create session:", error);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateSession: async (sessionId: number, updates) => {
+    set({ isLoading: true });
+    try {
+      await apiClient.updateSession(sessionId, updates);
+      await get().loadSessions(); // Refresh sessions list
+      // If this is the current session, reload it
+      const currentSession = get().currentSession;
+      if (currentSession && currentSession.id === sessionId) {
+        await get().loadSession(sessionId);
+      }
+    } catch (error) {
+      console.error("Failed to update session:", error);
       throw error;
     } finally {
       set({ isLoading: false });

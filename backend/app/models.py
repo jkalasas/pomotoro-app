@@ -26,6 +26,7 @@ class Category(SQLModel, table=True):
 class PomodoroSession(SQLModel, table=True):
     __tablename__ = "session"
     id: Optional[int] = SQLField(default=None, primary_key=True)
+    name: str = SQLField(default="")
     description: str
     focus_duration: int
     short_break_duration: int

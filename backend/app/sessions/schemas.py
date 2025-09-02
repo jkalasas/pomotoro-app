@@ -16,6 +16,7 @@ class TaskResponse(BaseModel):
 
 
 class SessionCreate(BaseModel):
+    name: Optional[str] = None
     description: str
     pomodoro_config: PomodoroConfig
     tasks: List[TaskResponse]
@@ -23,6 +24,7 @@ class SessionCreate(BaseModel):
 
 class SessionPublic(BaseModel):
     id: int
+    name: str
     description: str
     focus_duration: int
     short_break_duration: int
@@ -44,6 +46,7 @@ class SessionWithTasksPublic(SessionPublic):
 
 
 class SessionUpdate(BaseModel):
+    name: Optional[str] = None
     description: Optional[str] = None
 
 

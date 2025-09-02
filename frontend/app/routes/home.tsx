@@ -11,14 +11,17 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import {
   Check,
   CloudLightning,
+  Edit2,
   FilePenLine,
   Pause,
   Play,
   Plus,
   PlusCircle,
+  X,
 } from "lucide-react";
 import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -27,6 +30,7 @@ import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
 import { SessionInfoForm } from "~/components/pomotoro/forms/SessionInfoForm";
 import type { Session } from "~/types/session";
 import { TaskDifficulty } from "~/types/task";
+import type { Task } from "~/stores/tasks";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +67,27 @@ interface RecommendationResponse {
   total_estimated_time: number;
 }
 
+interface GeneratedSessionInfo {
+  sessionDetails: {
+    title: string;
+    description: string;
+  };
+  pomodoroSetup: {
+    duration: number;
+    shortBreakTime: number;
+    longBreakTime: number;
+    pomodorosBeforeLongBreak: number;
+  };
+  tasks: Array<{
+    id: string;
+    name: string;
+    description: string;
+    difficulty: TaskDifficulty;
+    pomodoros: number;
+    category: string;
+  }>;
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Pomotoro" },
@@ -78,7 +103,9 @@ export default function Home() {
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [sessionInfo, setSessionInfo] = useState<Session>();
+  const [sessionInfo, setSessionInfo] = useState<GeneratedSessionInfo>();
+  const [editingSessionName, setEditingSessionName] = useState(false);
+  const [sessionNameInput, setSessionNameInput] = useState("");
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -157,47 +184,37 @@ export default function Home() {
       // First generate recommendations
       const recommendations = await apiClient.getRecommendations(projectDetails) as RecommendationResponse;
       
-      const result = await tasksStore.createSession({
-        description: projectDetails,
-        pomodoro_config: recommendations.pomodoro_config,
-        tasks: recommendations.generated_tasks.map((task: GeneratedTask) => ({
-          name: task.name,
-          category: task.category,
-          estimated_completion_time: task.estimated_completion_time,
-        })),
-      });
-
-      // Convert backend format to frontend format for display
+      // Convert backend format to frontend format for display (don't create session yet)
       const sessionInfo = {
         sessionDetails: {
           title: projectDetails,
           description: projectDetails,
         },
         pomodoroSetup: {
-          duration: result.focus_duration,
-          shortBreakTime: result.short_break_duration,
-          longBreakTime: result.long_break_duration,
-          pomodorosBeforeLongBreak: result.long_break_per_pomodoros,
+          duration: recommendations.pomodoro_config.focus_duration,
+          shortBreakTime: recommendations.pomodoro_config.short_break_duration,
+          longBreakTime: recommendations.pomodoro_config.long_break_duration,
+          pomodorosBeforeLongBreak: recommendations.pomodoro_config.long_break_per_pomodoros,
         },
-        tasks: result.tasks.map(task => ({
-          id: task.id.toString(),
+        tasks: recommendations.generated_tasks.map((task: GeneratedTask, index: number) => ({
+          id: `temp-${index}`,
           name: task.name,
           description: "",
           difficulty: TaskDifficulty.MEDIUM,
-          pomodoros: Math.ceil(task.estimated_completion_time / result.focus_duration),
+          pomodoros: Math.ceil(task.estimated_completion_time / recommendations.pomodoro_config.focus_duration),
           category: task.category,
         })),
       };
 
       setSessionInfo(sessionInfo);
 
-      toast.success("Session created successfully!", {
+      toast.success("Tasks generated successfully!", {
         id: toastId,
         duration: 5000,
       });
     } catch (error) {
-      console.error("Failed to create session:", error);
-      toast.error("Failed to create session", {
+      console.error("Failed to generate tasks:", error);
+      toast.error("Failed to generate tasks", {
         id: toastId,
         duration: 5000,
       });
@@ -206,7 +223,14 @@ export default function Home() {
   };
 
   const createSessionFromGenerated = async () => {
-    if (!sessionInfo || !authStore.user) return;
+    if (!sessionInfo || !authStore.user || isGenerating) return;
+
+    // Check if a session with this description already exists
+    const existingSession = tasksStore.sessions.find(s => s.description === sessionInfo.sessionDetails.title);
+    if (existingSession) {
+      toast.error("A session with this name already exists");
+      return;
+    }
 
     try {
       const sessionData = {
@@ -219,7 +243,7 @@ export default function Home() {
         },
         tasks: sessionInfo.tasks.map((task) => ({
           name: task.name,
-          category: "General", // Default category
+          category: task.category,
           estimated_completion_time: task.pomodoros * sessionInfo.pomodoroSetup.duration,
         })),
       };
@@ -228,11 +252,37 @@ export default function Home() {
       tasksStore.setCurrentSession(createdSession);
       await pomodoroStore.setSession(createdSession.id);
       setIsSessionDialogOpen(false);
+      setSessionInfo(undefined); // Clear the generated session info
       toast.success("Session created and started!");
     } catch (error) {
       console.error("Failed to create session:", error);
       toast.error("Failed to create session");
     }
+  };
+
+  const startEditingSessionName = () => {
+    if (tasksStore.currentSession) {
+      setSessionNameInput(tasksStore.currentSession.name);
+      setEditingSessionName(true);
+    }
+  };
+
+  const saveSessionName = async () => {
+    if (tasksStore.currentSession && sessionNameInput.trim()) {
+      try {
+        await tasksStore.updateSession(tasksStore.currentSession.id, { name: sessionNameInput.trim() });
+        setEditingSessionName(false);
+        toast.success("Session name updated!");
+      } catch (error) {
+        console.error("Failed to update session name:", error);
+        toast.error("Failed to update session name");
+      }
+    }
+  };
+
+  const cancelEditingSessionName = () => {
+    setEditingSessionName(false);
+    setSessionNameInput("");
   };
 
   return (
@@ -324,14 +374,53 @@ export default function Home() {
             type="button"
             className="mt-3 w-full"
             onClick={createSessionFromGenerated}
+            disabled={!sessionInfo || isGenerating}
           >
             Create Session from Tasks
           </Button>
         </DialogContent>
       </Dialog>
       <div className="flex justify-between w-full">
-        <span className="font-bold">Coding Session</span>
-        <span className="font-medium">2 hours allotted</span>
+        <div className="flex items-center gap-2">
+          {editingSessionName ? (
+            <>
+              <Input
+                value={sessionNameInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSessionNameInput(e.target.value)}
+                className="font-bold text-lg"
+                placeholder="Session name"
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') saveSessionName();
+                  if (e.key === 'Escape') cancelEditingSessionName();
+                }}
+                autoFocus
+              />
+              <Button size="sm" variant="ghost" onClick={saveSessionName}>
+                <Check className="size-4" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={cancelEditingSessionName}>
+                <X className="size-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="font-bold">
+                {tasksStore.currentSession?.name || "No Session Selected"}
+              </span>
+              {tasksStore.currentSession && (
+                <Button size="sm" variant="ghost" onClick={startEditingSessionName}>
+                  <Edit2 className="size-4" />
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+        <span className="font-medium">
+          {tasksStore.currentSession 
+            ? `${Math.floor(tasksStore.currentSession.tasks.reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60)} hours allotted`
+            : "0 hours allotted"
+          }
+        </span>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-5">
         <Card className="row-span-3">
@@ -446,7 +535,7 @@ export default function Home() {
                       pomodoroStore.setSession(session.id);
                     }}
                   >
-                    {session.description}
+                    {session.name || session.description}
                   </Button>
                 ))}
               </div>

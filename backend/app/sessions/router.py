@@ -27,7 +27,28 @@ def create_session(
     session_data: SessionCreate,
     current_user: ActiveUserDep,
 ):
+    # Generate a name if not provided
+    session_name = session_data.name
+    if not session_name:
+        # Generate a name based on the description and tasks
+        task_names = [task.name for task in session_data.tasks]
+        prompt = f"Generate a concise, descriptive name for a Pomodoro session with description: '{session_data.description}' and tasks: {', '.join(task_names)}. Keep it under 50 characters."
+        
+        try:
+            import google.generativeai as genai
+            from ..config import settings
+            
+            genai.configure(api_key=settings.gemini_api_key)
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(prompt)
+            session_name = response.text.strip().strip('"').strip("'")[:50]
+        except Exception as e:
+            print(f"Failed to generate session name: {e}")
+            # Fallback to a generic name
+            session_name = f"Session {len(session_data.tasks)} tasks"
+    
     db_session = PomodoroSession(
+        name=session_name,
         description=session_data.description,
         user_id=current_user.id,
         **session_data.pomodoro_config.model_dump()
@@ -69,6 +90,7 @@ def create_session(
 
     return SessionWithTasksPublic(
         id=db_session.id,
+        name=db_session.name,
         description=db_session.description,
         focus_duration=db_session.focus_duration,
         short_break_duration=db_session.short_break_duration,
@@ -86,7 +108,20 @@ def read_sessions(
     sessions = db.exec(
         select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
     ).all()
-    return sessions
+    
+    # Convert to SessionPublic format to ensure all fields are included
+    return [
+        SessionPublic(
+            id=session.id,
+            name=session.name,
+            description=session.description,
+            focus_duration=session.focus_duration,
+            short_break_duration=session.short_break_duration,
+            long_break_duration=session.long_break_duration,
+            long_break_per_pomodoros=session.long_break_per_pomodoros,
+        )
+        for session in sessions
+    ]
 
 
 @router.post("/active", response_model=ActiveSessionPublic)
@@ -255,6 +290,7 @@ def read_session(
 
     return SessionWithTasksPublic(
         id=db_session.id,
+        name=db_session.name,
         description=db_session.description,
         focus_duration=db_session.focus_duration,
         short_break_duration=db_session.short_break_duration,
@@ -276,10 +312,22 @@ def update_session(
         raise HTTPException(status_code=404, detail="Session not found")
     if session_update.description is not None:
         db_session.description = session_update.description
+    if session_update.name is not None:
+        db_session.name = session_update.name
     db.add(db_session)
     db.commit()
     db.refresh(db_session)
-    return db_session
+    
+    # Return in SessionPublic format to ensure consistency
+    return SessionPublic(
+        id=db_session.id,
+        name=db_session.name,
+        description=db_session.description,
+        focus_duration=db_session.focus_duration,
+        short_break_duration=db_session.short_break_duration,
+        long_break_duration=db_session.long_break_duration,
+        long_break_per_pomodoros=db_session.long_break_per_pomodoros,
+    )
 
 
 @router.delete("/{session_id}", response_model=dict)

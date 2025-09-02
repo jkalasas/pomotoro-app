@@ -4,6 +4,7 @@ import type { Task } from "./task";
 export interface SessionDetails {
   title: string;
   description?: string;
+  name?: string;
 }
 
 export interface Session {
