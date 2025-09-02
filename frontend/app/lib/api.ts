@@ -169,6 +169,11 @@ class ApiClient {
       body: JSON.stringify({ description }),
     });
   }
+
+  // Daily progress
+  async getDailyProgress() {
+    return this.request('/sessions/daily-progress');
+  }
 }
 
 export const apiClient = new ApiClient();

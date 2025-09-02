@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
+import { DailyProgress } from "~/components/pomotoro/daily-progress";
 import { Checkbox } from "~/components/ui/checkbox";
 import TaskCheckItem from "~/components/pomotoro/tasks/task-check-item";
 import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
@@ -498,26 +499,7 @@ export default function Home() {
         </Card>
         <Card className="row-span-2 col-span-2">
           <CardContent>
-            <div className="flex justify-between items-center">
-              <span className="font-bold">Daily Progress</span>
-              <Button variant="ghost">
-                <FilePenLine className="size-6" />
-              </Button>
-            </div>
-            <div className="flex justify-between items-center px-5 flex-col lg:flex-row gap-3">
-              <div className="flex flex-col items-center justify-center">
-                <span>Rests</span>
-                <span className="text-2xl font-bold">50</span>
-                <span>Minutes</span>
-              </div>
-              <DailyGoalChart sessions={1} targetSessions={1} />
-              <div className="flex flex-col items-center justify-center">
-                <span>Finished</span>
-                <span className="text-2xl font-bold">8</span>
-                <span>Tasks</span>
-              </div>
-            </div>
-            <p className="text-center">Completed: 2 sessions</p>
+            <DailyProgress />
           </CardContent>
         </Card>
         <Card className="row-span-3 col-span-2">

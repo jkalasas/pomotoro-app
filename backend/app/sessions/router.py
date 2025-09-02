@@ -266,6 +266,86 @@ def stop_active_session(
     return {"message": "Active session stopped successfully"}
 
 
+@router.get("/daily-progress", response_model=dict)
+def get_daily_progress(
+    current_user: ActiveUserDep,
+    db: SessionDep
+):
+    """Get daily progress for the current user."""
+    from datetime import date, datetime, time
+    
+    # Get today's date range
+    today = date.today()
+    today_start = datetime.combine(today, time.min)
+    today_end = datetime.combine(today, time.max)
+    
+    # 1. Count completed tasks today
+    completed_tasks_query = select(Task).where(
+        Task.completed == True,
+        Task.completed_at >= today_start,
+        Task.completed_at <= today_end
+    )
+    
+    # Get tasks that belong to user's sessions
+    user_sessions = select(PomodoroSession.id).where(PomodoroSession.user_id == current_user.id)
+    completed_tasks_query = completed_tasks_query.where(Task.session_id.in_(user_sessions))
+    
+    completed_tasks_result = db.exec(completed_tasks_query)
+    completed_tasks = len(list(completed_tasks_result))
+    
+    # 2. Count completed sessions today
+    # A session is considered completed if all its tasks are completed
+    # and the last task was completed today
+    completed_sessions = 0
+    
+    # Get all user's sessions
+    user_sessions_query = select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    user_sessions_result = db.exec(user_sessions_query)
+    
+    for session in user_sessions_result:
+        # Get all tasks for this session
+        session_tasks_query = select(Task).where(Task.session_id == session.id)
+        session_tasks = list(db.exec(session_tasks_query))
+        
+        if not session_tasks:
+            continue
+            
+        # Check if all tasks are completed
+        all_completed = all(task.completed for task in session_tasks)
+        
+        if all_completed:
+            # Check if the last completed task was today
+            completed_tasks_today = [
+                task for task in session_tasks 
+                if task.completed_at and today_start <= task.completed_at <= today_end
+            ]
+            
+            if completed_tasks_today:
+                # Find the most recent completion time
+                latest_completion = max(task.completed_at for task in completed_tasks_today)
+                if today_start <= latest_completion <= today_end:
+                    completed_sessions += 1
+    
+    # 3. Calculate rest time (estimate based on completed pomodoros)
+    # For each completed task, assume some break time
+    # This is a rough estimate - in a real app, you'd track actual break times
+    rest_time_minutes = completed_tasks * 5  # 5 minutes break per completed task
+    
+    # 4. Daily goal sessions (hardcoded for now, could be made configurable)
+    daily_goal_sessions = 8
+    
+    # 5. Today's date
+    date_str = today.isoformat()
+    
+    return {
+        "rest_time_minutes": rest_time_minutes,
+        "daily_goal_sessions": daily_goal_sessions,
+        "completed_tasks": completed_tasks,
+        "completed_sessions": completed_sessions,
+        "date": date_str
+    }
+
+
 @router.get("/{session_id}", response_model=SessionWithTasksPublic)
 def read_session(
     db: SessionDep,

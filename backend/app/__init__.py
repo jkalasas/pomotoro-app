@@ -34,10 +34,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:1420",  # Tauri dev server
+        "http://localhost:1421",  # Updated Tauri dev server
         "https://tauri.localhost",  # Tauri production
         "tauri://localhost",  # Tauri custom protocol
         "http://localhost:3000",  # Alternative dev port
         "http://127.0.0.1:1420",  # Alternative localhost
+        "http://127.0.0.1:1421",  # Updated alternative localhost
         "http://127.0.0.1:3000",  # Alternative localhost
         "*",
     ],

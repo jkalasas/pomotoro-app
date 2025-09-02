@@ -41,18 +41,25 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const authStore = useAuthStore();
+  const { token, user, loadUser } = useAuthStore();
   const pomodoroStore = usePomodoroStore();
   const initWindow = useWindowStore((state) => state.initWindow);
 
   const [tray, setTray] = useState<TrayIcon>();
 
   useEffect(() => {
-    // Load user on app start
-    if (authStore.token && !authStore.user) {
-      authStore.loadUser();
-    }
+    // Load user on app start if we have a token but no user
+    const initializeAuth = async () => {
+      if (token && !user) {
+        try {
+          await loadUser();
+        } catch (error) {
+          console.error("Failed to load user on app start:", error);
+        }
+      }
+    };
 
+    initializeAuth();
     initWindow();
 
     (async () => {
@@ -66,10 +73,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       setTray(await TrayIcon.new(trayOptions));
     })();
-  }, [authStore, pomodoroStore, initWindow]);
+  }, [token, user, loadUser, initWindow]);
 
   // Show auth form if not authenticated
-  if (!authStore.user && !authStore.isLoading) {
+  if (!user && !useAuthStore.getState().token) {
     return (
       <html lang="en">
         <head>

@@ -115,6 +115,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       if (currentSession) {
         await get().loadSession(currentSession.id);
       }
+      
+      // Refresh daily progress after completing a task
+      // Import and call the daily progress refresh function
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('task-completed'));
+      }
     } catch (error) {
       console.error("Failed to complete task:", error);
       throw error;
