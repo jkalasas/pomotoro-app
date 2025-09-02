@@ -55,6 +55,10 @@ export default function Pomodoro() {
     loadActiveSession,
     isLoading,
     setTime,
+    showRestOverlay,
+    setShowRestOverlay,
+    skipRest,
+    updateTimer,
   } = usePomodoroStore();
 
   const window = useWindowStore();
@@ -106,6 +110,16 @@ export default function Pomodoro() {
     }
   }, [time, isRunning]);
 
+  // Handle rest overlay display
+  useEffect(() => {
+    const isBreakPhase = phase === "short_break" || phase === "long_break";
+    const shouldShowOverlay = isBreakPhase && isRunning && time > 0;
+    
+    if (shouldShowOverlay !== showRestOverlay) {
+      setShowRestOverlay(shouldShowOverlay);
+    }
+  }, [phase, isRunning, time, showRestOverlay, setShowRestOverlay]);
+
   return (
     <main className="container mx-auto">
       <div className="flex justify-center mb-4">
@@ -119,6 +133,11 @@ export default function Pomodoro() {
         {currentTaskId && (
           <p className="text-sm text-muted-foreground">
             Task ID: {currentTaskId}
+          </p>
+        )}
+        {showRestOverlay && (
+          <p className="text-sm text-orange-600 font-medium mt-1">
+            🍅 Rest Overlay Active
           </p>
         )}
       </div>
@@ -136,16 +155,69 @@ export default function Pomodoro() {
         <Button type="button" onClick={resetTimer} disabled={isLoading}>
           <RefreshCw className="size-4" />
         </Button>
-        <Button
-          type="button"
-          onClick={() => {
-            // For testing - set time to 10 seconds
-            // This would need to be updated to use the API
-          }}
-          disabled={isLoading}
-        >
-          <Bug className="size-4" />
-        </Button>
+      </div>
+
+      {/* Test Section */}
+      <div className="border-t pt-4 mt-6">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold mb-2">Test Features</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Use these buttons to test the invasive rest overlay functionality
+          </p>
+        </div>
+        
+        <div className="flex justify-center gap-2">
+          <Button
+            type="button"
+            onClick={async () => {
+              // For testing - simulate entering break phase
+              setShowRestOverlay(true);
+              // Also update backend to reflect break state
+              await updateTimer({
+                phase: "short_break",
+                time_remaining: 300, // 5 minutes
+              });
+            }}
+            disabled={isLoading}
+            variant="outline"
+            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+          >
+            <Bug className="size-4 mr-2" />
+            Test Rest Overlay (5min)
+          </Button>
+          
+          <Button
+            type="button"
+            onClick={async () => {
+              // Test with different duration
+              setShowRestOverlay(true);
+              await updateTimer({
+                phase: "long_break",
+                time_remaining: 900, // 15 minutes
+              });
+            }}
+            disabled={isLoading}
+            variant="outline"
+            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+          >
+            <Bug className="size-4 mr-2" />
+            Test Long Break (15min)
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => {
+              // Force hide overlay for testing
+              setShowRestOverlay(false);
+            }}
+            disabled={isLoading}
+            variant="outline"
+            className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+          >
+            <Bug className="size-4 mr-2" />
+            Force Hide Overlay
+          </Button>
+        </div>
       </div>
     </main>
   );

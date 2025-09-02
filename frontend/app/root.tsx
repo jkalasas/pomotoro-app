@@ -15,7 +15,6 @@ import Titlebar from "./components/pomotoro/titlebar";
 import { useWindowStore } from "./stores/window";
 import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
-import { usePomodoroStore } from "./stores/pomodoro";
 import {
   SidebarInset,
   SidebarProvider,
@@ -42,7 +41,6 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { token, user, loadUser } = useAuthStore();
-  const pomodoroStore = usePomodoroStore();
   const initWindow = useWindowStore((state) => state.initWindow);
 
   const [tray, setTray] = useState<TrayIcon>();
@@ -111,6 +109,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <main>{children}</main>
           </SidebarInset>
         </SidebarProvider>
+        
         <Toaster />
         <ScrollRestoration />
         <Scripts />

@@ -21,6 +21,7 @@ import {
   Play,
   Plus,
   PlusCircle,
+  Timer,
   X,
 } from "lucide-react";
 import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
@@ -291,6 +292,13 @@ export default function Home() {
       <div className="w-full flex justify-between">
         <SidebarTrigger />
         <div className="flex justify-end gap-3">
+          <Link to="/pomodoro">
+            <Button variant="outline" className="inline-flex items-center gap-2">
+              <Timer />
+              <span>Pomodoro Timer</span>
+            </Button>
+          </Link>
+          
           {sessionInfo && (
             <Button
               type="button"
@@ -447,6 +455,12 @@ export default function Home() {
                 ? "Short break"
                 : "Long break"}
             </p>
+            
+            {pomodoroStore.showRestOverlay && (
+              <p className="text-center text-sm text-orange-600 font-medium">
+                🍅 Rest Overlay Active
+              </p>
+            )}
 
             <div className="mt-3 flex flex-col gap-3">
               <Button
@@ -494,6 +508,64 @@ export default function Home() {
                   <span>Finish Task</span>
                 </Button>
               )}
+              
+              {/* Test buttons for rest overlay */}
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm text-muted-foreground mb-2 text-center">Test Features</p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                    onClick={async () => {
+                      // Test rest overlay with 5 minutes - create new overlay window
+                      await pomodoroStore.updateTimer({
+                        phase: "short_break",
+                        time_remaining: 300, // 5 minutes
+                      });
+                      pomodoroStore.setShowRestOverlay(true);
+                    }}
+                    disabled={pomodoroStore.isLoading}
+                  >
+                    <Timer />
+                    <span>Test Rest Overlay (5min)</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                    onClick={async () => {
+                      // Test long break overlay - create new overlay window
+                      await pomodoroStore.updateTimer({
+                        phase: "long_break",
+                        time_remaining: 900, // 15 minutes
+                      });
+                      pomodoroStore.setShowRestOverlay(true);
+                    }}
+                    disabled={pomodoroStore.isLoading}
+                  >
+                    <Timer />
+                    <span>Test Long Break (15min)</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+                    onClick={async () => {
+                      // Force close overlay window
+                      const windowStore = useWindowStore.getState();
+                      await windowStore.closeOverlayWindow();
+                      pomodoroStore.setShowRestOverlay(false);
+                    }}
+                    disabled={pomodoroStore.isLoading}
+                  >
+                    <X />
+                    <span>Force Hide Overlay</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

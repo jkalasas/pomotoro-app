@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiClient } from "~/lib/api";
+import { useWindowStore } from "./window";
 
 export interface PomodoroState {
   time: number;
@@ -10,6 +11,7 @@ export interface PomodoroState {
   sessionId: number | null;
   pomodorosCompleted: number;
   isLoading: boolean;
+  showRestOverlay: boolean;
   startTimer: () => Promise<void>;
   pauseTimer: () => Promise<void>;
   resetTimer: () => Promise<void>;
@@ -23,6 +25,8 @@ export interface PomodoroState {
     current_task_id?: number;
     pomodoros_completed?: number;
   }) => Promise<void>;
+  setShowRestOverlay: (show: boolean) => void;
+  skipRest: () => Promise<void>;
 }
 
 export const usePomodoroStore = create<PomodoroState>((set, get) => ({
@@ -34,6 +38,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
   sessionId: null,
   pomodorosCompleted: 0,
   isLoading: false,
+  showRestOverlay: false,
 
   startTimer: async () => {
     set({ isLoading: true });
@@ -141,6 +146,39 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
       await get().loadActiveSession();
     } catch (error) {
       console.error("Failed to update timer:", error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  setShowRestOverlay: (show: boolean) => {
+    set({ showRestOverlay: show });
+    if (show) {
+      // Create overlay window when showing
+      const { time } = get();
+      useWindowStore.getState().createOverlayWindow(time);
+    } else {
+      // Close overlay window when hiding
+      useWindowStore.getState().closeOverlayWindow();
+    }
+  },
+
+  skipRest: async () => {
+    set({ isLoading: true });
+    try {
+      // Close the overlay window
+      await useWindowStore.getState().closeOverlayWindow();
+      
+      // Skip to next phase (usually back to focus)
+      await apiClient.updateActiveSession({
+        phase: "focus",
+        is_running: false,
+        time_remaining: 25 * 60, // Default 25 minute focus session
+      });
+      set({ showRestOverlay: false });
+      await get().loadActiveSession();
+    } catch (error) {
+      console.error("Failed to skip rest:", error);
     } finally {
       set({ isLoading: false });
     }
