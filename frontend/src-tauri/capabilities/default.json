@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": [
-    "main"
+    "main",
+    "*"
   ],
   "permissions": [
     "core:default",
@@ -17,6 +18,8 @@
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top",
     "core:window:allow-set-fullscreen",
+    "core:window:allow-maximize",
+    "core:window:allow-set-focus",
     "core:window:allow-set-size",
     "core:window:allow-toggle-maximize",
     "core:window:allow-set-position",
@@ -25,6 +28,9 @@
     "core:webview:allow-webview-close",
     "core:webview:allow-webview-position",
     "core:webview:allow-webview-size",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
     "notification:default",
     "store:default"
   ]

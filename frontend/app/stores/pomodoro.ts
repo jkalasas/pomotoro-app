@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { listen } from "@tauri-apps/api/event";
 import { apiClient } from "~/lib/api";
 import { useWindowStore } from "./window";
 
@@ -29,7 +30,16 @@ export interface PomodoroState {
   skipRest: () => Promise<void>;
 }
 
-export const usePomodoroStore = create<PomodoroState>((set, get) => ({
+export const usePomodoroStore = create<PomodoroState>((set, get) => {
+  // Set up event listeners for overlay communication
+  if (typeof window !== "undefined") {
+    listen('skip-rest', () => {
+      console.log('Received skip-rest event from overlay');
+      get().skipRest();
+    });
+  }
+
+  return {
   time: 0,
   maxTime: 0,
   isRunning: false,
@@ -152,35 +162,68 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
   },
 
   setShowRestOverlay: (show: boolean) => {
-    set({ showRestOverlay: show });
-    if (show) {
-      // Create overlay window when showing
+    const currentState = get();
+    console.log('setShowRestOverlay called:', { 
+      show, 
+      currentState: currentState.showRestOverlay,
+      currentTime: currentState.time 
+    });
+    
+    if (show && !currentState.showRestOverlay) {
+      // Create overlay window when showing (only if not already showing)
       const { time } = get();
-      useWindowStore.getState().createOverlayWindow(time);
+      console.log('Creating overlay window with time:', time);
+      set({ showRestOverlay: true });
+      
+      try {
+        useWindowStore.getState().createOverlayWindow(time);
+      } catch (error) {
+        console.error('Failed to create overlay window:', error);
+        // Reset state if creation fails
+        set({ showRestOverlay: false });
+      }
+    } else if (!show && currentState.showRestOverlay) {
+      // Close overlay window when hiding (only if currently showing)
+      console.log('Closing overlay window');
+      set({ showRestOverlay: false });
+      
+      try {
+        useWindowStore.getState().closeOverlayWindow();
+      } catch (error) {
+        console.error('Failed to close overlay window:', error);
+      }
     } else {
-      // Close overlay window when hiding
-      useWindowStore.getState().closeOverlayWindow();
+      console.log('No action needed - state already matches:', { show, current: currentState.showRestOverlay });
     }
   },
 
   skipRest: async () => {
+    console.log('skipRest called');
     set({ isLoading: true });
     try {
+      // First, update the overlay state
+      set({ showRestOverlay: false });
+      
       // Close the overlay window
+      console.log('Closing overlay window from skipRest');
       await useWindowStore.getState().closeOverlayWindow();
       
       // Skip to next phase (usually back to focus)
+      console.log('Updating session to skip rest');
       await apiClient.updateActiveSession({
         phase: "focus",
         is_running: false,
         time_remaining: 25 * 60, // Default 25 minute focus session
       });
-      set({ showRestOverlay: false });
+      
+      console.log('Loading active session after skip');
       await get().loadActiveSession();
+      console.log('skipRest completed successfully');
     } catch (error) {
       console.error("Failed to skip rest:", error);
     } finally {
       set({ isLoading: false });
     }
   },
-}));
+  };
+});

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
 import { useWindowStore } from "~/stores/window";
 import { usePomodoroStore } from "~/stores/pomodoro";
 
@@ -11,6 +13,19 @@ export default function Overlay() {
 
   // Extract minutes from time remaining (assuming timeRemaining is in seconds)
   const minutes = Math.ceil(timeRemaining / 60);
+
+  // Disable scrolling for this overlay page only
+  useEffect(() => {
+    // Disable scrolling
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
 
   // Handle escape key
   useEffect(() => {
@@ -40,68 +55,74 @@ export default function Overlay() {
 
   const handleSkip = async () => {
     try {
-      // Close the overlay window
-      await closeOverlayWindow();
-      // Skip the rest in the main app
-      await skipRest();
+      // Get the current window instance (this overlay window)
+      const currentWindow = getCurrentWindow();
+      
+      // Emit event to main window to skip rest
+      await emit('skip-rest');
+      
+      // Close this overlay window
+      await currentWindow.close();
     } catch (error) {
       console.error("Failed to skip rest:", error);
+      // Fallback: try to close the window anyway
+      try {
+        const currentWindow = getCurrentWindow();
+        await currentWindow.close();
+      } catch (closeError) {
+        console.error("Failed to close overlay window:", closeError);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-orange-700 via-orange-800 to-orange-900">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,255,255,0.1),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_75%,rgba(255,255,255,0.1),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.02)_25%,transparent_25%),linear-gradient(-45deg,rgba(255,255,255,0.02)_25%,transparent_25%)] bg-[20px_20px]" />
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-100 w-screen h-screen min-h-screen">
+      {/* Top section - clean white/light background */}
+      <div className="flex-1 flex items-center justify-center w-full">
+        <div className="text-center">
+          <h1 className="text-2xl md:text-3xl font-normal text-gray-700 tracking-wide">
+            YOU DESERVE A WELL DEFINED REST
+          </h1>
+        </div>
       </div>
 
-      <div className="relative text-center text-white px-8">
-        {/* Main message */}
-        <div className="mb-12">
-          <h1 className="text-4xl md:text-6xl font-light tracking-wide leading-tight">
-            YOU DESERVE A
-          </h1>
-          <h1 className="text-4xl md:text-6xl font-light tracking-wide leading-tight">
-            WELL DEFINED REST
-          </h1>
-        </div>
-
-        {/* Timer section */}
-        <div className="flex items-center justify-center space-x-6 mb-12">
+      {/* Bottom section - brown/orange colored bar */}
+      <div className="bg-primary text-primary-foreground px-8 py-6 w-full">
+        <div className="flex items-center justify-between max-w-6xl mx-auto">
+          {/* Left side - Logo and branding */}
           <div className="flex items-center space-x-3">
-            {/* Pomodoro logo/icon */}
-            <div className="flex items-center space-x-2 text-2xl font-bold">
-              <span className="text-white">🍅</span>
-              <span>POMOTORO</span>
+            <div className="text-2xl">🍅</div>
+            <span className="text-xl font-bold tracking-wide">POMOTORO</span>
+          </div>
+
+          {/* Right side - Timer and controls */}
+          <div className="flex items-center space-x-8">
+            {/* Timer display */}
+            <div className="text-right">
+              <div className="text-6xl md:text-7xl font-light tabular-nums">
+                {minutes}
+              </div>
+              <div className="text-sm tracking-[0.2em] opacity-90 uppercase">
+                MINUTES REMAINING
+              </div>
+              <div className="text-xs opacity-75 mt-1">
+                THIS OVERLAY WILL DISAPPEAR AFTER THE TIMER
+              </div>
             </div>
+
+            {/* Skip button - minimal style */}
+            <button
+              onClick={handleSkip}
+              className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
+            >
+              Skip Rest
+            </button>
           </div>
         </div>
-
-        {/* Countdown */}
-        <div className="mb-8">
-          <div className="text-8xl md:text-[10rem] font-light mb-4 tabular-nums">
-            {minutes}
-          </div>
-          <div className="text-lg tracking-[0.3em] text-orange-200 uppercase">
-            MINUTES REMAINING
-          </div>
-          <div className="text-sm text-orange-300 mt-4 tracking-wider">
-            THIS OVERLAY WILL DISAPPEAR AFTER THE TIMER
-          </div>
-        </div>
-
-        {/* Skip button */}
-        <div className="space-y-4">
-          <button
-            onClick={handleSkip}
-            className="px-8 py-3 text-sm text-orange-200 border border-orange-400 rounded-lg hover:bg-orange-800 transition-colors"
-          >
-            Skip Rest
-          </button>
-          <p className="text-xs text-orange-400">
+        
+        {/* ESC hint at bottom */}
+        <div className="text-center mt-4">
+          <p className="text-xs opacity-60">
             Press ESC to skip this rest period
           </p>
         </div>

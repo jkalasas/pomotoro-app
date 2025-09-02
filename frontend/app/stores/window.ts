@@ -88,43 +88,84 @@ export const useWindowStore = create<WindowState>((set, get) => ({
   
   createOverlayWindow: async (timeRemaining: number) => {
     try {
-      console.log('Starting overlay window creation...');
+      console.log('Starting overlay window creation...', { timeRemaining });
       
       // Close existing overlay if it exists
       const { overlayWindow } = get();
+      console.log('Current overlay window state:', overlayWindow);
+      
       if (overlayWindow) {
+        console.log('Closing existing overlay window...');
         try {
           await overlayWindow.close();
+          console.log('Existing overlay closed successfully');
         } catch (e) {
-          console.log('Previous overlay window already closed');
+          console.log('Previous overlay window already closed or error:', e);
         }
+        // Always clear the reference
+        set({ overlayWindow: undefined });
+        console.log('Overlay reference cleared');
+        
+        // Small delay to ensure cleanup is complete
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Create a new overlay window with simpler configuration first
-      const newOverlayWindow = new WebviewWindow('rest-overlay-' + Date.now(), {
+      console.log('Creating new overlay window...');
+      // Create a new overlay window to cover entire screen with unique label
+      const windowLabel = `rest-overlay-${Date.now()}`;
+      console.log('Using window label:', windowLabel);
+      
+      const newOverlayWindow = new WebviewWindow(windowLabel, {
         url: 'overlay',
         title: 'Rest Overlay',
-        width: 800,
-        height: 600,
-        center: true,
         decorations: false,
         alwaysOnTop: true,
+        resizable: false,
+        skipTaskbar: true,
+        transparent: false,
+        maximized: true,
+        visible: true,
+        fullscreen: true,
       });
+
+      console.log('WebviewWindow instance created:', newOverlayWindow);
 
       console.log('WebviewWindow instance created');
 
       // Listen for window events
-      newOverlayWindow.once('tauri://created', () => {
+      newOverlayWindow.once('tauri://created', async () => {
         console.log('Overlay window created successfully');
-        // After successful creation, make it fullscreen
-        newOverlayWindow.setFullscreen(true);
+        try {
+          // Ensure fullscreen after creation
+          await newOverlayWindow.setFullscreen(true);
+          await newOverlayWindow.setAlwaysOnTop(true);
+          await newOverlayWindow.setFocus();
+          console.log('Overlay window configured successfully');
+        } catch (error) {
+          console.error('Failed to configure overlay window:', error);
+        }
       });
 
       newOverlayWindow.once('tauri://error', (error) => {
         console.error('Overlay window creation error:', error);
+        set({ overlayWindow: undefined });
       });
 
+      // Listen for window close events to update state
+      newOverlayWindow.once('tauri://close-requested', () => {
+        console.log('Overlay window close requested');
+        set({ overlayWindow: undefined });
+      });
+
+      // Listen for destroyed event as well
+      newOverlayWindow.once('tauri://destroyed', () => {
+        console.log('Overlay window destroyed');
+        set({ overlayWindow: undefined });
+      });
+
+      console.log('Setting overlay window in state...');
       set({ overlayWindow: newOverlayWindow });
+      console.log('Overlay window creation completed');
       return newOverlayWindow;
     } catch (error) {
       console.error('Failed to create overlay window:', error);
@@ -137,9 +178,11 @@ export const useWindowStore = create<WindowState>((set, get) => ({
     if (overlayWindow) {
       try {
         await overlayWindow.close();
-        set({ overlayWindow: undefined });
       } catch (error) {
         console.error('Failed to close overlay window:', error);
+      } finally {
+        // Always clear the overlay reference
+        set({ overlayWindow: undefined });
       }
     }
   },
