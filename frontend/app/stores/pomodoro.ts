@@ -125,9 +125,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         session_id: number;
         pomodoros_completed: number;
       };
+      // Only set maxTime if it's not already set. The backend reports the
+      // remaining time, but we must not overwrite the original session
+      // duration (maxTime) on every sync; otherwise pausing (which causes a
+      // backend update with the current remaining time) will make the chart
+      // appear full again because maxTime would equal time.
+      const currentMax = get().maxTime;
       set({
         time: activeSession.time_remaining,
-        maxTime: activeSession.time_remaining, // Reset maxTime to current session's duration
+        maxTime: currentMax && currentMax > 0 ? currentMax : activeSession.time_remaining,
         isRunning: activeSession.is_running,
         phase: activeSession.phase,
         currentTaskId: activeSession.current_task_id,
