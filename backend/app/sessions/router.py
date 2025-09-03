@@ -17,6 +17,7 @@ from .schemas import (
 from sqlmodel import select
 from ..auth.deps import ActiveUserDep
 from ..users.models import User
+from ..analytics.service import AnalyticsService
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
@@ -130,21 +131,36 @@ def start_active_session(
     session_data: ActiveSessionCreate,
     current_user: ActiveUserDep,
 ):
-    # Check if session exists and belongs to user
+    # Get the session to validate it belongs to the user
     db_session = db.get(PomodoroSession, session_data.session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Check if user already has an active session
+
+    # Check if there's already an active session
     existing_active = db.exec(
         select(ActivePomodoroSession).where(ActivePomodoroSession.user_id == current_user.id)
     ).first()
     
     if existing_active:
+        # Log session switch analytics event
+        AnalyticsService.log_event(
+            db=db,
+            user_id=current_user.id,
+            event_type="session_switch",
+            event_data={
+                "from_session_id": existing_active.session_id,
+                "to_session_id": session_data.session_id,
+                "switch_time": datetime.utcnow().isoformat()
+            }
+        )
+        
+        # End analytics for previous session
+        AnalyticsService.end_session_analytics(db=db, session_id=existing_active.session_id)
+        
         # Update existing active session
         existing_active.session_id = session_data.session_id
         existing_active.is_running = False
-        existing_active.time_remaining = db_session.focus_duration * 60  # Convert to seconds
+        existing_active.time_remaining = db_session.focus_duration * 60
         existing_active.phase = "focus"
         existing_active.pomodoros_completed = 0
         existing_active.current_task_id = db_session.tasks[0].id if db_session.tasks else None
@@ -161,6 +177,25 @@ def start_active_session(
             current_task_id=db_session.tasks[0].id if db_session.tasks else None,
         )
         db.add(active_session)
+    
+    # Start analytics tracking for new session
+    AnalyticsService.start_session_analytics(
+        db=db,
+        user_id=current_user.id,
+        session_id=session_data.session_id
+    )
+    
+    # Log session start event
+    AnalyticsService.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="session_start",
+        event_data={
+            "session_id": session_data.session_id,
+            "session_name": db_session.name,
+            "start_time": datetime.utcnow().isoformat()
+        }
+    )
     
     db.commit()
     db.refresh(existing_active if existing_active else active_session)
@@ -212,31 +247,128 @@ def update_active_session(
     if not active_session:
         raise HTTPException(status_code=404, detail="No active session found")
     
+    # Track previous state for analytics
+    previous_running = active_session.is_running
+    previous_phase = active_session.phase
+    
     # Update fields if provided
     if session_update.is_running is not None:
         active_session.is_running = session_update.is_running
         if session_update.is_running:
             active_session.start_time = datetime.utcnow()
             active_session.pause_time = None
+            
+            # Log timer start event
+            AnalyticsService.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type="timer_start",
+                event_data={
+                    "session_id": active_session.session_id,
+                    "phase": active_session.phase,
+                    "time_remaining": active_session.time_remaining
+                }
+            )
         else:
             active_session.pause_time = datetime.utcnow()
-    
+            
+            # Log timer pause event
+            AnalyticsService.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type="timer_pause",
+                event_data={
+                    "session_id": active_session.session_id,
+                    "phase": active_session.phase,
+                    "time_remaining": active_session.time_remaining
+                }
+            )
+            
+            # Update interruptions count if pausing during focus
+            if active_session.phase == "focus":
+                AnalyticsService.update_session_analytics(
+                    db=db,
+                    session_id=active_session.session_id,
+                    interruptions_count=1  # This would need to be incremented properly
+                )
+
     if session_update.time_remaining is not None:
         active_session.time_remaining = session_update.time_remaining
-    
+
     if session_update.phase is not None:
+        # Log phase change
+        if previous_phase != session_update.phase:
+            AnalyticsService.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type="phase_change",
+                event_data={
+                    "session_id": active_session.session_id,
+                    "from_phase": previous_phase,
+                    "to_phase": session_update.phase,
+                    "change_time": datetime.utcnow().isoformat()
+                }
+            )
+            
+            # If switching to break, log break start
+            if session_update.phase in ["short_break", "long_break"]:
+                AnalyticsService.log_event(
+                    db=db,
+                    user_id=current_user.id,
+                    event_type="break_start",
+                    event_data={
+                        "session_id": active_session.session_id,
+                        "break_type": session_update.phase,
+                        "start_time": datetime.utcnow().isoformat()
+                    }
+                )
+        
         active_session.phase = session_update.phase
-    
+
     if session_update.current_task_id is not None:
+        # Log task switch if different
+        if active_session.current_task_id != session_update.current_task_id:
+            AnalyticsService.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type="task_switch",
+                event_data={
+                    "session_id": active_session.session_id,
+                    "from_task_id": active_session.current_task_id,
+                    "to_task_id": session_update.current_task_id,
+                    "switch_time": datetime.utcnow().isoformat()
+                }
+            )
+        
         active_session.current_task_id = session_update.current_task_id
-    
+
     if session_update.pomodoros_completed is not None:
+        # Log pomodoro completion if increased
+        if session_update.pomodoros_completed > active_session.pomodoros_completed:
+            AnalyticsService.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type="pomodoro_complete",
+                event_data={
+                    "session_id": active_session.session_id,
+                    "pomodoros_completed": session_update.pomodoros_completed,
+                    "completion_time": datetime.utcnow().isoformat()
+                }
+            )
+            
+            # Update session analytics
+            AnalyticsService.update_session_analytics(
+                db=db,
+                session_id=active_session.session_id,
+                pomodoros_completed=session_update.pomodoros_completed
+            )
+        
         active_session.pomodoros_completed = session_update.pomodoros_completed
-    
+
     db.add(active_session)
     db.commit()
     db.refresh(active_session)
-    
+
     return ActiveSessionPublic(
         id=active_session.id,
         session_id=active_session.session_id,
@@ -446,5 +578,28 @@ def complete_task(
     
     db.add(task)
     db.commit()
+    
+    # Log task completion analytics event
+    AnalyticsService.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="task_complete",
+        event_data={
+            "task_id": task_id,
+            "task_name": task.name,
+            "session_id": task.session_id,
+            "estimated_time": task.estimated_completion_time,
+            "actual_time": task.actual_completion_time,
+            "completion_time": task.completed_at.isoformat()
+        }
+    )
+    
+    # Update session analytics if available
+    if task.session_id:
+        AnalyticsService.update_session_analytics(
+            db=db,
+            session_id=task.session_id,
+            tasks_completed=len([t for t in task.session.tasks if t.completed])
+        )
     
     return {"message": "Task completed successfully"}

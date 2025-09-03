@@ -14,7 +14,8 @@ export const sessionInfoSchema = z.object({
 
 export type SessionInfoSchema = z.infer<typeof sessionInfoSchema>;
 
-interface Props extends Exclude<ComponentProps<"form">, "onSubmit"> {
+interface Props {
+  className?: string;
   disabled?: boolean;
   onSubmit?: (data: FormOnSubmitEvent<SessionInfoSchema>) => void;
 }

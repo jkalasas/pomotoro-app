@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { apiClient } from "~/lib/api";
 import { useWindowStore } from "./window";
+import { useAnalyticsStore } from "./analytics";
 
 export interface PomodoroState {
   time: number;
@@ -53,9 +54,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   startTimer: async () => {
     set({ isLoading: true });
     try {
+      const { sessionId, phase } = get();
       await apiClient.updateActiveSession({ is_running: true });
       set({ isRunning: true });
       await get().loadActiveSession();
+      
+      // Log analytics event
+      if (sessionId) {
+        useAnalyticsStore.getState().logTimerStart(sessionId, phase);
+      }
     } catch (error) {
       console.error("Failed to start timer:", error);
     } finally {
@@ -67,13 +74,18 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       // Sync current time with backend before pausing
-      const { time } = get();
+      const { time, sessionId, phase } = get();
       await apiClient.updateActiveSession({ 
         is_running: false,
         time_remaining: time 
       });
       set({ isRunning: false });
       await get().loadActiveSession();
+      
+      // Log analytics event
+      if (sessionId) {
+        useAnalyticsStore.getState().logTimerPause(sessionId, phase);
+      }
     } catch (error) {
       console.error("Failed to pause timer:", error);
     } finally {
@@ -105,9 +117,18 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   setSession: async (sessionId: number) => {
     set({ isLoading: true });
     try {
+      const previousSessionId = get().sessionId;
       await apiClient.startActiveSession(sessionId);
       set({ sessionId });
       await get().loadActiveSession();
+      
+      // Log analytics event
+      if (previousSessionId && previousSessionId !== sessionId) {
+        useAnalyticsStore.getState().logSessionSwitch(previousSessionId, sessionId);
+      } else {
+        // Get session name for logging (you might need to pass this as parameter)
+        useAnalyticsStore.getState().logSessionStart(sessionId, `Session ${sessionId}`);
+      }
     } catch (error) {
       console.error("Failed to set session:", error);
     } finally {
@@ -158,8 +179,27 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   updateTimer: async (updates) => {
     set({ isLoading: true });
     try {
+      const prevState = get();
       await apiClient.updateActiveSession(updates);
       await get().loadActiveSession();
+      
+      // Log analytics events for state changes
+      const newState = get();
+      const { sessionId } = newState;
+      
+      if (sessionId) {
+        // Log phase changes
+        if (updates.phase && updates.phase !== prevState.phase) {
+          if (updates.phase.includes('break')) {
+            useAnalyticsStore.getState().logBreakStart(sessionId, updates.phase);
+          }
+        }
+        
+        // Log pomodoro completion
+        if (updates.pomodoros_completed && updates.pomodoros_completed > prevState.pomodorosCompleted) {
+          useAnalyticsStore.getState().logPomodoroComplete(sessionId, updates.pomodoros_completed);
+        }
+      }
     } catch (error) {
       console.error("Failed to update timer:", error);
     } finally {

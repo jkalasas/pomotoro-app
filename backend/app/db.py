@@ -4,6 +4,8 @@ from fastapi import Depends
 from sqlmodel import SQLModel, create_engine, Session, select
 from app.config import settings
 from app.models import PomodoroSession
+# Import analytics models to ensure they're registered
+from app.analytics.models import AnalyticsEvent, SessionAnalytics, DailyStats, WeeklyStats
 
 DATABASE_URL = settings.database_url
 engine = create_engine(

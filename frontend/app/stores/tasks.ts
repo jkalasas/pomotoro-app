@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiClient } from "~/lib/api";
+import { useAnalyticsStore } from "./analytics";
 
 export interface Task {
   id: number;
@@ -110,8 +111,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   completeTask: async (taskId: number) => {
     try {
       await apiClient.completeTask(taskId);
-      // Refresh current session to get updated task status
+      
+      // Get task details for analytics logging
       const currentSession = get().currentSession;
+      const task = currentSession?.tasks.find(t => t.id === taskId);
+      
+      if (task && currentSession) {
+        // Log task completion analytics
+        useAnalyticsStore.getState().logTaskComplete(taskId, task.name, currentSession.id);
+      }
+      
+      // Refresh current session to get updated task status
       if (currentSession) {
         await get().loadSession(currentSession.id);
       }

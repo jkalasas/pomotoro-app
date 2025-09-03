@@ -4,4 +4,5 @@ export default [
   index("routes/home.tsx"),
   route("pomodoro", "routes/pomodoro.tsx"),
   route("overlay", "routes/overlay.tsx"),
+  route("analytics", "routes/analytics.tsx"),
 ] satisfies RouteConfig;

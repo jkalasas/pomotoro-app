@@ -293,6 +293,12 @@ export default function Home() {
       <div className="w-full flex justify-between">
         <SidebarTrigger />
         <div className="flex justify-end gap-3">
+          <Link to="/analytics">
+            <Button variant="outline" className="inline-flex items-center gap-2">
+              <CloudLightning />
+              <span>Analytics</span>
+            </Button>
+          </Link>
           <Link to="/pomodoro">
             <Button variant="outline" className="inline-flex items-center gap-2">
               <Timer />
