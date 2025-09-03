@@ -117,7 +117,7 @@ export const useWindowStore = create<WindowState>((set, get) => ({
       console.log('Using window label:', windowLabel);
       
       const newOverlayWindow = new WebviewWindow(windowLabel, {
-        url: 'overlay',
+        url: `overlay?time=${timeRemaining}`,
         title: 'Rest Overlay',
         width: 800,  // Start with reasonable size
         height: 600,

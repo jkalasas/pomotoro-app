@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
-import { useWindowStore } from "~/stores/window";
-import { usePomodoroStore } from "~/stores/pomodoro";
+import { useSearchParams } from "react-router";
 
 export default function Overlay() {
-  const { closeOverlayWindow } = useWindowStore();
-  const { skipRest, time } = usePomodoroStore();
+  const [searchParams] = useSearchParams();
   
-  // Use the time from the pomodoro store instead of URL params
-  const [timeRemaining, setTimeRemaining] = useState(time || 300);
+  // Get time from URL parameters, fallback to 300 seconds (5 minutes)
+  const initialTime = parseInt(searchParams.get('time') || '300', 10);
+  const [timeRemaining, setTimeRemaining] = useState(initialTime);
 
   // Extract minutes from time remaining (assuming timeRemaining is in seconds)
   const minutes = Math.ceil(timeRemaining / 60);

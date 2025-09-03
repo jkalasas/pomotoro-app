@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 
 import { Menu } from "@tauri-apps/api/menu";
@@ -42,10 +43,20 @@ export const links: Route.LinksFunction = () => [
 export function Layout({ children }: { children: React.ReactNode }) {
   const { token, user, loadUser } = useAuthStore();
   const initWindow = useWindowStore((state) => state.initWindow);
+  const location = useLocation();
 
   const [tray, setTray] = useState<TrayIcon>();
 
+  // Check if we're on the overlay route to bypass authentication
+  const isOverlayRoute = location.pathname === '/overlay';
+
   useEffect(() => {
+    // Skip authentication initialization for overlay route
+    if (isOverlayRoute) {
+      initWindow();
+      return;
+    }
+
     // Load user on app start if we have a token but no user
     const initializeAuth = async () => {
       if (token && !user) {
@@ -71,9 +82,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       setTray(await TrayIcon.new(trayOptions));
     })();
-  }, [token, user, loadUser, initWindow]);
+  }, [token, user, loadUser, initWindow, isOverlayRoute]);
 
-  // Show auth form if not authenticated
+  // If it's the overlay route, render it directly without authentication check
+  if (isOverlayRoute) {
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <Meta />
+          <Links />
+        </head>
+        <body onContextMenu={(e) => e.preventDefault()}>
+          {children}
+          <Toaster />
+          <ScrollRestoration />
+          <Scripts />
+        </body>
+      </html>
+    );
+  }
+
+  // Show auth form if not authenticated (for non-overlay routes)
   if (!user && !useAuthStore.getState().token) {
     return (
       <html lang="en">
