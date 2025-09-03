@@ -16,14 +16,16 @@ export default function Overlay() {
 
   // Disable scrolling for this overlay page only
   useEffect(() => {
-    // Disable scrolling
+    // Disable scrolling and set overlay mode
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    document.body.setAttribute('data-overlay', 'true');
     
     // Cleanup on unmount
     return () => {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
+      document.body.removeAttribute('data-overlay');
     };
   }, []);
 
@@ -76,7 +78,22 @@ export default function Overlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-gray-100 w-screen h-screen min-h-screen">
+    <div 
+      className="fixed inset-0 z-[9999] flex flex-col bg-gray-100"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        minWidth: '100vw',
+        minHeight: '100vh',
+        maxWidth: '100vw',
+        maxHeight: '100vh'
+      }}
+    >
       {/* Top section - clean white/light background */}
       <div className="flex-1 flex items-center justify-center w-full">
         <div className="text-center">

@@ -111,21 +111,24 @@ export const useWindowStore = create<WindowState>((set, get) => ({
       }
 
       console.log('Creating new overlay window...');
-      // Create a new overlay window to cover entire screen with unique label
+      
+      // Create a new overlay window with simple configuration
       const windowLabel = `rest-overlay-${Date.now()}`;
       console.log('Using window label:', windowLabel);
       
       const newOverlayWindow = new WebviewWindow(windowLabel, {
         url: 'overlay',
         title: 'Rest Overlay',
+        width: 800,  // Start with reasonable size
+        height: 600,
         decorations: false,
         alwaysOnTop: true,
         resizable: false,
         skipTaskbar: true,
         transparent: false,
-        maximized: true,
         visible: true,
-        fullscreen: true,
+        center: true,
+        fullscreen: true
       });
 
       console.log('WebviewWindow instance created:', newOverlayWindow);
@@ -136,10 +139,21 @@ export const useWindowStore = create<WindowState>((set, get) => ({
       newOverlayWindow.once('tauri://created', async () => {
         console.log('Overlay window created successfully');
         try {
-          // Ensure fullscreen after creation
-          await newOverlayWindow.setFullscreen(true);
+          // Maximize the window to fill screen
+          await newOverlayWindow.maximize();
           await newOverlayWindow.setAlwaysOnTop(true);
           await newOverlayWindow.setFocus();
+          
+          console.log('Window maximized and configured');
+          
+          // Try fullscreen as additional step
+          try {
+            await newOverlayWindow.setFullscreen(true);
+            console.log('Fullscreen set successfully');
+          } catch (fsError) {
+            console.warn('Fullscreen failed, using maximized window:', fsError);
+          }
+          
           console.log('Overlay window configured successfully');
         } catch (error) {
           console.error('Failed to configure overlay window:', error);

@@ -144,4 +144,14 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Ensure overlay pages have no margin/padding */
+  body[data-overlay="true"],
+  body[data-overlay="true"] #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
 }
