@@ -110,8 +110,6 @@ export default function Home() {
   const [editingSessionName, setEditingSessionName] = useState(false);
   const [sessionNameInput, setSessionNameInput] = useState("");
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
   // Load user data and sessions on mount
   useEffect(() => {
     if (authStore.token && !authStore.user) {
@@ -122,42 +120,9 @@ export default function Home() {
     }
   }, [authStore.token, authStore.user]);
 
-  // Timer countdown effect
-  useEffect(() => {
-    if (pomodoroStore.isRunning && pomodoroStore.time > 0) {
-      if (!timerRef.current) {
-        timerRef.current = setInterval(() => {
-          pomodoroStore.setTime(pomodoroStore.time - 1);
-        }, 1000);
-      }
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [pomodoroStore.isRunning, pomodoroStore.time, pomodoroStore.setTime]);
-
-  // Sync with backend periodically and handle timer completion
-  useEffect(() => {
-    if (pomodoroStore.time > 0 && pomodoroStore.time % 10 === 0 && pomodoroStore.isRunning) {
-      // Sync time with backend every 10 seconds
-      apiClient.updateActiveSession({ time_remaining: pomodoroStore.time }).catch(console.error);
-    }
-
-    if (pomodoroStore.time === 0 && pomodoroStore.isRunning) {
-      // Timer completed
-      apiClient.updateActiveSession({ is_running: false }).catch(console.error);
-      toast.success("Pomodoro completed!");
-    }
-  }, [pomodoroStore.time, pomodoroStore.isRunning]);
+  // Timer ticking, backend sync and completion handling are performed by
+  // the centralized pomodoro store background ticker. The Home page just
+  // renders the current store state.
 
   const totalPomodoros = useMemo(() => {
     if (!sessionInfo) return 0;

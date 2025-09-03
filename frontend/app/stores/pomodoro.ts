@@ -38,6 +38,67 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       console.log('Received skip-rest event from overlay');
       get().skipRest();
     });
+
+    // Background ticker: keep the timer running even when Pomodoro page
+    // unmounts. This decrements the stored time every second when
+    // `isRunning` is true, performs a backend sync every 10s and handles
+    // completion. It also ensures the rest overlay is created/closed when
+    // entering/exiting break phases so the overlay works when other pages
+    // are active.
+    try {
+      let _bgInterval = window.setInterval(() => {
+        try {
+          const state = get();
+
+          if (state.isRunning && state.time > 0) {
+            const newTime = state.time - 1;
+            set({ time: newTime });
+
+            // Sync with backend every 10 seconds (same heuristic as UI)
+            if (newTime > 0 && newTime % 10 === 0) {
+              apiClient.updateActiveSession({ time_remaining: newTime }).catch(console.error);
+            }
+
+            // Handle timer completion
+            if (newTime === 0) {
+              set({ isRunning: false });
+              apiClient.updateActiveSession({ is_running: false }).catch(console.error);
+            }
+          }
+
+          // Ensure rest overlay is shown even when the Pomodoro page is not
+          // mounted: create overlay on break phases, close otherwise.
+          const isBreakPhase = state.phase === "short_break" || state.phase === "long_break";
+          if (isBreakPhase && state.isRunning && state.time > 0 && !state.showRestOverlay) {
+            set({ showRestOverlay: true });
+            try {
+              useWindowStore.getState().createOverlayWindow(state.time);
+            } catch (error) {
+              console.error('Failed to create overlay window from background ticker', error);
+              set({ showRestOverlay: false });
+            }
+          } else if ((!isBreakPhase || !state.isRunning || state.time <= 0) && state.showRestOverlay) {
+            set({ showRestOverlay: false });
+            try {
+              useWindowStore.getState().closeOverlayWindow();
+            } catch (error) {
+              console.error('Failed to close overlay window from background ticker', error);
+            }
+          }
+        } catch (err) {
+          console.error('Error in pomodoro background ticker', err);
+        }
+      }, 1000);
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', () => {
+        if (_bgInterval) {
+          clearInterval(_bgInterval as unknown as number);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to start pomodoro background ticker', err);
+    }
   }
 
   return {

@@ -52,8 +52,8 @@ export default function Pomodoro() {
     currentTaskId,
     startTimer,
     pauseTimer,
-    resetTimer,
     loadActiveSession,
+    resetTimer,
     isLoading,
     setTime,
     showRestOverlay,
@@ -62,54 +62,9 @@ export default function Pomodoro() {
     updateTimer,
   } = usePomodoroStore();
 
-  const window = useWindowStore();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    window.setSize({ width: window.size.width, height: 360 });
-  }, []);
-
-  useEffect(() => {
-    loadActiveSession();
-  }, [loadActiveSession]);
-
-  // Timer countdown effect
-  useEffect(() => {
-    if (isRunning && time > 0) {
-      if (!timerRef.current) {
-        timerRef.current = setInterval(() => {
-          setTime(time - 1);
-        }, 1000);
-      }
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [isRunning, time, setTime]);
-
-  // Sync with backend periodically and handle timer completion
-  useEffect(() => {
-    if (time > 0 && time % 10 === 0 && isRunning) {
-      // Sync time with backend every 10 seconds
-      apiClient.updateActiveSession({ time_remaining: time }).catch(console.error);
-    }
-
-    if (time === 0 && isRunning) {
-      // Timer completed
-      apiClient.updateActiveSession({ is_running: false }).catch(console.error);
-      // TODO: Handle phase transitions (focus -> break -> focus)
-      toast.success("Pomodoro completed!");
-    }
-  }, [time, isRunning]);
+  // Timer ticking, backend sync and rest-overlay are handled centrally by
+  // the pomodoro store background ticker so page-level intervals are not
+  // required. The page simply reads state from the store for rendering.
 
   // Handle rest overlay display
   useEffect(() => {
