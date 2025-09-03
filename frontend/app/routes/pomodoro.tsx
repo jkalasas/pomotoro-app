@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import { apiClient } from "~/lib/api";
 import { SessionSelector } from "~/components/pomotoro/session-selector";
+import { showTestFeatures } from "~/lib/env";
 
 const chartData = [
   { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
@@ -157,68 +158,69 @@ export default function Pomodoro() {
         </Button>
       </div>
 
-      {/* Test Section */}
-      <div className="border-t pt-4 mt-6">
-        <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold mb-2">Test Features</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Use these buttons to test the invasive rest overlay functionality
-          </p>
-        </div>
-        
-        <div className="flex justify-center gap-2">
-          <Button
-            type="button"
-            onClick={async () => {
-              // For testing - simulate entering break phase
-              setShowRestOverlay(true);
-              // Also update backend to reflect break state
-              await updateTimer({
-                phase: "short_break",
-                time_remaining: 300, // 5 minutes
-              });
-            }}
-            disabled={isLoading}
-            variant="outline"
-            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
-          >
-            <Bug className="size-4 mr-2" />
-            Test Rest Overlay (5min)
-          </Button>
+      {showTestFeatures() && (
+        <div className="border-t pt-4 mt-6">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-semibold mb-2">Test Features</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Use these buttons to test the invasive rest overlay functionality
+            </p>
+          </div>
           
-          <Button
-            type="button"
-            onClick={async () => {
-              // Test with different duration
-              setShowRestOverlay(true);
-              await updateTimer({
-                phase: "long_break",
-                time_remaining: 900, // 15 minutes
-              });
-            }}
-            disabled={isLoading}
-            variant="outline"
-            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-          >
-            <Bug className="size-4 mr-2" />
-            Test Long Break (15min)
-          </Button>
+          <div className="flex justify-center gap-2">
+            <Button
+              type="button"
+              onClick={async () => {
+                // For testing - simulate entering break phase
+                setShowRestOverlay(true);
+                // Also update backend to reflect break state
+                await updateTimer({
+                  phase: "short_break",
+                  time_remaining: 300, // 5 minutes
+                });
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+            >
+              <Bug className="size-4 mr-2" />
+              Test Rest Overlay (5min)
+            </Button>
+            
+            <Button
+              type="button"
+              onClick={async () => {
+                // Test with different duration
+                setShowRestOverlay(true);
+                await updateTimer({
+                  phase: "long_break",
+                  time_remaining: 900, // 15 minutes
+                });
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+            >
+              <Bug className="size-4 mr-2" />
+              Test Long Break (15min)
+            </Button>
 
-          <Button
-            type="button"
-            onClick={() => {
-              // Force hide overlay for testing
-              setShowRestOverlay(false);
-            }}
-            disabled={isLoading}
-            variant="outline"
-            className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-          >
-            <Bug className="size-4 mr-2" />
-            Force Hide Overlay
-          </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                // Force hide overlay for testing
+                setShowRestOverlay(false);
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+            >
+              <Bug className="size-4 mr-2" />
+              Force Hide Overlay
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }
