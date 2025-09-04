@@ -115,6 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Links />
         </head>
         <body onContextMenu={(e) => e.preventDefault()}>
+          <Titlebar />
           <AuthForm />
           <Toaster />
           <ScrollRestoration />
