@@ -14,6 +14,14 @@ export interface PomodoroState {
   pomodorosCompleted: number;
   isLoading: boolean;
   showRestOverlay: boolean;
+  showFeedbackModal: boolean;
+  pendingSessionCompletion: {
+    sessionId: number;
+    sessionName: string;
+    totalTasks: number;
+    completedTasks: number;
+    focusDuration: number;
+  } | null;
   startTimer: () => Promise<void>;
   pauseTimer: () => Promise<void>;
   resetTimer: () => Promise<void>;
@@ -29,6 +37,9 @@ export interface PomodoroState {
   }) => Promise<void>;
   setShowRestOverlay: (show: boolean) => void;
   skipRest: () => Promise<void>;
+  triggerSessionCompletion: (sessionId: number, sessionName: string, totalTasks: number, completedTasks: number, focusDuration: number) => void;
+  setShowFeedbackModal: (show: boolean) => void;
+  submitSessionFeedback: (focusLevel: string, reflection?: string) => Promise<void>;
 }
 
 export const usePomodoroStore = create<PomodoroState>((set, get) => {
@@ -37,6 +48,13 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     listen('skip-rest', () => {
       console.log('Received skip-rest event from overlay');
       get().skipRest();
+    });
+
+    // Listen for session completion events from task store
+    window.addEventListener('session-completion', (event: any) => {
+      console.log('Session completion event received:', event.detail);
+      const { sessionId, sessionName, totalTasks, completedTasks, focusDuration } = event.detail;
+      get().triggerSessionCompletion(sessionId, sessionName, totalTasks, completedTasks, focusDuration);
     });
 
     // Background ticker: keep the timer running even when Pomodoro page
@@ -111,6 +129,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   pomodorosCompleted: 0,
   isLoading: false,
   showRestOverlay: false,
+  showFeedbackModal: false,
+  pendingSessionCompletion: null,
 
   startTimer: async () => {
     set({ isLoading: true });
@@ -178,6 +198,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   setSession: async (sessionId: number) => {
     set({ isLoading: true });
     try {
+      // First check if the session is completed
+      const session = await apiClient.getSession(sessionId) as { completed: boolean };
+      if (session.completed) {
+        throw new Error("Cannot start a completed session");
+      }
+      
       const previousSessionId = get().sessionId;
       await apiClient.startActiveSession(sessionId);
       set({ sessionId });
@@ -192,6 +218,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
     } catch (error) {
       console.error("Failed to set session:", error);
+      throw error; // Re-throw to allow UI to handle the error
     } finally {
       set({ isLoading: false });
     }
@@ -328,6 +355,84 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       console.log('skipRest completed successfully');
     } catch (error) {
       console.error("Failed to skip rest:", error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  triggerSessionCompletion: (sessionId, sessionName, totalTasks, completedTasks, focusDuration) => {
+    console.log('triggerSessionCompletion called with:', { sessionId, sessionName, totalTasks, completedTasks, focusDuration });
+    set({
+      showFeedbackModal: true,
+      pendingSessionCompletion: {
+        sessionId,
+        sessionName,
+        totalTasks,
+        completedTasks,
+        focusDuration,
+      },
+    });
+    console.log('Modal state updated - showFeedbackModal:', true);
+  },
+
+  setShowFeedbackModal: (show) => {
+    set({ showFeedbackModal: show });
+    if (!show) {
+      set({ pendingSessionCompletion: null });
+    }
+  },
+
+  submitSessionFeedback: async (focusLevel, reflection) => {
+    const { pendingSessionCompletion } = get();
+    if (!pendingSessionCompletion) {
+      throw new Error("No pending session completion");
+    }
+
+    set({ isLoading: true });
+    try {
+      // Log feedback submission analytics
+      useAnalyticsStore.getState().logFeedbackSubmitted(
+        pendingSessionCompletion.sessionId,
+        focusLevel,
+        reflection
+      );
+      
+      // Use API client directly since we're mixing stores
+      await apiClient.completeSession(
+        pendingSessionCompletion.sessionId,
+        focusLevel,
+        reflection
+      );
+      
+      // Log session completion analytics
+      useAnalyticsStore.getState().logSessionComplete(
+        pendingSessionCompletion.sessionId,
+        focusLevel,
+        pendingSessionCompletion.completedTasks,
+        pendingSessionCompletion.totalTasks
+      );
+      
+      // Refresh data in all relevant stores
+      const { useTaskStore } = await import('./tasks');
+      
+      // Use the centralized refresh function
+      await useTaskStore.getState().refreshAllData();
+      
+      set({
+        showFeedbackModal: false,
+        pendingSessionCompletion: null,
+      });
+      
+      // Trigger global refresh event
+      if (typeof window !== 'undefined') {
+        console.log('Triggering session-completed event for refresh');
+        window.dispatchEvent(new CustomEvent('session-completed', {
+          detail: { sessionId: pendingSessionCompletion.sessionId }
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to submit session feedback:", error);
+      throw error;
     } finally {
       set({ isLoading: false });
     }

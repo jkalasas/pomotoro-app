@@ -18,7 +18,11 @@ interface AnalyticsState {
   // Convenience methods for common events
   logSessionStart: (sessionId: number, sessionName: string) => Promise<void>;
   logSessionSwitch: (fromSessionId: number, toSessionId: number) => Promise<void>;
+  logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => Promise<void>;
+  logSessionReset: (sessionId: number, reason: string) => Promise<void>;
   logTaskComplete: (taskId: number, taskName: string, sessionId?: number) => Promise<void>;
+  logTaskUncomplete: (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => Promise<void>;
+  logFeedbackSubmitted: (sessionId: number, focusLevel: string, reflection?: string) => Promise<void>;
   logPomodoroComplete: (sessionId: number, pomodorosCompleted: number) => Promise<void>;
   logTimerStart: (sessionId: number, phase: string) => Promise<void>;
   logTimerPause: (sessionId: number, phase: string) => Promise<void>;
@@ -155,6 +159,45 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       session_id: sessionId,
       break_type: breakType,
       start_time: new Date().toISOString()
+    });
+  },
+
+  logSessionComplete: async (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => {
+    await get().logEvent('session_complete_frontend', {
+      session_id: sessionId,
+      focus_level: focusLevel,
+      tasks_completed: tasksCompleted,
+      total_tasks: totalTasks,
+      completion_rate: totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0,
+      completion_time: new Date().toISOString()
+    });
+  },
+
+  logSessionReset: async (sessionId: number, reason: string) => {
+    await get().logEvent('session_reset_frontend', {
+      session_id: sessionId,
+      reason,
+      reset_time: new Date().toISOString()
+    });
+  },
+
+  logTaskUncomplete: async (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => {
+    await get().logEvent('task_uncomplete_frontend', {
+      task_id: taskId,
+      task_name: taskName,
+      session_id: sessionId,
+      session_reset: sessionReset,
+      uncomplete_time: new Date().toISOString()
+    });
+  },
+
+  logFeedbackSubmitted: async (sessionId: number, focusLevel: string, reflection?: string) => {
+    await get().logEvent('feedback_submitted', {
+      session_id: sessionId,
+      focus_level: focusLevel,
+      has_reflection: !!reflection,
+      reflection_length: reflection?.length || 0,
+      submission_time: new Date().toISOString()
     });
   },
 }));

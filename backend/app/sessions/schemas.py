@@ -1,5 +1,15 @@
 from typing import List, Optional
 from pydantic import BaseModel
+from enum import Enum
+from datetime import datetime
+
+
+class FocusLevel(str, Enum):
+    HIGHLY_DISTRACTED = "HIGHLY_DISTRACTED"
+    DISTRACTED = "DISTRACTED"
+    NEUTRAL = "NEUTRAL"
+    FOCUSED = "FOCUSED"
+    HIGHLY_FOCUSED = "HIGHLY_FOCUSED"
 
 
 class PomodoroConfig(BaseModel):
@@ -70,3 +80,24 @@ class ActiveSessionUpdate(BaseModel):
     phase: Optional[str] = None
     current_task_id: Optional[int] = None
     pomodoros_completed: Optional[int] = None
+
+
+class SessionFeedbackCreate(BaseModel):
+    focus_level: FocusLevel
+    session_reflection: Optional[str] = None
+
+
+class SessionFeedbackPublic(BaseModel):
+    id: int
+    session_id: int
+    focus_level: str
+    session_reflection: Optional[str]
+    tasks_completed: int
+    tasks_failed: int
+    focus_duration_minutes: int
+    created_at: datetime
+
+
+class SessionCompleteRequest(BaseModel):
+    focus_level: FocusLevel
+    session_reflection: Optional[str] = None

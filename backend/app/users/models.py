@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
-    from ..models import PomodoroSession, ActivePomodoroSession  # noqa: F401
+    from ..models import PomodoroSession, ActivePomodoroSession, SessionFeedback  # noqa: F401
     from ..analytics.models import AnalyticsEvent, SessionAnalytics, DailyStats, WeeklyStats  # noqa: F401
 
 
@@ -17,6 +17,7 @@ class User(SQLModel, table=True):
 
     sessions: List["PomodoroSession"] = Relationship(back_populates="user")
     active_session: Optional["ActivePomodoroSession"] = Relationship(back_populates="user")
+    session_feedbacks: List["SessionFeedback"] = Relationship(back_populates="user")
     
     # Analytics relationships
     analytics_events: List["AnalyticsEvent"] = Relationship(back_populates="user")

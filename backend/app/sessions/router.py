@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 
 from ..db import SessionDep, get_session
-from ..models import PomodoroSession, Task, Category, ActivePomodoroSession
+from ..models import PomodoroSession, Task, Category, ActivePomodoroSession, SessionFeedback
 from .schemas import (
     SessionCreate,
     SessionWithTasksPublic,
@@ -13,6 +13,10 @@ from .schemas import (
     ActiveSessionCreate,
     ActiveSessionPublic,
     ActiveSessionUpdate,
+    SessionFeedbackCreate,
+    SessionFeedbackPublic,
+    SessionCompleteRequest,
+    FocusLevel,
 )
 from sqlmodel import select
 from ..auth.deps import ActiveUserDep
@@ -135,6 +139,10 @@ def start_active_session(
     db_session = db.get(PomodoroSession, session_data.session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Prevent starting completed sessions
+    if db_session.completed:
+        raise HTTPException(status_code=400, detail="Cannot start a completed session")
 
     # Check if there's already an active session
     existing_active = db.exec(
@@ -603,3 +611,207 @@ def complete_task(
         )
     
     return {"message": "Task completed successfully"}
+
+
+@router.put("/tasks/{task_id}/uncomplete", response_model=dict)
+def uncomplete_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check if task belongs to user's session
+    if task.session and task.session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this task")
+    
+    # Get the session to check if it's completed
+    session = task.session
+    was_session_completed = session.completed if session else False
+    
+    # Mark task as incomplete
+    task.completed = False
+    task.completed_at = None
+    task.actual_completion_time = None
+    
+    db.add(task)
+    
+    # If session was completed, reset it when task is uncompleted
+    if was_session_completed and session:
+        session.completed = False
+        session.completed_at = None
+        db.add(session)
+        
+        # Log session reset analytics event
+        AnalyticsService.log_event(
+            db=db,
+            user_id=current_user.id,
+            event_type="session_reset",
+            event_data={
+                "session_id": session.id,
+                "trigger_task_id": task_id,
+                "trigger_task_name": task.name,
+                "reason": "task_uncompleted",
+                "reset_time": datetime.utcnow().isoformat()
+            }
+        )
+    
+    db.commit()
+    
+    # Log task uncompletion analytics event
+    AnalyticsService.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="task_uncomplete",
+        event_data={
+            "task_id": task_id,
+            "task_name": task.name,
+            "session_id": task.session_id,
+            "session_was_completed": was_session_completed,
+            "session_reset": was_session_completed
+        }
+    )
+    
+    # Update session analytics if available
+    if task.session_id:
+        AnalyticsService.update_session_analytics(
+            db=db,
+            session_id=task.session_id,
+            tasks_completed=len([t for t in task.session.tasks if t.completed])
+        )
+    
+    return {"message": "Task uncompleted successfully", "session_reset": was_session_completed}
+
+
+@router.post("/{session_id}/complete", response_model=SessionFeedbackPublic)
+def complete_session(
+    session_id: int,
+    feedback_data: SessionCompleteRequest,
+    db: SessionDep,
+    current_user: ActiveUserDep,
+):
+    """Complete a session and submit feedback"""
+    
+    # Get the session
+    session = db.exec(
+        select(PomodoroSession)
+        .where(PomodoroSession.id == session_id)
+        .where(PomodoroSession.user_id == current_user.id)
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if session.completed:
+        raise HTTPException(status_code=400, detail="Session already completed")
+    
+    # Mark session as completed
+    session.completed = True
+    session.completed_at = datetime.utcnow()
+    
+    # Mark ALL tasks as completed when session is completed
+    incomplete_tasks = []
+    for task in session.tasks:
+        if not task.completed:
+            task.completed = True
+            task.completed_at = datetime.utcnow()
+            incomplete_tasks.append(task.id)
+    
+    # Log which tasks were auto-completed
+    if incomplete_tasks:
+        AnalyticsService.log_event(
+            db=db,
+            user_id=current_user.id,
+            event_type="tasks_auto_completed",
+            event_data={
+                "session_id": session_id,
+                "auto_completed_task_ids": incomplete_tasks,
+                "reason": "session_completion"
+            }
+        )
+    
+    # Calculate session statistics (all tasks are now completed)
+    completed_tasks = len(session.tasks)
+    failed_tasks = 0  # No failed tasks since we completed all
+    total_focus_time = sum(task.actual_completion_time or 0 for task in session.tasks if task.completed)
+    focus_duration_minutes = total_focus_time // 60
+    
+    # Create feedback record
+    feedback = SessionFeedback(
+        session_id=session_id,
+        user_id=current_user.id,
+        focus_level=feedback_data.focus_level.value,
+        session_reflection=feedback_data.session_reflection,
+        tasks_completed=completed_tasks,
+        tasks_failed=failed_tasks,
+        focus_duration_minutes=focus_duration_minutes,
+    )
+    
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    
+    # Log analytics event for session completion
+    AnalyticsService.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="session_complete",
+        event_data={
+            "session_id": session_id,
+            "focus_level": feedback_data.focus_level.value,
+            "tasks_completed": completed_tasks,
+            "tasks_failed": failed_tasks,
+            "focus_duration_minutes": focus_duration_minutes,
+        }
+    )
+    
+    # Update session analytics
+    AnalyticsService.update_session_analytics(
+        db=db,
+        session_id=session_id,
+        tasks_completed=completed_tasks,
+        session_ended_at=session.completed_at
+    )
+    
+    return SessionFeedbackPublic(
+        id=feedback.id,
+        session_id=feedback.session_id,
+        focus_level=feedback.focus_level,
+        session_reflection=feedback.session_reflection,
+        tasks_completed=feedback.tasks_completed,
+        tasks_failed=feedback.tasks_failed,
+        focus_duration_minutes=feedback.focus_duration_minutes,
+        created_at=feedback.created_at,
+    )
+
+
+@router.get("/feedback", response_model=List[SessionFeedbackPublic])
+def get_session_feedbacks(
+    db: SessionDep,
+    current_user: ActiveUserDep,
+    limit: int = 50,
+):
+    """Get session feedback history for the current user"""
+    
+    feedbacks = db.exec(
+        select(SessionFeedback)
+        .where(SessionFeedback.user_id == current_user.id)
+        .order_by(SessionFeedback.created_at.desc())
+        .limit(limit)
+    ).all()
+    
+    return [
+        SessionFeedbackPublic(
+            id=feedback.id,
+            session_id=feedback.session_id,
+            focus_level=feedback.focus_level,
+            session_reflection=feedback.session_reflection,
+            tasks_completed=feedback.tasks_completed,
+            tasks_failed=feedback.tasks_failed,
+            focus_duration_minutes=feedback.focus_duration_minutes,
+            created_at=feedback.created_at,
+        )
+        for feedback in feedbacks
+    ]

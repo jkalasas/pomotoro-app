@@ -113,10 +113,22 @@ class AnalyticsService:
             )
         ).all()
         
+        # Count session feedback events
+        from ..models import SessionFeedback
+        session_feedbacks = db.exec(
+            select(SessionFeedback).where(
+                and_(
+                    SessionFeedback.user_id == user_id,
+                    SessionFeedback.created_at >= day_start,
+                    SessionFeedback.created_at <= day_end
+                )
+            )
+        ).all()
+        
         # Aggregate metrics
         daily_stats.total_focus_time = sum(sa.total_focus_time for sa in session_analytics)
         daily_stats.total_break_time = sum(sa.total_break_time for sa in session_analytics)
-        daily_stats.sessions_completed = len([sa for sa in session_analytics if sa.session_ended_at])
+        daily_stats.sessions_completed = len(session_feedbacks)  # Use feedback count for completed sessions
         daily_stats.tasks_completed = sum(sa.tasks_completed for sa in session_analytics)
         daily_stats.pomodoros_completed = sum(sa.pomodoros_completed for sa in session_analytics)
         daily_stats.interruptions_count = sum(sa.interruptions_count for sa in session_analytics)
@@ -173,6 +185,26 @@ class AnalyticsService:
         
         average_session_length = total_focus_time / total_sessions if total_sessions > 0 else 0
         
+        # Get session feedback data for focus level insights
+        from ..models import SessionFeedback
+        session_feedbacks = db.exec(
+            select(SessionFeedback).where(
+                and_(
+                    SessionFeedback.user_id == user_id,
+                    SessionFeedback.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    SessionFeedback.created_at <= datetime.combine(end_date, datetime.max.time())
+                )
+            )
+        ).all()
+        
+        # Analyze focus levels
+        focus_levels = [sf.focus_level for sf in session_feedbacks]
+        most_common_focus_level = None
+        if focus_levels:
+            from collections import Counter
+            focus_counter = Counter(focus_levels)
+            most_common_focus_level = focus_counter.most_common(1)[0][0]
+        
         # Determine trends
         recent_stats = daily_stats[-7:] if len(daily_stats) >= 7 else daily_stats
         older_stats = daily_stats[-14:-7] if len(daily_stats) >= 14 else []
@@ -197,6 +229,17 @@ class AnalyticsService:
             recommendations.append("Consider extending your focus periods")
         if focus_time_trend == "declining":
             recommendations.append("Your focus time is declining - try setting smaller, more achievable goals")
+        
+        # Add focus level recommendations
+        if most_common_focus_level:
+            if most_common_focus_level in ["HIGHLY_DISTRACTED", "DISTRACTED"]:
+                recommendations.append("Your sessions show low focus levels - try eliminating distractions")
+            elif most_common_focus_level in ["FOCUSED", "HIGHLY_FOCUSED"]:
+                recommendations.append("Great focus levels! Consider challenging yourself with longer sessions")
+        
+        if len(session_feedbacks) < total_sessions * 0.5:
+            recommendations.append("Submit session feedback more regularly to get better insights")
+            
         if not recommendations:
             recommendations.append("Keep up the great work! Your productivity is on track.")
         

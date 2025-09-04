@@ -33,12 +33,15 @@ class PomodoroSession(SQLModel, table=True):
     long_break_duration: int
     long_break_per_pomodoros: int
     user_id: Optional[int] = SQLField(default=None, foreign_key="user.id", index=True)
+    completed: bool = SQLField(default=False)
+    completed_at: Optional[datetime] = None
     tasks: List["Task"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     user: Optional["User"] = Relationship(back_populates="sessions")
     active_session: Optional["ActivePomodoroSession"] = Relationship(back_populates="session")
+    feedbacks: List["SessionFeedback"] = Relationship(back_populates="session")
 
 
 class ActivePomodoroSession(SQLModel, table=True):
@@ -74,3 +77,19 @@ class Task(SQLModel, table=True):
     )
     session: Optional[PomodoroSession] = Relationship(back_populates="tasks")
     active_sessions: List["ActivePomodoroSession"] = Relationship(back_populates="current_task")
+
+
+class SessionFeedback(SQLModel, table=True):
+    __tablename__ = "session_feedback"
+    id: Optional[int] = SQLField(default=None, primary_key=True)
+    session_id: int = SQLField(foreign_key="session.id", index=True)
+    user_id: int = SQLField(foreign_key="user.id", index=True)
+    focus_level: str = SQLField(index=True)  # "HIGHLY_DISTRACTED", "DISTRACTED", "NEUTRAL", "FOCUSED", "HIGHLY_FOCUSED"
+    session_reflection: Optional[str] = None
+    tasks_completed: int = SQLField(default=0)
+    tasks_failed: int = SQLField(default=0)
+    focus_duration_minutes: int = SQLField(default=0)
+    created_at: datetime = SQLField(default_factory=datetime.utcnow)
+    
+    session: Optional["PomodoroSession"] = Relationship(back_populates="feedbacks")
+    user: Optional["User"] = Relationship(back_populates="session_feedbacks")

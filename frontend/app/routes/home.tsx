@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import type { Route } from "./+types/home";
 import { useTaskStore } from "~/stores/tasks";
+import { useAnalyticsStore } from "~/stores/analytics";
 import {
   Card,
   CardContent,
@@ -21,6 +22,7 @@ import {
   Play,
   Plus,
   PlusCircle,
+  RotateCcw,
   Timer,
   X,
 } from "lucide-react";
@@ -48,6 +50,7 @@ import { usePomodoroStore } from "~/stores/pomodoro";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { useAuthStore } from "~/stores/auth";
 import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
+import { SessionFeedbackModal, type FocusLevel } from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
 import { showTestFeatures } from "~/lib/env";
 
@@ -102,6 +105,7 @@ export default function Home() {
   const tasksStore = useTaskStore();
   const pomodoroStore = usePomodoroStore();
   const authStore = useAuthStore();
+  const analyticsStore = useAnalyticsStore();
 
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
@@ -117,8 +121,55 @@ export default function Home() {
     }
     if (authStore.user) {
       tasksStore.loadSessions();
+      // Also refresh current session if pomodoro store has an active session
+      if (pomodoroStore.sessionId && !tasksStore.currentSession) {
+        tasksStore.loadSession(pomodoroStore.sessionId);
+      }
     }
-  }, [authStore.token, authStore.user]);
+  }, [authStore.token, authStore.user, pomodoroStore.sessionId]);
+
+  // Listen for session completion events to refresh data
+  useEffect(() => {
+    const handleSessionCompleted = () => {
+      console.log('Session completed - refreshing data');
+      tasksStore.refreshAllData();
+      // Also refresh analytics
+      analyticsStore.updateDailyStats();
+      analyticsStore.fetchInsights();
+    };
+
+    const handleSessionReset = () => {
+      console.log('Session reset - refreshing data');
+      tasksStore.refreshAllData();
+      // Refresh analytics after session reset
+      analyticsStore.updateDailyStats();
+    };
+
+    const handleTaskCompleted = () => {
+      console.log('Task completed/uncompleted - refreshing current session');
+      if (tasksStore.currentSession) {
+        tasksStore.loadSession(tasksStore.currentSession.id);
+      }
+      // Update daily stats after task changes
+      analyticsStore.updateDailyStats();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('session-completed', handleSessionCompleted);
+      window.addEventListener('session-reset', handleSessionReset);
+      window.addEventListener('task-completed', handleTaskCompleted);
+      window.addEventListener('task-uncompleted', handleTaskCompleted);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('session-completed', handleSessionCompleted);
+        window.removeEventListener('session-reset', handleSessionReset);
+        window.removeEventListener('task-completed', handleTaskCompleted);
+        window.removeEventListener('task-uncompleted', handleTaskCompleted);
+      }
+    };
+  }, [tasksStore]);
 
   // Timer ticking, backend sync and completion handling are performed by
   // the centralized pomodoro store background ticker. The Home page just
@@ -480,6 +531,19 @@ export default function Home() {
                   <span>Finish Task</span>
                 </Button>
               )}
+
+              {tasksStore.currentSession && !tasksStore.currentSession.completed && (
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-3"
+                  onClick={() => {
+                    tasksStore.completeSessionManually();
+                  }}
+                >
+                  <FilePenLine />
+                  <span>Complete Session</span>
+                </Button>
+              )}
               
               {showTestFeatures() && (
                 <div className="border-t pt-3 mt-3">
@@ -557,12 +621,22 @@ export default function Home() {
                     key={session.id}
                     variant={tasksStore.currentSession?.id === session.id ? "default" : "outline"}
                     size="sm"
+                    disabled={session.completed}
+                    className={session.completed ? "opacity-50" : ""}
                     onClick={async () => {
-                      await tasksStore.loadSession(session.id);
-                      pomodoroStore.setSession(session.id);
+                      try {
+                        await tasksStore.loadSession(session.id);
+                        await pomodoroStore.setSession(session.id);
+                      } catch (error) {
+                        console.error("Failed to start session:", error);
+                        // You could add a toast notification here
+                      }
                     }}
                   >
-                    {session.name || session.description}
+                    <span className="flex items-center gap-2">
+                      {session.completed && <Check className="size-3" />}
+                      {session.name || session.description}
+                    </span>
                   </Button>
                 ))}
               </div>
@@ -585,14 +659,26 @@ export default function Home() {
                           <span className="text-sm text-muted-foreground">
                             {task.estimated_completion_time} min
                           </span>
-                          {!task.completed && (
-                            <Button
-                              size="sm"
-                              onClick={() => tasksStore.completeTask(task.id)}
-                            >
+                          <Button
+                            size="sm"
+                            variant={task.completed ? "outline" : "default"}
+                            onClick={() => {
+                              if (task.completed) {
+                                tasksStore.uncompleteTask(task.id);
+                              } else {
+                                tasksStore.completeTask(task.id);
+                              }
+                            }}
+                          >
+                            {task.completed ? (
+                              <span className="flex items-center gap-1">
+                                <RotateCcw className="size-4" />
+                                Undo
+                              </span>
+                            ) : (
                               <Check className="size-4" />
-                            </Button>
-                          )}
+                            )}
+                          </Button>
                         </div>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
@@ -619,7 +705,9 @@ export default function Home() {
                     <Checkbox
                       checked={task.completed}
                       onCheckedChange={() => {
-                        if (!task.completed) {
+                        if (task.completed) {
+                          tasksStore.uncompleteTask(task.id);
+                        } else {
                           tasksStore.completeTask(task.id);
                         }
                       }}
@@ -636,6 +724,30 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Session Feedback Modal */}
+      {pomodoroStore.pendingSessionCompletion && (
+        <SessionFeedbackModal
+          isOpen={pomodoroStore.showFeedbackModal}
+          onClose={() => pomodoroStore.setShowFeedbackModal(false)}
+          onSubmit={async (focusLevel: FocusLevel, reflection?: string) => {
+            try {
+              await pomodoroStore.submitSessionFeedback(focusLevel, reflection);
+              toast.success("Session feedback submitted successfully!");
+              // Refresh analytics after successful submission
+              analyticsStore.fetchEvents();
+              analyticsStore.updateDailyStats();
+            } catch (error) {
+              console.error("Failed to submit feedback:", error);
+              toast.error("Failed to submit feedback. Please try again.");
+            }
+          }}
+          sessionName={pomodoroStore.pendingSessionCompletion.sessionName}
+          focusDuration={pomodoroStore.pendingSessionCompletion.focusDuration}
+          tasksCompleted={pomodoroStore.pendingSessionCompletion.completedTasks}
+          tasksTotal={pomodoroStore.pendingSessionCompletion.totalTasks}
+        />
+      )}
     </main>
   );
 }

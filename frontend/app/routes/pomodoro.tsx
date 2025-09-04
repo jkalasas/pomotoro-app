@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import { apiClient } from "~/lib/api";
 import { SessionSelector } from "~/components/pomotoro/session-selector";
+import { SessionFeedbackModal, type FocusLevel } from "~/components/pomodoro/session-feedback-modal";
 import { showTestFeatures } from "~/lib/env";
 
 const chartData = [
@@ -60,6 +61,10 @@ export default function Pomodoro() {
     setShowRestOverlay,
     skipRest,
     updateTimer,
+    showFeedbackModal,
+    pendingSessionCompletion,
+    setShowFeedbackModal,
+    submitSessionFeedback,
   } = usePomodoroStore();
 
   // Timer ticking, backend sync and rest-overlay are handled centrally by
@@ -175,6 +180,27 @@ export default function Pomodoro() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Session Feedback Modal */}
+      {pendingSessionCompletion && (
+        <SessionFeedbackModal
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          onSubmit={async (focusLevel: FocusLevel, reflection?: string) => {
+            try {
+              await submitSessionFeedback(focusLevel, reflection);
+              toast.success("Session feedback submitted successfully!");
+            } catch (error) {
+              console.error("Failed to submit feedback:", error);
+              toast.error("Failed to submit feedback. Please try again.");
+            }
+          }}
+          sessionName={pendingSessionCompletion.sessionName}
+          focusDuration={pendingSessionCompletion.focusDuration}
+          tasksCompleted={pendingSessionCompletion.completedTasks}
+          tasksTotal={pendingSessionCompletion.totalTasks}
+        />
       )}
     </main>
   );

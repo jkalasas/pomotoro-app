@@ -9,6 +9,8 @@ export interface Session {
   short_break_duration: number;
   long_break_duration: number;
   long_break_per_pomodoros: number;
+  completed?: boolean;
+  completed_at?: string;
 }
 
 export interface SessionsState {
@@ -29,6 +31,7 @@ export interface SessionsState {
       estimated_completion_time: number;
     }>;
   }) => Promise<void>;
+  completeSession: (sessionId: number, focusLevel: string, reflection?: string) => Promise<void>;
 }
 
 export const useSessionsStore = create<SessionsState>((set, get) => ({
@@ -54,6 +57,26 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await get().loadSessions(); // Reload sessions after creating
     } catch (error) {
       console.error("Failed to create session:", error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  completeSession: async (sessionId, focusLevel, reflection) => {
+    set({ isLoading: true });
+    try {
+      await apiClient.completeSession(sessionId, focusLevel, reflection);
+      // Update the local session state
+      set((state) => ({
+        sessions: state.sessions.map(session =>
+          session.id === sessionId
+            ? { ...session, completed: true, completed_at: new Date().toISOString() }
+            : session
+        ),
+      }));
+    } catch (error) {
+      console.error("Failed to complete session:", error);
+      throw error;
     } finally {
       set({ isLoading: false });
     }

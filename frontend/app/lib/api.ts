@@ -162,6 +162,27 @@ class ApiClient {
     });
   }
 
+  async uncompleteTask(taskId: number) {
+    return this.request(`/sessions/tasks/${taskId}/uncomplete`, {
+      method: 'PUT',
+    });
+  }
+
+  // Session feedback
+  async completeSession(sessionId: number, focusLevel: string, sessionReflection?: string) {
+    return this.request(`/sessions/${sessionId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        focus_level: focusLevel,
+        session_reflection: sessionReflection,
+      }),
+    });
+  }
+
+  async getSessionFeedbacks(limit: number = 50) {
+    return this.request(`/sessions/feedback?limit=${limit}`);
+  }
+
   // Recommendations
   async getRecommendations(description: string) {
     return this.request('/recommendations/generate-tasks', {
