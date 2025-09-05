@@ -111,7 +111,14 @@ class ApiClient {
     return this.request(`/sessions/${sessionId}`);
   }
 
-  async updateSession(sessionId: number, updates: { name?: string; description?: string }) {
+  async updateSession(sessionId: number, updates: { 
+    name?: string; 
+    description?: string;
+    focus_duration?: number;
+    short_break_duration?: number;
+    long_break_duration?: number;
+    long_break_per_pomodoros?: number;
+  }) {
     return this.request(`/sessions/${sessionId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),

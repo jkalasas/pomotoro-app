@@ -13,6 +13,7 @@ import {
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Check,
   CloudLightning,
@@ -23,6 +24,7 @@ import {
   Plus,
   PlusCircle,
   RotateCcw,
+  Settings,
   Timer,
   X,
 } from "lucide-react";
@@ -113,6 +115,13 @@ export default function Home() {
   const [sessionInfo, setSessionInfo] = useState<GeneratedSessionInfo>();
   const [editingSessionName, setEditingSessionName] = useState(false);
   const [sessionNameInput, setSessionNameInput] = useState("");
+  const [isSessionSettingsOpen, setIsSessionSettingsOpen] = useState(false);
+  const [sessionSettings, setSessionSettings] = useState({
+    focus_duration: 25,
+    short_break_duration: 5,
+    long_break_duration: 15,
+    long_break_per_pomodoros: 4,
+  });
 
   // Load user data and sessions on mount
   useEffect(() => {
@@ -304,6 +313,47 @@ export default function Home() {
     setSessionNameInput("");
   };
 
+  const openSessionSettings = () => {
+    if (tasksStore.currentSession) {
+      setSessionSettings({
+        focus_duration: tasksStore.currentSession.focus_duration,
+        short_break_duration: tasksStore.currentSession.short_break_duration,
+        long_break_duration: tasksStore.currentSession.long_break_duration,
+        long_break_per_pomodoros: tasksStore.currentSession.long_break_per_pomodoros,
+      });
+      setIsSessionSettingsOpen(true);
+    }
+  };
+
+  const saveSessionSettings = async () => {
+    if (tasksStore.currentSession) {
+      try {
+        await tasksStore.updateSession(tasksStore.currentSession.id, sessionSettings);
+        
+        // If this session is currently active in the Pomodoro timer, refresh it
+        if (pomodoroStore.sessionId === tasksStore.currentSession.id) {
+          await pomodoroStore.loadActiveSession();
+        }
+        
+        setIsSessionSettingsOpen(false);
+        toast.success("Session settings updated!");
+      } catch (error) {
+        console.error("Failed to update session settings:", error);
+        toast.error("Failed to update session settings");
+      }
+    }
+  };
+
+  const cancelSessionSettings = () => {
+    setIsSessionSettingsOpen(false);
+    setSessionSettings({
+      focus_duration: 25,
+      short_break_duration: 5,
+      long_break_duration: 15,
+      long_break_per_pomodoros: 4,
+    });
+  };
+
   return (
     <main className="flex flex-col items-center justify-center pb-4 gap-3 p-5">
       <div className="w-full flex justify-between">
@@ -412,6 +462,97 @@ export default function Home() {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {/* Session Settings Dialog */}
+      <Dialog open={isSessionSettingsOpen} onOpenChange={setIsSessionSettingsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Session Settings</DialogTitle>
+            <DialogDescription>
+              Customize the timing for your Pomodoro session
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
+              <Input
+                id="focus-duration"
+                type="number"
+                min="1"
+                max="120"
+                value={sessionSettings.focus_duration}
+                onChange={(e) => setSessionSettings({
+                  ...sessionSettings,
+                  focus_duration: parseInt(e.target.value) || 25
+                })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="short-break">Short Break Duration (minutes)</Label>
+              <Input
+                id="short-break"
+                type="number"
+                min="1"
+                max="30"
+                value={sessionSettings.short_break_duration}
+                onChange={(e) => setSessionSettings({
+                  ...sessionSettings,
+                  short_break_duration: parseInt(e.target.value) || 5
+                })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
+              <Input
+                id="long-break"
+                type="number"
+                min="1"
+                max="60"
+                value={sessionSettings.long_break_duration}
+                onChange={(e) => setSessionSettings({
+                  ...sessionSettings,
+                  long_break_duration: parseInt(e.target.value) || 15
+                })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="long-break-frequency">Long Break After (pomodoros)</Label>
+              <Input
+                id="long-break-frequency"
+                type="number"
+                min="1"
+                max="10"
+                value={sessionSettings.long_break_per_pomodoros}
+                onChange={(e) => setSessionSettings({
+                  ...sessionSettings,
+                  long_break_per_pomodoros: parseInt(e.target.value) || 4
+                })}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={cancelSessionSettings}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveSessionSettings}
+              className="flex-1"
+            >
+              Save Settings
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex justify-between w-full">
         <div className="flex items-center gap-2">
           {editingSessionName ? (
@@ -440,9 +581,14 @@ export default function Home() {
                 {tasksStore.currentSession?.name || "No Session Selected"}
               </span>
               {tasksStore.currentSession && (
-                <Button size="sm" variant="ghost" onClick={startEditingSessionName}>
-                  <Edit2 className="size-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={startEditingSessionName}>
+                    <Edit2 className="size-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={openSessionSettings}>
+                    <Settings className="size-4" />
+                  </Button>
+                </div>
               )}
             </>
           )}

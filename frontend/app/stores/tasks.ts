@@ -45,7 +45,14 @@ interface TaskState {
       estimated_completion_time: number;
     }>;
   }) => Promise<Session>;
-  updateSession: (sessionId: number, updates: { name?: string; description?: string }) => Promise<void>;
+  updateSession: (sessionId: number, updates: { 
+    name?: string; 
+    description?: string;
+    focus_duration?: number;
+    short_break_duration?: number;
+    long_break_duration?: number;
+    long_break_per_pomodoros?: number;
+  }) => Promise<void>;
   completeTask: (taskId: number) => Promise<void>;
   uncompleteTask: (taskId: number) => Promise<void>;
   completeSessionManually: () => Promise<void>;

@@ -58,6 +58,10 @@ class SessionWithTasksPublic(SessionPublic):
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    focus_duration: Optional[int] = None
+    short_break_duration: Optional[int] = None
+    long_break_duration: Optional[int] = None
+    long_break_per_pomodoros: Optional[int] = None
 
 
 class ActiveSessionCreate(BaseModel):

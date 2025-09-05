@@ -530,13 +530,59 @@ def update_session(
     db_session = db.get(PomodoroSession, session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Check if there's an active session running for this session
+    active_session = db.exec(
+        select(ActivePomodoroSession).where(
+            ActivePomodoroSession.session_id == session_id,
+            ActivePomodoroSession.user_id == current_user.id
+        )
+    ).first()
+    
+    if active_session and active_session.is_running:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot update session configuration while session is running"
+        )
+    
+    # Update fields if provided
     if session_update.description is not None:
         db_session.description = session_update.description
     if session_update.name is not None:
         db_session.name = session_update.name
+    if session_update.focus_duration is not None:
+        db_session.focus_duration = session_update.focus_duration
+    if session_update.short_break_duration is not None:
+        db_session.short_break_duration = session_update.short_break_duration
+    if session_update.long_break_duration is not None:
+        db_session.long_break_duration = session_update.long_break_duration
+    if session_update.long_break_per_pomodoros is not None:
+        db_session.long_break_per_pomodoros = session_update.long_break_per_pomodoros
+    
     db.add(db_session)
     db.commit()
     db.refresh(db_session)
+    
+    # Update active session timing if one exists and timing values were changed
+    timing_changed = any([
+        session_update.focus_duration is not None,
+        session_update.short_break_duration is not None,
+        session_update.long_break_duration is not None,
+        session_update.long_break_per_pomodoros is not None
+    ])
+    
+    if timing_changed and active_session and not active_session.is_running:
+        # Update the time_remaining based on current phase and new timings
+        if active_session.phase == "focus":
+            active_session.time_remaining = db_session.focus_duration * 60
+        elif active_session.phase == "short_break":
+            active_session.time_remaining = db_session.short_break_duration * 60
+        elif active_session.phase == "long_break":
+            active_session.time_remaining = db_session.long_break_duration * 60
+        
+        db.add(active_session)
+        db.commit()
+        db.refresh(active_session)
     
     # Return in SessionPublic format to ensure consistency
     return SessionPublic(

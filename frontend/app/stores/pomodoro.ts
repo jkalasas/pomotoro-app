@@ -234,15 +234,50 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         session_id: number;
         pomodoros_completed: number;
       };
-      // Only set maxTime if it's not already set. The backend reports the
-      // remaining time, but we must not overwrite the original session
-      // duration (maxTime) on every sync; otherwise pausing (which causes a
-      // backend update with the current remaining time) will make the chart
-      // appear full again because maxTime would equal time.
-      const currentMax = get().maxTime;
+      
+      const currentState = get();
+      
+      // Calculate the correct maxTime based on the session configuration and phase
+      // We need to get the session details to know the proper timing for each phase
+      let newMaxTime = activeSession.time_remaining;
+      
+      // If the phase hasn't changed and we already have a maxTime, and the timer isn't
+      // at the beginning (time_remaining equals maxTime), keep the existing maxTime
+      // to preserve the progress visualization. However, if the session ID changed
+      // or if we're at the beginning of a timer period, update maxTime.
+      const phaseChanged = currentState.phase !== activeSession.phase;
+      const sessionChanged = currentState.sessionId !== activeSession.session_id;
+      const isAtBeginning = !currentState.maxTime || currentState.time === currentState.maxTime || currentState.maxTime === 0;
+      
+      if (phaseChanged || sessionChanged || isAtBeginning) {
+        // Get session details to determine correct maxTime for the current phase
+        try {
+          const session = await apiClient.getSession(activeSession.session_id) as {
+            focus_duration: number;
+            short_break_duration: number;
+            long_break_duration: number;
+          };
+          
+          if (activeSession.phase === "focus") {
+            newMaxTime = session.focus_duration * 60;
+          } else if (activeSession.phase === "short_break") {
+            newMaxTime = session.short_break_duration * 60;
+          } else if (activeSession.phase === "long_break") {
+            newMaxTime = session.long_break_duration * 60;
+          }
+        } catch (error) {
+          console.error("Failed to get session details for maxTime calculation:", error);
+          // Fall back to using time_remaining as maxTime
+          newMaxTime = activeSession.time_remaining;
+        }
+      } else {
+        // Keep existing maxTime to preserve progress visualization
+        newMaxTime = currentState.maxTime;
+      }
+      
       set({
         time: activeSession.time_remaining,
-        maxTime: currentMax && currentMax > 0 ? currentMax : activeSession.time_remaining,
+        maxTime: newMaxTime,
         isRunning: activeSession.is_running,
         phase: activeSession.phase,
         currentTaskId: activeSession.current_task_id,
