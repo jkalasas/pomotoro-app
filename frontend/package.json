@@ -7,7 +7,10 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "VITEST=true vitest",
+    "test:run": "VITEST=true vitest run",
+    "test:ui": "VITEST=true vitest --ui"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -52,13 +55,19 @@
     "@react-router/dev": "^7.4.1",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.4.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
+    "jsdom": "^25.0.1",
     "react-router-devtools": "^1.1.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }
