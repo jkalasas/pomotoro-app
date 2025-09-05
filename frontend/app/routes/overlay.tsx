@@ -90,6 +90,17 @@ export default function Overlay() {
     }
   };
 
+  // Close overlay without skipping the rest period in the main window.
+  // This only closes the overlay window and does not emit 'skip-rest'.
+  const handleClose = async () => {
+    try {
+      const currentWindow = getCurrentWindow();
+      await currentWindow.close();
+    } catch (error) {
+      console.error('Failed to close overlay window:', error);
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 z-[9999] flex flex-col bg-gray-100"
@@ -140,21 +151,31 @@ export default function Overlay() {
               </div>
             </div>
 
-            {/* Skip button - minimal style */}
-            <button
-              onClick={handleSkip}
-              className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
-            >
-              Skip Rest
-            </button>
+            {/* Controls - Skip (emit) and Close (dismiss only) */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleSkip}
+                className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
+              >
+                Skip Rest
+              </button>
+
+              <button
+                onClick={handleClose}
+                className="px-3 py-2 text-sm bg-primary-foreground/5 border border-primary-foreground/10 rounded hover:bg-primary-foreground/10 transition-colors"
+                title="Close overlay without skipping the rest"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
         
         {/* ESC hint at bottom */}
         <div className="text-center mt-4">
-          <p className="text-xs opacity-60">
-            Press ESC to skip this rest period
-          </p>
+            <p className="text-xs opacity-60">
+              Press ESC to skip this rest period — or press Close to simply dismiss the overlay
+            </p>
         </div>
       </div>
     </div>
