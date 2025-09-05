@@ -470,16 +470,18 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Skip to focus phase with correct duration
       await apiClient.updateActiveSession({
         phase: "focus",
-        is_running: false,
+        // When the user explicitly skips rest, resume the focus period
+        // immediately so the timer is running again.
+        is_running: true,
         time_remaining: focusDuration,
       });
-      
-      // Update local state
+
+      // Update local state and mark the timer as running
       set({
         phase: "focus",
         time: focusDuration,
         maxTime: focusDuration,
-        isRunning: false
+        isRunning: true,
       });
       
       await get().loadActiveSession();

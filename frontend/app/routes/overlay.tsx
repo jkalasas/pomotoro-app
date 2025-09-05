@@ -43,7 +43,21 @@ export default function Overlay() {
   // Countdown timer
   useEffect(() => {
     if (timeRemaining <= 0) {
-      handleSkip();
+      // When the overlay timer naturally reaches zero, simply close
+      // the overlay window without emitting the 'skip-rest' event.
+      // Emitting 'skip-rest' causes the skipRest() handler in the
+      // main window to set is_running: false on the backend which can
+      // race with the main store's phase transition logic that should
+      // set is_running: true when moving back to focus. Only emit
+      // 'skip-rest' for user-initiated skips (button / ESC).
+      (async () => {
+        try {
+          const currentWindow = getCurrentWindow();
+          await currentWindow.close();
+        } catch (error) {
+          console.error('Failed to close overlay window on natural expiry:', error);
+        }
+      })();
       return;
     }
 
