@@ -167,6 +167,58 @@ export default function Pomodoro() {
 
             <Button
               type="button"
+              onClick={async () => {
+                // Directly test phase completion logic
+                const store = usePomodoroStore.getState();
+                console.log('Current state before phase completion:', {
+                  phase: store.phase,
+                  sessionId: store.sessionId,
+                  pomodorosCompleted: store.pomodorosCompleted
+                });
+                alert(`Starting phase completion test. Current: ${store.phase} -> next phase`);
+                await store.handlePhaseCompletion();
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100"
+            >
+              <Bug className="size-4 mr-2" />
+              Direct Phase Completion
+            </Button>
+
+            <Button
+              type="button"
+              onClick={async () => {
+                // Set a very short timer for testing
+                await updateTimer({
+                  time_remaining: 5, // 5 seconds
+                  is_running: true
+                });
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+            >
+              <Bug className="size-4 mr-2" />
+              5-Second Timer Test
+            </Button>
+
+            <Button
+              type="button"
+              onClick={async () => {
+                // Test timer completion and phase transition
+                await simulateTimerCompletion();
+              }}
+              disabled={isLoading}
+              variant="outline"
+              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+            >
+              <Bug className="size-4 mr-2" />
+              Simulate Timer Complete
+            </Button>
+
+            <Button
+              type="button"
               onClick={() => {
                 // Force hide overlay for testing
                 setShowRestOverlay(false);

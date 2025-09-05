@@ -29,11 +29,13 @@ export interface PomodoroState {
   setMaxTime: (maxTime: number) => void;
   setSession: (sessionId: number) => Promise<void>;
   loadActiveSession: () => Promise<void>;
+  handlePhaseCompletion: () => Promise<void>;
   updateTimer: (updates: {
     time_remaining?: number;
     phase?: string;
     current_task_id?: number;
     pomodoros_completed?: number;
+    is_running?: boolean;
   }) => Promise<void>;
   setShowRestOverlay: (show: boolean) => void;
   skipRest: () => Promise<void>;
@@ -46,13 +48,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
     listen('skip-rest', () => {
-      console.log('Received skip-rest event from overlay');
       get().skipRest();
     });
 
     // Listen for session completion events from task store
     window.addEventListener('session-completion', (event: any) => {
-      console.log('Session completion event received:', event.detail);
       const { sessionId, sessionName, totalTasks, completedTasks, focusDuration } = event.detail;
       get().triggerSessionCompletion(sessionId, sessionName, totalTasks, completedTasks, focusDuration);
     });
@@ -79,8 +79,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
 
             // Handle timer completion
             if (newTime === 0) {
-              set({ isRunning: false });
-              apiClient.updateActiveSession({ is_running: false }).catch(console.error);
+              get().handlePhaseCompletion();
             }
           }
 
@@ -138,7 +137,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const { sessionId, phase } = get();
       await apiClient.updateActiveSession({ is_running: true });
       set({ isRunning: true });
-      await get().loadActiveSession();
+      // Note: Removed loadActiveSession() call to prevent state override
       
       // Log analytics event
       if (sessionId) {
@@ -299,6 +298,94 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     }
   },
 
+  handlePhaseCompletion: async () => {
+    const { phase, pomodorosCompleted, sessionId } = get();
+    
+    if (!sessionId) {
+      console.error('No active session found for phase completion');
+      return;
+    }
+
+    try {
+      // Get session configuration to determine durations and break intervals
+      const session = await apiClient.getSession(sessionId) as {
+        focus_duration: number;
+        short_break_duration: number;
+        long_break_duration: number;
+        long_break_per_pomodoros: number;
+      };
+
+      let nextPhase: string;
+      let nextDuration: number;
+      let newPomodorosCompleted = pomodorosCompleted;
+
+      if (phase === "focus") {
+        // Focus phase completed - increment pomodoro count and move to break
+        newPomodorosCompleted = pomodorosCompleted + 1;
+        
+        // Determine if it's time for a long break
+        if (newPomodorosCompleted % session.long_break_per_pomodoros === 0) {
+          nextPhase = "long_break";
+          nextDuration = session.long_break_duration * 60;
+        } else {
+          nextPhase = "short_break";
+          nextDuration = session.short_break_duration * 60;
+        }
+        
+        // Log pomodoro completion
+        try {
+          useAnalyticsStore.getState().logPomodoroComplete(sessionId, newPomodorosCompleted);
+        } catch (analyticsError) {
+          console.error('Failed to log pomodoro completion, but continuing:', analyticsError);
+        }
+      } else {
+        // Break phase completed - move back to focus
+        nextPhase = "focus";
+        nextDuration = session.focus_duration * 60;
+      }
+
+      // Update the backend with new phase and restart timer
+      await apiClient.updateActiveSession({
+        phase: nextPhase,
+        time_remaining: nextDuration,
+        is_running: true,
+        pomodoros_completed: newPomodorosCompleted
+      });
+      
+      // Update local state
+      set({
+        phase: nextPhase,
+        time: nextDuration,
+        maxTime: nextDuration,
+        isRunning: true,
+        pomodorosCompleted: newPomodorosCompleted
+      });
+      
+      // Log phase change analytics
+      try {
+        useAnalyticsStore.getState().logEvent('phase_change', {
+          session_id: sessionId,
+          from_phase: phase,
+          to_phase: nextPhase,
+          change_time: new Date().toISOString()
+        });
+        
+        if (nextPhase.includes('break')) {
+          useAnalyticsStore.getState().logBreakStart(sessionId, nextPhase);
+        }
+      } catch (analyticsError) {
+        console.error('Failed to log analytics, but continuing:', analyticsError);
+      }
+      
+    } catch (error) {
+      console.error('Failed to handle phase completion:', error);
+      
+      // Fallback: just stop the timer
+      set({ isRunning: false });
+      await apiClient.updateActiveSession({ is_running: false });
+    }
+  },
+
   updateTimer: async (updates) => {
     set({ isLoading: true });
     try {
@@ -332,16 +419,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
 
   setShowRestOverlay: (show: boolean) => {
     const currentState = get();
-    console.log('setShowRestOverlay called:', { 
-      show, 
-      currentState: currentState.showRestOverlay,
-      currentTime: currentState.time 
-    });
     
     if (show && !currentState.showRestOverlay) {
       // Create overlay window when showing (only if not already showing)
       const { time } = get();
-      console.log('Creating overlay window with time:', time);
       set({ showRestOverlay: true });
       
       try {
@@ -353,7 +434,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
     } else if (!show && currentState.showRestOverlay) {
       // Close overlay window when hiding (only if currently showing)
-      console.log('Closing overlay window');
       set({ showRestOverlay: false });
       
       try {
@@ -361,33 +441,48 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       } catch (error) {
         console.error('Failed to close overlay window:', error);
       }
-    } else {
-      console.log('No action needed - state already matches:', { show, current: currentState.showRestOverlay });
     }
   },
 
   skipRest: async () => {
-    console.log('skipRest called');
+    const { sessionId } = get();
+    
+    if (!sessionId) {
+      console.error('No active session found for skip rest');
+      return;
+    }
+    
     set({ isLoading: true });
     try {
       // First, update the overlay state
       set({ showRestOverlay: false });
       
       // Close the overlay window
-      console.log('Closing overlay window from skipRest');
       await useWindowStore.getState().closeOverlayWindow();
       
-      // Skip to next phase (usually back to focus)
-      console.log('Updating session to skip rest');
+      // Get session configuration to use correct focus duration
+      const session = await apiClient.getSession(sessionId) as {
+        focus_duration: number;
+      };
+      
+      const focusDuration = session.focus_duration * 60; // Convert minutes to seconds
+      
+      // Skip to focus phase with correct duration
       await apiClient.updateActiveSession({
         phase: "focus",
         is_running: false,
-        time_remaining: 25 * 60, // Default 25 minute focus session
+        time_remaining: focusDuration,
       });
       
-      console.log('Loading active session after skip');
+      // Update local state
+      set({
+        phase: "focus",
+        time: focusDuration,
+        maxTime: focusDuration,
+        isRunning: false
+      });
+      
       await get().loadActiveSession();
-      console.log('skipRest completed successfully');
     } catch (error) {
       console.error("Failed to skip rest:", error);
     } finally {
@@ -396,7 +491,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   triggerSessionCompletion: (sessionId, sessionName, totalTasks, completedTasks, focusDuration) => {
-    console.log('triggerSessionCompletion called with:', { sessionId, sessionName, totalTasks, completedTasks, focusDuration });
     set({
       showFeedbackModal: true,
       pendingSessionCompletion: {
@@ -407,7 +501,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         focusDuration,
       },
     });
-    console.log('Modal state updated - showFeedbackModal:', true);
   },
 
   setShowFeedbackModal: (show) => {
@@ -460,7 +553,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Trigger global refresh event
       if (typeof window !== 'undefined') {
-        console.log('Triggering session-completed event for refresh');
         window.dispatchEvent(new CustomEvent('session-completed', {
           detail: { sessionId: pendingSessionCompletion.sessionId }
         }));
