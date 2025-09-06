@@ -71,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     initializeAuth();
     initWindow();
 
-    (async () => {
+    /* (async () => {
       const menu = await Menu.new({
         items: [{ id: "quit", text: "Quit " }],
       });
@@ -81,7 +81,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       };
 
       setTray(await TrayIcon.new(trayOptions));
-    })();
+    })(); */
   }, [token, user, loadUser, initWindow, isOverlayRoute]);
 
   // If it's the overlay route, render it directly without authentication check
