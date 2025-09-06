@@ -31,6 +31,7 @@ interface TaskState {
   refreshAllData: () => Promise<void>;
   loadSessions: () => Promise<void>;
   loadSession: (sessionId: number) => Promise<void>;
+  getSession: (sessionId: number) => Promise<Session>;
   createSession: (sessionData: {
     description: string;
     pomodoro_config: {
@@ -53,10 +54,24 @@ interface TaskState {
     long_break_duration?: number;
     long_break_per_pomodoros?: number;
   }) => Promise<void>;
+  deleteSession: (sessionId: number) => Promise<void>;
   completeTask: (taskId: number) => Promise<void>;
   uncompleteTask: (taskId: number) => Promise<void>;
   completeSessionManually: () => Promise<void>;
   setCurrentSession: (session: Session | null) => void;
+  // Task management methods
+  addTaskToSession: (sessionId: number, taskData: {
+    name: string;
+    category: string;
+    estimated_completion_time: number;
+  }) => Promise<void>;
+  updateTask: (taskId: number, taskData: {
+    name?: string;
+    category?: string;
+    estimated_completion_time?: number;
+  }) => Promise<void>;
+  deleteTask: (taskId: number) => Promise<void>;
+  reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -77,7 +92,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ isLoading: true });
     try {
       const sessions = await apiClient.getSessions() as Session[];
-      set({ sessions });
+      // Ensure all sessions have a tasks array
+      const sessionsWithTasks = sessions.map(session => ({
+        ...session,
+        tasks: session.tasks || []
+      }));
+      set({ sessions: sessionsWithTasks });
     } catch (error) {
       console.error("Failed to load sessions:", error);
     } finally {
@@ -89,11 +109,30 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ isLoading: true });
     try {
       const session = await apiClient.getSession(sessionId) as Session;
-      set({ currentSession: session });
+      // Ensure session has a tasks array
+      const sessionWithTasks = {
+        ...session,
+        tasks: session.tasks || []
+      };
+      set({ currentSession: sessionWithTasks });
     } catch (error) {
       console.error("Failed to load session:", error);
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  getSession: async (sessionId: number) => {
+    try {
+      const session = await apiClient.getSession(sessionId) as Session;
+      // Ensure session has a tasks array
+      return {
+        ...session,
+        tasks: session.tasks || []
+      };
+    } catch (error) {
+      console.error("Failed to get session:", error);
+      throw error;
     }
   },
 
@@ -276,4 +315,107 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   setCurrentSession: (session: Session | null) => set({ currentSession: session }),
+
+  deleteSession: async (sessionId: number) => {
+    try {
+      await apiClient.deleteSession(sessionId);
+      // Remove from local state
+      set((state) => ({
+        sessions: state.sessions.filter(session => session.id !== sessionId),
+        currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      throw error;
+    }
+  },
+
+  addTaskToSession: async (sessionId: number, taskData) => {
+    try {
+      const newTask = await apiClient.addTaskToSession(sessionId, taskData) as Task;
+      // Update the local state by adding the task to the session
+      set((state) => ({
+        sessions: state.sessions.map(session =>
+          session.id === sessionId
+            ? { ...session, tasks: [...(session.tasks || []), newTask] }
+            : session
+        ),
+        currentSession: state.currentSession?.id === sessionId
+          ? { ...state.currentSession, tasks: [...(state.currentSession.tasks || []), newTask] }
+          : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to add task:", error);
+      throw error;
+    }
+  },
+
+  updateTask: async (taskId: number, taskData) => {
+    try {
+      const updatedTask = await apiClient.updateTask(taskId, taskData) as Task;
+      // Update the local state
+      set((state) => ({
+        sessions: state.sessions.map(session => ({
+          ...session,
+          tasks: (session.tasks || []).map(task =>
+            task.id === taskId ? updatedTask : task
+          ),
+        })),
+        currentSession: state.currentSession ? {
+          ...state.currentSession,
+          tasks: (state.currentSession.tasks || []).map(task =>
+            task.id === taskId ? updatedTask : task
+          ),
+        } : null,
+      }));
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      throw error;
+    }
+  },
+
+  deleteTask: async (taskId: number) => {
+    try {
+      await apiClient.deleteTask(taskId);
+      // Remove from local state
+      set((state) => ({
+        sessions: state.sessions.map(session => ({
+          ...session,
+          tasks: (session.tasks || []).filter(task => task.id !== taskId),
+        })),
+        currentSession: state.currentSession ? {
+          ...state.currentSession,
+          tasks: (state.currentSession.tasks || []).filter(task => task.id !== taskId),
+        } : null,
+      }));
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      throw error;
+    }
+  },
+
+  reorderTasks: async (sessionId: number, taskIds) => {
+    try {
+      await apiClient.reorderTasks(sessionId, taskIds);
+      // Update the local state to reflect the new order
+      set((state) => ({
+        sessions: state.sessions.map(session => {
+          if (session.id === sessionId && session.tasks) {
+            const taskMap = new Map(session.tasks.map(task => [task.id, task]));
+            const reorderedTasks = taskIds.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+            return { ...session, tasks: reorderedTasks };
+          }
+          return session;
+        }),
+        currentSession: state.currentSession?.id === sessionId && state.currentSession?.tasks ? (() => {
+          const taskMap = new Map(state.currentSession.tasks.map(task => [task.id, task]));
+          const reorderedTasks = taskIds.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+          return { ...state.currentSession, tasks: reorderedTasks };
+        })() : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      throw error;
+    }
+  },
 }));

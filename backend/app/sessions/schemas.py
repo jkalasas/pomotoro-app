@@ -105,3 +105,19 @@ class SessionFeedbackPublic(BaseModel):
 class SessionCompleteRequest(BaseModel):
     focus_level: FocusLevel
     session_reflection: Optional[str] = None
+
+
+class TaskCreate(BaseModel):
+    name: str
+    category: str
+    estimated_completion_time: int
+
+
+class TaskUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    estimated_completion_time: Optional[int] = None
+
+
+class TaskReorder(BaseModel):
+    task_ids: List[int]

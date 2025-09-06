@@ -175,6 +175,42 @@ class ApiClient {
     });
   }
 
+  // Task management endpoints
+  async addTaskToSession(sessionId: number, taskData: {
+    name: string;
+    category: string;
+    estimated_completion_time: number;
+  }) {
+    return this.request(`/sessions/${sessionId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async updateTask(taskId: number, taskData: {
+    name?: string;
+    category?: string;
+    estimated_completion_time?: number;
+  }) {
+    return this.request(`/sessions/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async deleteTask(taskId: number) {
+    return this.request(`/sessions/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderTasks(sessionId: number, taskIds: number[]) {
+    return this.request(`/sessions/${sessionId}/tasks/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ task_ids: taskIds }),
+    });
+  }
+
   // Session feedback
   async completeSession(sessionId: number, focusLevel: string, sessionReflection?: string) {
     return this.request(`/sessions/${sessionId}/complete`, {

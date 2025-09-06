@@ -381,6 +381,15 @@ export default function Home() {
       <div className="w-full flex justify-between">
         <SidebarTrigger />
         <div className="flex justify-end gap-3">
+          <Link to="/sessions">
+            <Button
+              variant="outline"
+              className="inline-flex items-center gap-2"
+            >
+              <Settings />
+              <span>Sessions</span>
+            </Button>
+          </Link>
           <Link to="/analytics">
             <Button
               variant="outline"

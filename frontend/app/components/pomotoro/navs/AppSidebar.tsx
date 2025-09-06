@@ -4,6 +4,7 @@ import {
   CircleUser,
   Hourglass,
   Timer,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
@@ -36,6 +37,11 @@ const items: SidebarItem[] = [
     label: "Pomodoro Timer",
     url: "/pomodoro",
     icon: Timer,
+  },
+  {
+    label: "Sessions",
+    url: "/sessions",
+    icon: Settings,
   },
   {
     label: "Session Overview",
