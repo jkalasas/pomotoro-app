@@ -5,14 +5,13 @@ from sqlmodel import select
 from ..auth.deps import ActiveUserDep
 from ..db import SessionDep
 from ..models import PomodoroSession, Task
-from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse, UserAnalyticsResponse
+from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse
 from .genetic_algorithm import GeneticAlgorithmScheduler
-from ..services.analytics import UserAnalyticsService
 
 router = APIRouter(prefix="/scheduler", tags=["Scheduler"])
 
 
-def schedule_tasks_with_ga(session_ids: List[int], db, user: ActiveUserDep) -> ScheduleResponse:
+def schedule_tasks_with_ga(session_ids: List[int], db: SessionDep, user: ActiveUserDep) -> ScheduleResponse:
     """
     Schedule tasks using the Genetic Algorithm implementation from IMPLEMENTATION.md
     """
@@ -74,13 +73,14 @@ def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUser
     Generate an optimized task schedule using genetic algorithm
     """
     # Verify user owns all requested sessions
-    query = select(PomodoroSession).where(
-        PomodoroSession.id.in_(request.session_ids),
-        PomodoroSession.user_id != user.id
+    query = (
+        select(PomodoroSession)
+        .where(PomodoroSession.id.in_(request.session_ids))
+        .where(PomodoroSession.user_id != user.id)
+        .exists()
     )
 
-    unauthorized_sessions = db.exec(query).first()
-    if unauthorized_sessions:
+    if db.exec(query).first():
         raise HTTPException(
             status_code=403,
             detail="Cannot schedule tasks from sessions not owned by the user.",
@@ -90,40 +90,3 @@ def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUser
         raise HTTPException(status_code=400, detail="Session IDs list cannot be empty.")
     
     return schedule_tasks_with_ga(request.session_ids, db, user)
-
-
-@router.get("/user-insights", response_model=UserAnalyticsResponse)
-def get_user_insights(db: SessionDep, user: ActiveUserDep):
-    """
-    Get user analytics insights for the genetic algorithm scheduler.
-    """
-    try:
-        completion_rate = UserAnalyticsService.calculate_completion_rate(user, db)
-        focus_level = UserAnalyticsService.calculate_average_focus_level(user, db)
-        time_ratio = UserAnalyticsService.calculate_estimated_vs_actual_ratio(user, db)
-        category_performance = UserAnalyticsService.get_task_category_performance(user, db)
-        time_of_day_performance = UserAnalyticsService.get_time_of_day_performance(user, db)
-        
-        return UserAnalyticsResponse(
-            completion_rate=completion_rate,
-            average_focus_level=focus_level,
-            estimated_vs_actual_ratio=time_ratio,
-            category_performance=category_performance,
-            time_of_day_performance=time_of_day_performance
-        )
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating user insights: {str(e)}")
-
-
-@router.post("/update-daily-stats")
-def update_daily_stats(db: SessionDep, user: ActiveUserDep):
-    """
-    Update daily statistics for the current user.
-    """
-    try:
-        UserAnalyticsService.update_daily_stats(user, db)
-        return {"message": "Daily statistics updated successfully"}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating daily stats: {str(e)}")
