@@ -28,8 +28,6 @@ import {
   Timer,
   X,
 } from "lucide-react";
-import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
-import { DailyProgress } from "~/components/pomotoro/daily-progress";
 import { Checkbox } from "~/components/ui/checkbox";
 import TaskCheckItem from "~/components/pomotoro/tasks/task-check-item";
 import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
@@ -52,9 +50,13 @@ import { usePomodoroStore } from "~/stores/pomodoro";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { useAuthStore } from "~/stores/auth";
 import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
-import { SessionFeedbackModal, type FocusLevel } from "~/components/pomodoro/session-feedback-modal";
+import {
+  SessionFeedbackModal,
+  type FocusLevel,
+} from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
 import { showTestFeatures } from "~/lib/env";
+import useElementSize from "~/hooks/use-element-size";
 
 interface GeneratedTask {
   name: string;
@@ -123,6 +125,8 @@ export default function Home() {
     long_break_per_pomodoros: 4,
   });
 
+  const [pomodoroWidgetRef, pomodoroWidgetSize] = useElementSize();
+
   // Load user data and sessions on mount
   useEffect(() => {
     if (authStore.token && !authStore.user) {
@@ -140,7 +144,7 @@ export default function Home() {
   // Listen for session completion events to refresh data
   useEffect(() => {
     const handleSessionCompleted = () => {
-      console.log('Session completed - refreshing data');
+      console.log("Session completed - refreshing data");
       tasksStore.refreshAllData();
       // Also refresh analytics
       analyticsStore.updateDailyStats();
@@ -148,14 +152,14 @@ export default function Home() {
     };
 
     const handleSessionReset = () => {
-      console.log('Session reset - refreshing data');
+      console.log("Session reset - refreshing data");
       tasksStore.refreshAllData();
       // Refresh analytics after session reset
       analyticsStore.updateDailyStats();
     };
 
     const handleTaskCompleted = () => {
-      console.log('Task completed/uncompleted - refreshing current session');
+      console.log("Task completed/uncompleted - refreshing current session");
       if (tasksStore.currentSession) {
         tasksStore.loadSession(tasksStore.currentSession.id);
       }
@@ -163,19 +167,19 @@ export default function Home() {
       analyticsStore.updateDailyStats();
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('session-completed', handleSessionCompleted);
-      window.addEventListener('session-reset', handleSessionReset);
-      window.addEventListener('task-completed', handleTaskCompleted);
-      window.addEventListener('task-uncompleted', handleTaskCompleted);
+    if (typeof window !== "undefined") {
+      window.addEventListener("session-completed", handleSessionCompleted);
+      window.addEventListener("session-reset", handleSessionReset);
+      window.addEventListener("task-completed", handleTaskCompleted);
+      window.addEventListener("task-uncompleted", handleTaskCompleted);
     }
 
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('session-completed', handleSessionCompleted);
-        window.removeEventListener('session-reset', handleSessionReset);
-        window.removeEventListener('task-completed', handleTaskCompleted);
-        window.removeEventListener('task-uncompleted', handleTaskCompleted);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("session-completed", handleSessionCompleted);
+        window.removeEventListener("session-reset", handleSessionReset);
+        window.removeEventListener("task-completed", handleTaskCompleted);
+        window.removeEventListener("task-uncompleted", handleTaskCompleted);
       }
     };
   }, [tasksStore]);
@@ -210,8 +214,10 @@ export default function Home() {
 
     try {
       // First generate recommendations
-      const recommendations = await apiClient.getRecommendations(projectDetails) as RecommendationResponse;
-      
+      const recommendations = (await apiClient.getRecommendations(
+        projectDetails
+      )) as RecommendationResponse;
+
       // Convert backend format to frontend format for display (don't create session yet)
       const sessionInfo = {
         sessionDetails: {
@@ -222,16 +228,22 @@ export default function Home() {
           duration: recommendations.pomodoro_config.focus_duration,
           shortBreakTime: recommendations.pomodoro_config.short_break_duration,
           longBreakTime: recommendations.pomodoro_config.long_break_duration,
-          pomodorosBeforeLongBreak: recommendations.pomodoro_config.long_break_per_pomodoros,
+          pomodorosBeforeLongBreak:
+            recommendations.pomodoro_config.long_break_per_pomodoros,
         },
-        tasks: recommendations.generated_tasks.map((task: GeneratedTask, index: number) => ({
-          id: `temp-${index}`,
-          name: task.name,
-          description: "",
-          difficulty: TaskDifficulty.MEDIUM,
-          pomodoros: Math.ceil(task.estimated_completion_time / recommendations.pomodoro_config.focus_duration),
-          category: task.category,
-        })),
+        tasks: recommendations.generated_tasks.map(
+          (task: GeneratedTask, index: number) => ({
+            id: `temp-${index}`,
+            name: task.name,
+            description: "",
+            difficulty: TaskDifficulty.MEDIUM,
+            pomodoros: Math.ceil(
+              task.estimated_completion_time /
+                recommendations.pomodoro_config.focus_duration
+            ),
+            category: task.category,
+          })
+        ),
       };
 
       setSessionInfo(sessionInfo);
@@ -254,7 +266,9 @@ export default function Home() {
     if (!sessionInfo || !authStore.user || isGenerating) return;
 
     // Check if a session with this description already exists
-    const existingSession = tasksStore.sessions.find(s => s.description === sessionInfo.sessionDetails.title);
+    const existingSession = tasksStore.sessions.find(
+      (s) => s.description === sessionInfo.sessionDetails.title
+    );
     if (existingSession) {
       toast.error("A session with this name already exists");
       return;
@@ -267,12 +281,14 @@ export default function Home() {
           focus_duration: sessionInfo.pomodoroSetup.duration,
           short_break_duration: sessionInfo.pomodoroSetup.shortBreakTime,
           long_break_duration: sessionInfo.pomodoroSetup.longBreakTime,
-          long_break_per_pomodoros: sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
+          long_break_per_pomodoros:
+            sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
         },
         tasks: sessionInfo.tasks.map((task) => ({
           name: task.name,
           category: task.category,
-          estimated_completion_time: task.pomodoros * sessionInfo.pomodoroSetup.duration,
+          estimated_completion_time:
+            task.pomodoros * sessionInfo.pomodoroSetup.duration,
         })),
       };
 
@@ -298,7 +314,9 @@ export default function Home() {
   const saveSessionName = async () => {
     if (tasksStore.currentSession && sessionNameInput.trim()) {
       try {
-        await tasksStore.updateSession(tasksStore.currentSession.id, { name: sessionNameInput.trim() });
+        await tasksStore.updateSession(tasksStore.currentSession.id, {
+          name: sessionNameInput.trim(),
+        });
         setEditingSessionName(false);
         toast.success("Session name updated!");
       } catch (error) {
@@ -319,7 +337,8 @@ export default function Home() {
         focus_duration: tasksStore.currentSession.focus_duration,
         short_break_duration: tasksStore.currentSession.short_break_duration,
         long_break_duration: tasksStore.currentSession.long_break_duration,
-        long_break_per_pomodoros: tasksStore.currentSession.long_break_per_pomodoros,
+        long_break_per_pomodoros:
+          tasksStore.currentSession.long_break_per_pomodoros,
       });
       setIsSessionSettingsOpen(true);
     }
@@ -328,13 +347,16 @@ export default function Home() {
   const saveSessionSettings = async () => {
     if (tasksStore.currentSession) {
       try {
-        await tasksStore.updateSession(tasksStore.currentSession.id, sessionSettings);
-        
+        await tasksStore.updateSession(
+          tasksStore.currentSession.id,
+          sessionSettings
+        );
+
         // If this session is currently active in the Pomodoro timer, refresh it
         if (pomodoroStore.sessionId === tasksStore.currentSession.id) {
           await pomodoroStore.loadActiveSession();
         }
-        
+
         setIsSessionSettingsOpen(false);
         toast.success("Session settings updated!");
       } catch (error) {
@@ -360,18 +382,24 @@ export default function Home() {
         <SidebarTrigger />
         <div className="flex justify-end gap-3">
           <Link to="/analytics">
-            <Button variant="outline" className="inline-flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="inline-flex items-center gap-2"
+            >
               <CloudLightning />
               <span>Analytics</span>
             </Button>
           </Link>
           <Link to="/pomodoro">
-            <Button variant="outline" className="inline-flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="inline-flex items-center gap-2"
+            >
               <Timer />
               <span>Pomodoro Timer</span>
             </Button>
           </Link>
-          
+
           {sessionInfo && (
             <Button
               type="button"
@@ -382,9 +410,15 @@ export default function Home() {
             </Button>
           )}
 
-          <Dialog open={isNewSessionDialogOpen} onOpenChange={setIsNewSessionDialogOpen}>
+          <Dialog
+            open={isNewSessionDialogOpen}
+            onOpenChange={setIsNewSessionDialogOpen}
+          >
             <DialogTrigger disabled={isGenerating}>
-              <Button className="inline-flex items-center gap-2" disabled={isGenerating}>
+              <Button
+                className="inline-flex items-center gap-2"
+                disabled={isGenerating}
+              >
                 <Plus />
                 <span>New Session</span>
               </Button>
@@ -464,7 +498,10 @@ export default function Home() {
       </Dialog>
 
       {/* Session Settings Dialog */}
-      <Dialog open={isSessionSettingsOpen} onOpenChange={setIsSessionSettingsOpen}>
+      <Dialog
+        open={isSessionSettingsOpen}
+        onOpenChange={setIsSessionSettingsOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Session Settings</DialogTitle>
@@ -482,25 +519,31 @@ export default function Home() {
                 min="1"
                 max="120"
                 value={sessionSettings.focus_duration}
-                onChange={(e) => setSessionSettings({
-                  ...sessionSettings,
-                  focus_duration: parseInt(e.target.value) || 25
-                })}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    focus_duration: parseInt(e.target.value) || 25,
+                  })
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="short-break">Short Break Duration (minutes)</Label>
+              <Label htmlFor="short-break">
+                Short Break Duration (minutes)
+              </Label>
               <Input
                 id="short-break"
                 type="number"
                 min="1"
                 max="30"
                 value={sessionSettings.short_break_duration}
-                onChange={(e) => setSessionSettings({
-                  ...sessionSettings,
-                  short_break_duration: parseInt(e.target.value) || 5
-                })}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    short_break_duration: parseInt(e.target.value) || 5,
+                  })
+                }
               />
             </div>
 
@@ -512,41 +555,44 @@ export default function Home() {
                 min="1"
                 max="60"
                 value={sessionSettings.long_break_duration}
-                onChange={(e) => setSessionSettings({
-                  ...sessionSettings,
-                  long_break_duration: parseInt(e.target.value) || 15
-                })}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_duration: parseInt(e.target.value) || 15,
+                  })
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break-frequency">Long Break After (pomodoros)</Label>
+              <Label htmlFor="long-break-frequency">
+                Long Break After (pomodoros)
+              </Label>
               <Input
                 id="long-break-frequency"
                 type="number"
                 min="1"
                 max="10"
                 value={sessionSettings.long_break_per_pomodoros}
-                onChange={(e) => setSessionSettings({
-                  ...sessionSettings,
-                  long_break_per_pomodoros: parseInt(e.target.value) || 4
-                })}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_per_pomodoros: parseInt(e.target.value) || 4,
+                  })
+                }
               />
             </div>
           </div>
 
           <div className="flex gap-2 mt-6">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={cancelSessionSettings}
               className="flex-1"
             >
               Cancel
             </Button>
-            <Button 
-              onClick={saveSessionSettings}
-              className="flex-1"
-            >
+            <Button onClick={saveSessionSettings} className="flex-1">
               Save Settings
             </Button>
           </div>
@@ -559,19 +605,25 @@ export default function Home() {
             <>
               <Input
                 value={sessionNameInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSessionNameInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSessionNameInput(e.target.value)
+                }
                 className="font-bold text-lg"
                 placeholder="Session name"
                 onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                  if (e.key === 'Enter') saveSessionName();
-                  if (e.key === 'Escape') cancelEditingSessionName();
+                  if (e.key === "Enter") saveSessionName();
+                  if (e.key === "Escape") cancelEditingSessionName();
                 }}
                 autoFocus
               />
               <Button size="sm" variant="ghost" onClick={saveSessionName}>
                 <Check className="size-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={cancelEditingSessionName}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={cancelEditingSessionName}
+              >
                 <X className="size-4" />
               </Button>
             </>
@@ -582,10 +634,18 @@ export default function Home() {
               </span>
               {tasksStore.currentSession && (
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={startEditingSessionName}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={startEditingSessionName}
+                  >
                     <Edit2 className="size-4" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={openSessionSettings}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={openSessionSettings}
+                  >
                     <Settings className="size-4" />
                   </Button>
                 </div>
@@ -594,14 +654,19 @@ export default function Home() {
           )}
         </div>
         <span className="font-medium">
-          {tasksStore.currentSession 
-            ? `${Math.floor(tasksStore.currentSession.tasks.reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60)} hours allotted`
-            : "0 hours allotted"
-          }
+          {tasksStore.currentSession
+            ? `${Math.floor(
+                tasksStore.currentSession.tasks.reduce(
+                  (acc, task) => acc + task.estimated_completion_time,
+                  0
+                ) / 60
+              )} hours allotted`
+            : "0 hours allotted"}
         </span>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-5">
-        <Card className="row-span-3">
+      <div className="flex flex-col lg:flex-row gap-5 w-full items-stretch">
+        {/* Pomodoro Widget */}
+        <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
           <CardContent>
             <div className="flex flex-col items-center">
               <span className="font-bold text-center">Current Task</span>
@@ -624,7 +689,7 @@ export default function Home() {
                 ? "Short break"
                 : "Long break"}
             </p>
-            
+
             {pomodoroStore.showRestOverlay && (
               <p className="text-center text-sm text-orange-600 font-medium">
                 🍅 Rest Overlay Active
@@ -678,22 +743,25 @@ export default function Home() {
                 </Button>
               )}
 
-              {tasksStore.currentSession && !tasksStore.currentSession.completed && (
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-3"
-                  onClick={() => {
-                    tasksStore.completeSessionManually();
-                  }}
-                >
-                  <FilePenLine />
-                  <span>Complete Session</span>
-                </Button>
-              )}
-              
+              {tasksStore.currentSession &&
+                !tasksStore.currentSession.completed && (
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-3"
+                    onClick={() => {
+                      tasksStore.completeSessionManually();
+                    }}
+                  >
+                    <FilePenLine />
+                    <span>Complete Session</span>
+                  </Button>
+                )}
+
               {showTestFeatures() && (
                 <div className="border-t pt-3 mt-3">
-                  <p className="text-sm text-muted-foreground mb-2 text-center">Test Features</p>
+                  <p className="text-sm text-muted-foreground mb-2 text-center">
+                    Test Features
+                  </p>
                   <div className="flex flex-col gap-2">
                     <Button
                       variant="outline"
@@ -712,7 +780,7 @@ export default function Home() {
                       <Timer />
                       <span>Test Rest Overlay (5min)</span>
                     </Button>
-                  
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -730,7 +798,7 @@ export default function Home() {
                       <Timer />
                       <span>Test Long Break (15min)</span>
                     </Button>
-                  
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -752,20 +820,20 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
-        <Card className="row-span-2 col-span-2">
-          <CardContent>
-            <DailyProgress />
-          </CardContent>
-        </Card>
-        <Card className="row-span-3 col-span-2">
-          <CardContent>
+        {/* Tasks Widget */}
+        <Card className="flex-2" style={{ maxHeight: pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : 'auto' }}>
+          <CardContent className="max-h-full overflow-hidden">
             <div className="flex justify-between items-center">
               <span className="font-bold">Tasks</span>
               <div className="flex gap-2">
                 {tasksStore.sessions.map((session) => (
                   <Button
                     key={session.id}
-                    variant={tasksStore.currentSession?.id === session.id ? "default" : "outline"}
+                    variant={
+                      tasksStore.currentSession?.id === session.id
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     disabled={session.completed}
                     className={session.completed ? "opacity-50" : ""}
@@ -787,18 +855,26 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="h-96 overflow-y-auto">
+            <div className="max-h-full overflow-y-auto pb-12">
               {tasksStore.currentSession && tasksStore.currentSession.tasks ? (
                 <div className="space-y-2">
                   {tasksStore.currentSession.tasks.map((task) => (
                     <div
                       key={task.id}
                       className={`p-3 border rounded-lg ${
-                        task.completed ? "bg-muted border-border/50 opacity-75" : "bg-card border-border"
+                        task.completed
+                          ? "bg-muted border-border/50 opacity-75"
+                          : "bg-card border-border"
                       }`}
                     >
                       <div className="flex justify-between items-center">
-                        <span className={task.completed ? "line-through text-muted-foreground" : ""}>
+                        <span
+                          className={
+                            task.completed
+                              ? "line-through text-muted-foreground"
+                              : ""
+                          }
+                        >
                           {task.name}
                         </span>
                         <div className="flex gap-2">
@@ -835,13 +911,17 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  {tasksStore.currentSession ? "Loading tasks..." : "Select a session to view tasks"}
+                  {tasksStore.currentSession
+                    ? "Loading tasks..."
+                    : "Select a session to view tasks"}
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
-        <Card className="place-self-stretch">
+      </div>
+      <div className="flex gap-5 w-full">
+        <Card className="flex-1">
           <CardContent>
             <p className="font-bold">Checklist</p>
             <div className="flex flex-col gap-1">
@@ -858,13 +938,21 @@ export default function Home() {
                         }
                       }}
                     />
-                    <span className={task.completed ? "line-through text-muted-foreground" : ""}>
+                    <span
+                      className={
+                        task.completed
+                          ? "line-through text-muted-foreground"
+                          : ""
+                      }
+                    >
                       {task.name}
                     </span>
                   </div>
                 ))
               ) : (
-                <span className="text-muted-foreground">No tasks available</span>
+                <span className="text-muted-foreground">
+                  No tasks available
+                </span>
               )}
             </div>
           </CardContent>

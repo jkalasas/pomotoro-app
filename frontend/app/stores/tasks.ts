@@ -181,8 +181,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       }
       
-      // Refresh daily progress after completing a task
-      // Import and call the daily progress refresh function
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));
       }
@@ -236,7 +234,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       }
       
-      // Refresh daily progress after uncompleting a task
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-uncompleted'));
       }
