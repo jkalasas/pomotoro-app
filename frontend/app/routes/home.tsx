@@ -341,7 +341,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen">
+    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
       <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 border border-border/50 shadow-sm">
         <SidebarTrigger />
         <div className="flex items-center gap-6">
@@ -529,21 +529,25 @@ export default function Home() {
             </div>
             <div className="mx-auto">
               <PomodoroTimer
-                time={pomodoroStore.time}
+                time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0}
                 endTime={pomodoroStore.maxTime}
               />
             </div>
             <div className="-mt-4 mb-12 flex flex-col items-center">
-              <p className="text-center">
-                {pomodoroStore.phase === "focus"
-                  ? "Stay focused!"
-                  : pomodoroStore.phase === "short_break"
-                  ? "Short break"
-                  : "Long break"}
-              </p>
-              <p className="text-sm text-muted-foreground ">
-                {Math.floor(pomodoroStore.time / 60)} minutes remaining
-              </p>
+              {schedulerStore.getCurrentTask() ? (
+                <>
+                  <p className="text-center">
+                    {pomodoroStore.phase === "focus"
+                      ? "Stay focused!"
+                      : pomodoroStore.phase === "short_break"
+                      ? "Short break"
+                      : "Long break"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {Math.floor(pomodoroStore.time / 60)} minutes remaining
+                  </p>
+                </>
+              ) : null}
             </div>
 
             {pomodoroStore.showRestOverlay && (
@@ -554,43 +558,47 @@ export default function Home() {
             )}
 
             <div className="mt-3 flex flex-col gap-3">
-              <div className="flex gap-3 ">
-                <Button
-                  className="flex flex-1 items-center gap-3"
-                  variant="default"
-                  onClick={() => {
-                    if (pomodoroStore.isRunning) {
-                      pomodoroStore.pauseTimer();
-                    } else {
-                      pomodoroStore.startTimer();
-                    }
-                  }}
-                  disabled={pomodoroStore.isLoading}
-                >
-                  {pomodoroStore.isRunning ? (
-                    <>
-                      <Pause />
-                      <span>Pause Task</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play />
-                      <span>Start Task</span>
-                    </>
-                  )}
-                </Button>
-                <Button
-                  className="flex items-center gap-3"
-                  variant="outline"
-                  onClick={() => {
-                    pomodoroStore.resetTimer();
-                  }}
-                  disabled={pomodoroStore.isLoading}
-                >
-                  <RotateCcw />
-                  {/*  <span>Reset Timer</span> */}
-                </Button>
-              </div>
+              {schedulerStore.getCurrentTask() && (
+                <>
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex flex-1 items-center gap-3"
+                      variant="default"
+                      onClick={() => {
+                        if (pomodoroStore.isRunning) {
+                          pomodoroStore.pauseTimer();
+                        } else {
+                          pomodoroStore.startTimer();
+                        }
+                      }}
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      {pomodoroStore.isRunning ? (
+                        <>
+                          <Pause />
+                          <span>Pause Task</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play />
+                          <span>Start Task</span>
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      className="flex items-center gap-3"
+                      variant="outline"
+                      onClick={() => {
+                        pomodoroStore.resetTimer();
+                      }}
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      <RotateCcw />
+                      {/*  <span>Reset Timer</span> */}
+                    </Button>
+                  </div>
+                </>
+              )}
               {schedulerStore.getCurrentTask() && (
                 <Button
                   className="flex items-center gap-3"

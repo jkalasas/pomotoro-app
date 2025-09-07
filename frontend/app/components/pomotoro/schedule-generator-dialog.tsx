@@ -107,11 +107,11 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
                       onCheckedChange={() => handleSessionToggle(session.id)}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">
                           {session.name || session.description}
                         </span>
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs min-w-[120px] h-6 flex items-center justify-center shrink-0 px-2">
                           {session.tasks?.filter(task => !task.completed).length || 0} uncompleted tasks
                         </Badge>
                       </div>

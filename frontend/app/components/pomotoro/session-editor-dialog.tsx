@@ -27,6 +27,7 @@ import {
   Sparkles,
   Settings,
   GripVertical,
+  ClipboardList,
 } from "lucide-react";
 import { TaskDifficulty } from "~/types/task";
 import { formatMinutes } from "~/lib/time";
@@ -350,9 +351,9 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl w-[95vw] overflow-y-auto bg-card border-border/50 shadow-lg rounded-2xl sm:w-full">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+          <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between items-center gap-3">
             <span>Session Editor</span>
             <div className="flex gap-2">
               <Button
@@ -360,6 +361,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                 size="sm"
                 onClick={() => setShowRefinementDialog(true)}
                 disabled={isRefining || isGenerating}
+                className="rounded-full"
               >
                 <Sparkles className="h-4 w-4 mr-2" />
                 {isRefining ? "Refining..." : "Refine with AI"}
@@ -372,10 +374,10 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 ">
           {/* Session Details Section */}
-          <Card>
-            <CardHeader>
+          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between">
                 <span>Session Details</span>
                 {!editingSessionDetails ? (
@@ -383,13 +385,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                     variant="outline"
                     size="sm"
                     onClick={() => setEditingSessionDetails(true)}
+                    className="rounded-full"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={saveSessionDetails}>
+                    <Button variant="outline" size="sm" onClick={saveSessionDetails} className="rounded-full">
                       <Save className="h-4 w-4 mr-2" />
                       Save
                     </Button>
@@ -403,6 +406,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                           description: sessionInfo.sessionDetails.description,
                         });
                       }}
+                      className="rounded-full"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -422,6 +426,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                         setSessionForm({ ...sessionForm, title: e.target.value })
                       }
                       placeholder="Enter session title"
+                      className="rounded-lg"
                     />
                   </div>
                   <div>
@@ -437,6 +442,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       }
                       placeholder="Enter session description"
                       rows={3}
+                      className="rounded-lg"
                     />
                   </div>
                 </div>
@@ -452,8 +458,8 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
           </Card>
 
           {/* Pomodoro Configuration Section */}
-          <Card>
-            <CardHeader>
+          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between">
                 <span>Pomodoro Configuration</span>
                 {!editingPomodoroConfig ? (
@@ -461,13 +467,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                     variant="outline"
                     size="sm"
                     onClick={() => setEditingPomodoroConfig(true)}
+                    className="rounded-full"
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={savePomodoroConfig}>
+                    <Button variant="outline" size="sm" onClick={savePomodoroConfig} className="rounded-full">
                       <Save className="h-4 w-4 mr-2" />
                       Save
                     </Button>
@@ -478,6 +485,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                         setEditingPomodoroConfig(false);
                         setPomodoroForm(sessionInfo.pomodoroSetup);
                       }}
+                      className="rounded-full"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -487,7 +495,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
             </CardHeader>
             <CardContent>
               {editingPomodoroConfig ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
                     <Input
@@ -502,6 +510,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                           duration: parseInt(e.target.value) || 25,
                         })
                       }
+                      className="rounded-lg"
                     />
                   </div>
                   <div>
@@ -518,6 +527,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                           shortBreakTime: parseInt(e.target.value) || 5,
                         })
                       }
+                      className="rounded-lg"
                     />
                   </div>
                   <div>
@@ -534,6 +544,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                           longBreakTime: parseInt(e.target.value) || 15,
                         })
                       }
+                      className="rounded-lg"
                     />
                   </div>
                   <div>
@@ -552,31 +563,44 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                           pomodorosBeforeLongBreak: parseInt(e.target.value) || 4,
                         })
                       }
+                      className="rounded-lg"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <span className="text-muted-foreground">Focus Duration:</span>
-                  <span>{sessionInfo.pomodoroSetup.duration} min</span>
-                  <span className="text-muted-foreground">Short Break:</span>
-                  <span>{sessionInfo.pomodoroSetup.shortBreakTime} min</span>
-                  <span className="text-muted-foreground">Long Break:</span>
-                  <span>{sessionInfo.pomodoroSetup.longBreakTime} min</span>
-                  <span className="text-muted-foreground">Long Break After:</span>
-                  <span>{sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak} pomodoros</span>
-                  <span className="text-muted-foreground">Total Pomodoros:</span>
-                  <span>{totalPomodoros} pomodoros</span>
-                  <span className="text-muted-foreground">Total Time:</span>
-                  <span>{formatMinutes(totalTimeMinutes)}</span>
-                </div>
+                <>
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm p-3 bg-muted/20 rounded-lg">
+                      <span className="text-muted-foreground">Focus Duration:</span>
+                      <span className="font-medium">{sessionInfo.pomodoroSetup.duration} min</span>
+                      <span className="text-muted-foreground">Short Break:</span>
+                      <span className="font-medium">{sessionInfo.pomodoroSetup.shortBreakTime} min</span>
+                      <span className="text-muted-foreground">Long Break:</span>
+                      <span className="font-medium">{sessionInfo.pomodoroSetup.longBreakTime} min</span>
+                      <span className="text-muted-foreground">Long Break After:</span>
+                      <span className="font-medium">{sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak} pomodoros</span>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 bg-muted/20 rounded-lg">
+                      <div className="flex flex-col items-center sm:items-start">
+                        <span className="text-muted-foreground text-sm">Total Pomodoros</span>
+                        <span className="text-xl font-semibold">{totalPomodoros}</span>
+                      </div>
+                      <div className="hidden sm:block h-8 border-r border-muted-foreground/30"></div>
+                      <div className="flex flex-col items-center sm:items-start">
+                        <span className="text-muted-foreground text-sm">Total Time</span>
+                        <span className="text-xl font-semibold">{formatMinutes(totalTimeMinutes)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
 
           {/* Tasks Section */}
-          <Card>
-            <CardHeader>
+          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between">
                 <span>Tasks ({sessionInfo.tasks.length})</span>
                 <Button
@@ -586,6 +610,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                     resetForms();
                     setAddingNewTask(true);
                   }}
+                  className="rounded-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Task
@@ -596,47 +621,55 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
               <DragDropContext onDragEnd={handleDragEnd}>
                 <Droppable droppableId="tasks">
                   {(provided: DroppableProvided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
                       {sessionInfo.tasks.map((task, index) => (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
                           {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                            <Card
+                            <div
                               key={task.id}
-                              className={`border ${snapshot.isDragging ? "shadow-lg" : ""}`}
+                              className={`p-2 bg-muted/20 rounded-lg border border-border/40 ${snapshot.isDragging ? "shadow-lg" : ""}`}
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                             >
-                              <CardContent className="p-4">
+                              <div className="p-2">
                                 {editingTaskId === task.id ? (
                                   <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                       <div>
-                                        <Label htmlFor="task-name">Task Name</Label>
+                                        <Label htmlFor={`task-name-${task.id}`}>Task Name</Label>
                                         <Input
-                                          id="task-name"
+                                          id={`task-name-${task.id}`}
                                           value={taskForm.name}
                                           onChange={(e) =>
-                                            setTaskForm({ ...taskForm, name: e.target.value })
+                                            setTaskForm({
+                                              ...taskForm,
+                                              name: e.target.value,
+                                            })
                                           }
-                                          placeholder="Enter task name"
+                                          placeholder="Task name"
+                                          className="rounded-lg"
                                         />
                                       </div>
                                       <div>
-                                        <Label htmlFor="task-category">Category</Label>
+                                        <Label htmlFor={`task-category-${task.id}`}>Category</Label>
                                         <Input
-                                          id="task-category"
+                                          id={`task-category-${task.id}`}
                                           value={taskForm.category}
                                           onChange={(e) =>
-                                            setTaskForm({ ...taskForm, category: e.target.value })
+                                            setTaskForm({
+                                              ...taskForm,
+                                              category: e.target.value,
+                                            })
                                           }
-                                          placeholder="Enter category"
+                                          placeholder="Category"
+                                          className="rounded-lg"
                                         />
                                       </div>
                                     </div>
                                     <div>
-                                      <Label htmlFor="task-description">Description</Label>
+                                      <Label htmlFor={`task-description-${task.id}`}>Description (Optional)</Label>
                                       <Textarea
-                                        id="task-description"
+                                        id={`task-description-${task.id}`}
                                         value={taskForm.description}
                                         onChange={(e) =>
                                           setTaskForm({
@@ -644,17 +677,18 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                             description: e.target.value,
                                           })
                                         }
-                                        placeholder="Enter task description"
+                                        placeholder="Task description"
                                         rows={2}
+                                        className="rounded-lg"
                                       />
                                     </div>
-                                    <div className="w-48">
-                                      <Label htmlFor="task-estimated-time">Estimated Time (minutes)</Label>
+                                    <div>
+                                      <Label htmlFor={`task-time-${task.id}`}>Estimated Time (minutes)</Label>
                                       <Input
-                                        id="task-estimated-time"
+                                        id={`task-time-${task.id}`}
                                         type="number"
-                                        min="5"
-                                        max="480"
+                                        min="1"
+                                        max="240"
                                         value={taskForm.estimatedTime}
                                         onChange={(e) =>
                                           setTaskForm({
@@ -662,71 +696,67 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                             estimatedTime: parseInt(e.target.value) || 25,
                                           })
                                         }
+                                        className="rounded-lg"
                                       />
                                     </div>
-                                    <div className="flex gap-2">
-                                      <Button size="sm" onClick={saveTask}>
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => setEditingTaskId(null)} className="rounded-full">
+                                        <X className="h-4 w-4" />
+                                        Cancel
+                                      </Button>
+                                      <Button size="sm" onClick={saveTask} className="rounded-full">
                                         <Save className="h-4 w-4 mr-2" />
                                         Save
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setEditingTaskId(null);
-                                          setTaskForm({
-                                            name: "",
-                                            description: "",
-                                            category: "",
-                                            estimatedTime: 25,
-                                          });
-                                        }}
-                                      >
-                                        <X className="h-4 w-4" />
                                       </Button>
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div {...provided.dragHandleProps}>
-                                        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                      </div>
+                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                                    <div className="flex items-center gap-2" {...provided.dragHandleProps}>
+                                      <GripVertical className="h-4 w-4 text-muted-foreground" />
                                       <div className="flex-1">
-                                        <div className="flex flex-col items-start gap-2 mb-1">
-                                          <h4 className="font-medium">{task.name}</h4>
-                                          <Badge variant="secondary">{task.category}</Badge>
-                                          <Badge variant="outline">
-                                            {formatMinutes(task.estimatedTime)}
-                                          </Badge>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="font-medium">{task.name}</span>
+                                          {task.category && (
+                                            <Badge variant="outline" className="text-xs">
+                                              {task.category}
+                                            </Badge>
+                                          )}
                                         </div>
                                         {task.description && (
-                                          <p className="text-sm text-muted-foreground">
+                                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                                             {task.description}
                                           </p>
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex flex-col gap-1 ml-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => editTask(task.id)}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => deleteTask(task.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 mt-2 sm:mt-0">
+                                      <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                                        {task.estimatedTime} min
+                                      </Badge>
+                                      <div className="flex items-center">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => editTask(task.id)}
+                                          className="h-6 w-6"
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => deleteTask(task.id)}
+                                          className="h-6 w-6 text-destructive"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                 )}
-                              </CardContent>
-                            </Card>
+                              </div>
+                            </div>
                           )}
                         </Draggable>
                       ))}
@@ -734,93 +764,114 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       
                       {/* Add New Task Form */}
                       {addingNewTask && (
-                        <Card className="border-dashed">
-                          <CardContent className="p-4">
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label htmlFor="new-task-name">Task Name</Label>
-                                  <Input
-                                    id="new-task-name"
-                                    value={taskForm.name}
-                                    onChange={(e) =>
-                                      setTaskForm({ ...taskForm, name: e.target.value })
-                                    }
-                                    placeholder="Enter task name"
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="new-task-category">Category</Label>
-                                  <Input
-                                    id="new-task-category"
-                                    value={taskForm.category}
-                                    onChange={(e) =>
-                                      setTaskForm({ ...taskForm, category: e.target.value })
-                                    }
-                                    placeholder="Enter category"
-                                  />
-                                </div>
+                        <div className="p-3 bg-muted/20 rounded-lg border border-dashed border-border">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor="new-task-name">Task Name</Label>
+                                <Input
+                                  id="new-task-name"
+                                  value={taskForm.name}
+                                  onChange={(e) =>
+                                    setTaskForm({ ...taskForm, name: e.target.value })
+                                  }
+                                  placeholder="Enter task name"
+                                  className="rounded-lg"
+                                />
                               </div>
                               <div>
-                                <Label htmlFor="new-task-description">Description</Label>
-                                <Textarea
-                                  id="new-task-description"
-                                  value={taskForm.description}
-                                  onChange={(e) =>
-                                    setTaskForm({
-                                      ...taskForm,
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Enter task description"
-                                  rows={2}
-                                />
-                              </div>
-                              <div className="w-48">
-                                <Label htmlFor="new-task-estimated-time">Estimated Time (minutes)</Label>
+                                <Label htmlFor="new-task-category">Category</Label>
                                 <Input
-                                  id="new-task-estimated-time"
-                                  type="number"
-                                  min="5"
-                                  max="480"
-                                  value={taskForm.estimatedTime}
+                                  id="new-task-category"
+                                  value={taskForm.category}
                                   onChange={(e) =>
-                                    setTaskForm({
-                                      ...taskForm,
-                                      estimatedTime: parseInt(e.target.value) || 25,
-                                    })
+                                    setTaskForm({ ...taskForm, category: e.target.value })
                                   }
+                                  placeholder="Enter category"
+                                  className="rounded-lg"
                                 />
-                              </div>
-                              <div className="flex gap-2">
-                                <Button size="sm" onClick={addTask}>
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Add Task
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setAddingNewTask(false);
-                                    setTaskForm({
-                                      name: "",
-                                      description: "",
-                                      category: "",
-                                      estimatedTime: 25,
-                                    });
-                                  }}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
+                            <div>
+                              <Label htmlFor="new-task-description">Description (Optional)</Label>
+                              <Textarea
+                                id="new-task-description"
+                                value={taskForm.description}
+                                onChange={(e) =>
+                                  setTaskForm({
+                                    ...taskForm,
+                                    description: e.target.value,
+                                  })
+                                }
+                                placeholder="Enter task description"
+                                rows={2}
+                                className="rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="new-task-estimated-time">Estimated Time (minutes)</Label>
+                              <Input
+                                id="new-task-estimated-time"
+                                type="number"
+                                min="5"
+                                max="480"
+                                value={taskForm.estimatedTime}
+                                onChange={(e) =>
+                                  setTaskForm({
+                                    ...taskForm,
+                                    estimatedTime: parseInt(e.target.value) || 25,
+                                  })
+                                }
+                                className="rounded-lg"
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setAddingNewTask(false);
+                                  setTaskForm({
+                                    name: "",
+                                    description: "",
+                                    category: "",
+                                    estimatedTime: 25,
+                                  });
+                                }}
+                                className="rounded-full"
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Cancel
+                              </Button>
+                              <Button size="sm" onClick={addTask} className="rounded-full">
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       )}
 
                       {sessionInfo.tasks.length === 0 && !addingNewTask && (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No tasks yet. Click "Add Task" to get started.
+                        <div className="flex flex-col items-center justify-center py-8 text-center p-4 bg-muted/20 rounded-lg border border-dashed border-border">
+                          <div className="rounded-full bg-muted/30 p-3 mb-3">
+                            <ClipboardList className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <h3 className="text-lg font-medium mb-1">No Tasks Added</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Add tasks to your session to get started
+                          </p>
+                          <Button
+                            onClick={() => {
+                              resetForms();
+                              setAddingNewTask(true);
+                            }}
+                            variant="outline"
+                            className="rounded-full"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add First Task
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -832,18 +883,18 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
         </div>
 
         {/* Footer Actions */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1"
+            className="flex-1 rounded-full"
           >
             Cancel
           </Button>
           <Button
             onClick={onCreateSession}
             disabled={!sessionInfo || isGenerating || sessionInfo.tasks.length === 0}
-            className="flex-1"
+            className="flex-1 rounded-full"
           >
             Create Session
           </Button>
@@ -852,7 +903,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
       
       {/* Refinement Instructions Dialog */}
       <Dialog open={showRefinementDialog} onOpenChange={setShowRefinementDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl w-[95vw] backdrop-blur-sm bg-card/80 border-border/50 shadow-lg rounded-2xl sm:w-full">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
@@ -864,36 +915,52 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="refinement-instructions">Refinement Instructions</Label>
-              <Textarea
-                id="refinement-instructions"
-                value={refinementInstructions}
-                onChange={(e) => setRefinementInstructions(e.target.value)}
-                placeholder="E.g., 'Break down larger tasks into smaller ones', 'Reorganize tasks by priority', 'Adjust timing estimates', 'Improve task descriptions', or leave empty for general improvements..."
-                rows={4}
-                className="mt-2"
-              />
-            </div>
+            <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-sm rounded-xl">
+              <CardContent className="p-4">
+                <Label htmlFor="refinement-instructions">Refinement Instructions</Label>
+                <Textarea
+                  id="refinement-instructions"
+                  value={refinementInstructions}
+                  onChange={(e) => setRefinementInstructions(e.target.value)}
+                  placeholder="E.g., 'Break down larger tasks into smaller ones', 'Reorganize tasks by priority', 'Adjust timing estimates', 'Improve task descriptions', or leave empty for general improvements..."
+                  rows={4}
+                  className="mt-2 rounded-lg"
+                />
+              </CardContent>
+            </Card>
 
             {sessionInfo && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                <p className="font-medium mb-2">Current session summary:</p>
-                <p><strong>Title:</strong> {sessionInfo.sessionDetails.title}</p>
-                <p><strong>Tasks:</strong> {sessionInfo.tasks.length} tasks ({Math.ceil(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0) / sessionInfo.pomodoroSetup.duration)} pomodoros total)</p>
-                <p><strong>Estimated time:</strong> {formatMinutes(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0))}</p>
-              </div>
+              <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-sm rounded-xl overflow-hidden">
+                <CardHeader className="pb-2 bg-muted/20">
+                  <CardTitle className="text-sm font-medium">Current Session Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-muted-foreground">Title:</span>
+                  <span className="font-medium">{sessionInfo.sessionDetails.title}</span>
+                  
+                  <span className="text-muted-foreground">Tasks:</span>
+                  <span className="font-medium">
+                    {sessionInfo.tasks.length} tasks 
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({Math.ceil(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0) / sessionInfo.pomodoroSetup.duration)} pomodoros)
+                    </span>
+                  </span>
+                  
+                  <span className="text-muted-foreground">Estimated time:</span>
+                  <span className="font-medium">{formatMinutes(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0))}</span>
+                </CardContent>
+              </Card>
             )}
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t mt-4">
             <Button
               variant="outline"
               onClick={() => {
                 setShowRefinementDialog(false);
                 setRefinementInstructions("");
               }}
-              className="flex-1"
+              className="flex-1 rounded-full"
               disabled={isRefining}
             >
               Cancel
@@ -901,11 +968,11 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
             <Button
               onClick={refineWithLLM}
               disabled={isRefining || isGenerating}
-              className="flex-1"
+              className="flex-1 rounded-full"
             >
               {isRefining ? (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2 animate-spin" />
+                  <Sparkles className="h-4 w-4 mr-2 animate-pulse" />
                   Refining...
                 </>
               ) : (

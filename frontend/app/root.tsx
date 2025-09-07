@@ -153,7 +153,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <main>{children}</main>
+            <main className="mt-8">{children}</main>
           </SidebarInset>
         </SidebarProvider>
         

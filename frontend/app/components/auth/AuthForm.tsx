@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuthStore } from "~/stores/auth";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -20,6 +20,66 @@ export function AuthForm() {
     email: "",
     password: "",
   });
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size to match window
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Circle properties
+    const circles = Array(5).fill(0).map(() => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      radius: 50 + Math.random() * 100,
+      speedX: (Math.random() - 0.5) * 0.8,
+      speedY: (Math.random() - 0.5) * 0.8,
+      opacity: 0.1 + Math.random() * 0.2,
+    }));
+
+    // Animation loop
+    let animationId: number;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      circles.forEach(circle => {
+        // Move circle
+        circle.x += circle.speedX;
+        circle.y += circle.speedY;
+        
+        // Bounce off edges
+        if (circle.x < 0 || circle.x > canvas.width) circle.speedX *= -1;
+        if (circle.y < 0 || circle.y > canvas.height) circle.speedY *= -1;
+        
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${circle.opacity})`;
+        ctx.fill();
+      });
+      
+      animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
 
   const { login, register, isLoading } = useAuthStore();
 
@@ -44,8 +104,12 @@ export function AuthForm() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen pt-10">
-      <Card className="w-full max-w-md">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-primary to-primary/60 pt-10 p-4 relative overflow-hidden">
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 w-full h-full pointer-events-none" 
+      />
+      <Card className="w-full max-w-md shadow-lg relative z-10">
         <CardHeader>
           <CardTitle>Welcome to Pomotoro</CardTitle>
           <CardDescription>

@@ -54,7 +54,7 @@ export default function AppSidebar() {
           <Logo showText className="h-8 w-8" textClassName="text-lg font-bold" />
         </div>
         {user && (
-        <div className="flex justify-between gap-3">
+        <div className="flex justify-between gap-3 bg-secondary/20 p-3 rounded-lg ">
           <div>
             <p className="text-sm font-medium">
               {user.first_name} {user.last_name}
