@@ -1,6 +1,41 @@
 import { create } from 'zustand';
 import { analyticsAPI, type AnalyticsEvent, type DailyStats, type ProductivityInsights } from '~/lib/analytics';
 
+// Performance optimization: Queue and batch analytics events
+interface QueuedEvent {
+  eventType: string;
+  eventData?: Record<string, any>;
+  timestamp: number;
+}
+
+let eventQueue: QueuedEvent[] = [];
+let flushTimeout: NodeJS.Timeout | null = null;
+
+// Debounced analytics for high-frequency events like timer updates
+const debouncedEvents = new Map<string, NodeJS.Timeout>();
+
+// Helper for debounced logging
+const debouncedLog = (key: string, eventType: string, eventData?: Record<string, any>, delay = 5000) => {
+  if (debouncedEvents.has(key)) {
+    clearTimeout(debouncedEvents.get(key)!);
+  }
+  
+  const timeout = setTimeout(() => {
+    eventQueue.push({
+      eventType,
+      eventData,
+      timestamp: Date.now()
+    });
+    debouncedEvents.delete(key);
+  }, delay);
+  
+  debouncedEvents.set(key, timeout);
+};
+
+// Batch size and delay for performance
+const BATCH_SIZE = 10;
+const FLUSH_DELAY = 2000; // 2 seconds
+
 interface AnalyticsState {
   // State
   events: AnalyticsEvent[];
@@ -9,195 +44,335 @@ interface AnalyticsState {
   loading: boolean;
   
   // Actions
-  logEvent: (eventType: string, eventData?: Record<string, any>) => Promise<void>;
+  logEvent: (eventType: string, eventData?: Record<string, any>) => void; // Made synchronous for performance
+  logEventDebounced: (key: string, eventType: string, eventData?: Record<string, any>, delay?: number) => void;
+  flushEvents: () => Promise<void>;
   fetchEvents: (eventType?: string, days?: number) => Promise<void>;
   fetchDailyStats: (days?: number) => Promise<void>;
   fetchInsights: (days?: number) => Promise<void>;
   updateDailyStats: () => Promise<void>;
   
-  // Convenience methods for common events
-  logSessionStart: (sessionId: number, sessionName: string) => Promise<void>;
-  logSessionSwitch: (fromSessionId: number, toSessionId: number) => Promise<void>;
-  logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => Promise<void>;
-  logSessionReset: (sessionId: number, reason: string) => Promise<void>;
-  logTaskComplete: (taskId: number, taskName: string, sessionId?: number) => Promise<void>;
-  logTaskUncomplete: (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => Promise<void>;
-  logFeedbackSubmitted: (sessionId: number, focusLevel: string, reflection?: string) => Promise<void>;
-  logPomodoroComplete: (sessionId: number, pomodorosCompleted: number) => Promise<void>;
-  logTimerStart: (sessionId: number, phase: string) => Promise<void>;
-  logTimerPause: (sessionId: number, phase: string) => Promise<void>;
-  logBreakStart: (sessionId: number, breakType: string) => Promise<void>;
+  // Convenience methods for common events - now synchronous for performance
+  logSessionStart: (sessionId: number, sessionName: string) => void;
+  logSessionSwitch: (fromSessionId: number, toSessionId: number) => void;
+  logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => void;
+  logSessionReset: (sessionId: number, reason: string) => void;
+  logTaskComplete: (taskId: number, taskName: string, sessionId?: number) => void;
+  logTaskUncomplete: (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => void;
+  logFeedbackSubmitted: (sessionId: number, focusLevel: string, reflection?: string) => void;
+  logPomodoroComplete: (sessionId: number, pomodorosCompleted: number) => void;
+  logTimerStart: (sessionId: number, phase: string) => void;
+  logTimerPause: (sessionId: number, phase: string) => void;
+  logBreakStart: (sessionId: number, breakType: string) => void;
+  
+  // New comprehensive event tracking methods - now synchronous for performance  
+  logUserAction: (action: string, context?: Record<string, any>) => void;
+  logSessionGeneration: (projectDetails: string, success: boolean, taskCount?: number) => void;
+  logSettingsChange: (settingType: string, oldValue: any, newValue: any) => void;
+  logScheduleGeneration: (taskCount: number, totalTime: number, success: boolean) => void;
+  logTaskEdit: (taskId: number, changeType: string, details?: Record<string, any>) => void;
+  logNavigationEvent: (fromPage: string, toPage: string) => void;
+  logTimerReset: (sessionId: number, phase: string, timeRemaining: number) => void;
+  logBreakSkip: (sessionId: number, breakType: string) => void;
+  logModalOpen: (modalType: string, context?: Record<string, any>) => void;
+  logModalClose: (modalType: string, action: string) => void;
 }
 
-export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
-  // Initial state
-  events: [],
-  dailyStats: [],
-  insights: null,
-  loading: false,
-  
-  // Base actions
-  logEvent: async (eventType: string, eventData?: Record<string, any>) => {
-    try {
-      const event = await analyticsAPI.logEvent(eventType, eventData);
-      set((state) => ({
-        events: [event, ...state.events].slice(0, 50) // Keep only recent 50 events
-      }));
-    } catch (error) {
-      console.error('Failed to log analytics event:', error);
-    }
-  },
-
-  fetchEvents: async (eventType?: string, days = 7) => {
-    try {
-      set({ loading: true });
-      const events = await analyticsAPI.getEvents(eventType, days);
-      set({ events, loading: false });
-    } catch (error) {
-      console.error('Failed to fetch analytics events:', error);
-      set({ loading: false });
-    }
-  },
-
-  fetchDailyStats: async (days = 30) => {
-    try {
-      set({ loading: true });
-      const dailyStats = await analyticsAPI.getDailyStats(days);
-      set({ dailyStats, loading: false });
-    } catch (error) {
-      console.error('Failed to fetch daily stats:', error);
-      set({ loading: false });
-    }
-  },
-
-  fetchInsights: async (days = 30) => {
-    try {
-      const insights = await analyticsAPI.getProductivityInsights(days);
-      set({ insights });
-    } catch (error) {
-      console.error('Failed to fetch insights:', error);
-    }
-  },
-
-  updateDailyStats: async () => {
-    try {
-      await analyticsAPI.updateDailyStats();
-      // Refresh daily stats after update
-      get().fetchDailyStats();
-    } catch (error) {
-      console.error('Failed to update daily stats:', error);
-    }
-  },
-
-  // Convenience methods for common events
-  logSessionStart: async (sessionId: number, sessionName: string) => {
-    await get().logEvent('session_start', {
-      session_id: sessionId,
-      session_name: sessionName,
-      start_time: new Date().toISOString()
-    });
+export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
+  // Optimized event flushing function
+  const flushEvents = async () => {
+    if (eventQueue.length === 0) return;
     
-    // Start session tracking
-    try {
-      await analyticsAPI.startSessionTracking(sessionId);
-    } catch (error) {
-      console.error('Failed to start session tracking:', error);
-    }
-  },
-
-  logSessionSwitch: async (fromSessionId: number, toSessionId: number) => {
-    await get().logEvent('session_switch', {
-      from_session_id: fromSessionId,
-      to_session_id: toSessionId,
-      switch_time: new Date().toISOString()
-    });
+    const eventsToFlush = eventQueue.splice(0, eventQueue.length);
     
-    // End tracking for previous session and start for new one
     try {
-      await analyticsAPI.endSessionTracking(fromSessionId);
-      await analyticsAPI.startSessionTracking(toSessionId);
+      // Process events in parallel for better performance
+      await Promise.allSettled(
+        eventsToFlush.map(event => 
+          analyticsAPI.logEvent(event.eventType, event.eventData).catch(() => {
+            // Silently fail analytics to not affect user experience
+          })
+        )
+      );
     } catch (error) {
-      console.error('Failed to switch session tracking:', error);
+      // Silently fail analytics to not affect user experience
+      console.debug('Analytics batch failed:', error);
     }
-  },
+  };
 
-  logTaskComplete: async (taskId: number, taskName: string, sessionId?: number) => {
-    await get().logEvent('task_complete', {
-      task_id: taskId,
-      task_name: taskName,
-      session_id: sessionId,
-      completion_time: new Date().toISOString()
-    });
-  },
+  // Auto-flush mechanism
+  const scheduleFlush = () => {
+    if (flushTimeout) clearTimeout(flushTimeout);
+    
+    if (eventQueue.length >= BATCH_SIZE) {
+      // Flush immediately if batch is full
+      flushEvents();
+    } else {
+      // Schedule flush after delay
+      flushTimeout = setTimeout(flushEvents, FLUSH_DELAY);
+    }
+  };
 
-  logPomodoroComplete: async (sessionId: number, pomodorosCompleted: number) => {
-    await get().logEvent('pomodoro_complete', {
-      session_id: sessionId,
-      pomodoros_completed: pomodorosCompleted,
-      completion_time: new Date().toISOString()
-    });
-  },
+  return {
+    // Initial state
+    events: [],
+    dailyStats: [],
+    insights: null,
+    loading: false,
+    
+    // Base actions
+    logEvent: (eventType: string, eventData?: Record<string, any>) => {
+      // Queue event instead of sending immediately - massive performance improvement
+      eventQueue.push({
+        eventType,
+        eventData,
+        timestamp: Date.now()
+      });
+      
+      scheduleFlush();
+    },
 
-  logTimerStart: async (sessionId: number, phase: string) => {
-    await get().logEvent('timer_start', {
-      session_id: sessionId,
-      phase,
-      start_time: new Date().toISOString()
-    });
-  },
+    // For high-frequency events like timer updates
+    logEventDebounced: (key: string, eventType: string, eventData?: Record<string, any>, delay = 5000) => {
+      debouncedLog(key, eventType, eventData, delay);
+      scheduleFlush();
+    },
 
-  logTimerPause: async (sessionId: number, phase: string) => {
-    await get().logEvent('timer_pause', {
-      session_id: sessionId,
-      phase,
-      pause_time: new Date().toISOString()
-    });
-  },
+    flushEvents,
 
-  logBreakStart: async (sessionId: number, breakType: string) => {
-    await get().logEvent('break_start', {
-      session_id: sessionId,
-      break_type: breakType,
-      start_time: new Date().toISOString()
-    });
-  },
+    fetchEvents: async (eventType?: string, days = 7) => {
+      try {
+        set({ loading: true });
+        const events = await analyticsAPI.getEvents(eventType, days);
+        set({ events, loading: false });
+      } catch (error) {
+        console.error('Failed to fetch analytics events:', error);
+        set({ loading: false });
+      }
+    },
 
-  logSessionComplete: async (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => {
-    await get().logEvent('session_complete_frontend', {
-      session_id: sessionId,
-      focus_level: focusLevel,
-      tasks_completed: tasksCompleted,
-      total_tasks: totalTasks,
-      completion_rate: totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0,
-      completion_time: new Date().toISOString()
-    });
-  },
+    fetchDailyStats: async (days = 30) => {
+      try {
+        set({ loading: true });
+        const dailyStats = await analyticsAPI.getDailyStats(days);
+        set({ dailyStats, loading: false });
+      } catch (error) {
+        console.error('Failed to fetch daily stats:', error);
+        set({ loading: false });
+      }
+    },
 
-  logSessionReset: async (sessionId: number, reason: string) => {
-    await get().logEvent('session_reset_frontend', {
-      session_id: sessionId,
-      reason,
-      reset_time: new Date().toISOString()
-    });
-  },
+    fetchInsights: async (days = 30) => {
+      try {
+        const insights = await analyticsAPI.getProductivityInsights(days);
+        set({ insights });
+      } catch (error) {
+        console.error('Failed to fetch insights:', error);
+      }
+    },
 
-  logTaskUncomplete: async (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => {
-    await get().logEvent('task_uncomplete_frontend', {
-      task_id: taskId,
-      task_name: taskName,
-      session_id: sessionId,
-      session_reset: sessionReset,
-      uncomplete_time: new Date().toISOString()
-    });
-  },
+    updateDailyStats: async () => {
+      try {
+        await analyticsAPI.updateDailyStats();
+        // Refresh daily stats after update
+        get().fetchDailyStats();
+      } catch (error) {
+        console.error('Failed to update daily stats:', error);
+      }
+    },
 
-  logFeedbackSubmitted: async (sessionId: number, focusLevel: string, reflection?: string) => {
-    await get().logEvent('feedback_submitted', {
-      session_id: sessionId,
-      focus_level: focusLevel,
-      has_reflection: !!reflection,
-      reflection_length: reflection?.length || 0,
-      submission_time: new Date().toISOString()
-    });
-  },
-}));
+    // Convenience methods for common events - now synchronous and non-blocking
+    logSessionStart: (sessionId: number, sessionName: string) => {
+      get().logEvent('session_start', {
+        session_id: sessionId,
+        session_name: sessionName,
+        start_time: new Date().toISOString()
+      });
+      
+      // Non-blocking session tracking
+      analyticsAPI.startSessionTracking(sessionId).catch(() => {
+        // Silently fail
+      });
+    },
+
+    logSessionSwitch: (fromSessionId: number, toSessionId: number) => {
+      get().logEvent('session_switch', {
+        from_session_id: fromSessionId,
+        to_session_id: toSessionId,
+        switch_time: new Date().toISOString()
+      });
+      
+      // Non-blocking session tracking
+      Promise.allSettled([
+        analyticsAPI.endSessionTracking(fromSessionId),
+        analyticsAPI.startSessionTracking(toSessionId)
+      ]);
+    },
+
+    logTaskComplete: (taskId: number, taskName: string, sessionId?: number) => {
+      get().logEvent('task_complete', {
+        task_id: taskId,
+        task_name: taskName,
+        session_id: sessionId,
+        completion_time: new Date().toISOString()
+      });
+    },
+
+    logPomodoroComplete: (sessionId: number, pomodorosCompleted: number) => {
+      get().logEvent('pomodoro_complete', {
+        session_id: sessionId,
+        pomodoros_completed: pomodorosCompleted,
+        completion_time: new Date().toISOString()
+      });
+    },
+
+    logTimerStart: (sessionId: number, phase: string) => {
+      get().logEvent('timer_start', {
+        session_id: sessionId,
+        phase,
+        start_time: new Date().toISOString()
+      });
+    },
+
+    logTimerPause: (sessionId: number, phase: string) => {
+      get().logEvent('timer_pause', {
+        session_id: sessionId,
+        phase,
+        pause_time: new Date().toISOString()
+      });
+    },
+
+    logBreakStart: (sessionId: number, breakType: string) => {
+      get().logEvent('break_start', {
+        session_id: sessionId,
+        break_type: breakType,
+        start_time: new Date().toISOString()
+      });
+    },
+
+    logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => {
+      get().logEvent('session_complete_frontend', {
+        session_id: sessionId,
+        focus_level: focusLevel,
+        tasks_completed: tasksCompleted,
+        total_tasks: totalTasks,
+        completion_rate: totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0,
+        completion_time: new Date().toISOString()
+      });
+    },
+
+    logSessionReset: (sessionId: number, reason: string) => {
+      get().logEvent('session_reset_frontend', {
+        session_id: sessionId,
+        reason,
+        reset_time: new Date().toISOString()
+      });
+    },
+
+    logTaskUncomplete: (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => {
+      get().logEvent('task_uncomplete_frontend', {
+        task_id: taskId,
+        task_name: taskName,
+        session_id: sessionId,
+        session_reset: sessionReset,
+        uncomplete_time: new Date().toISOString()
+      });
+    },
+
+    logFeedbackSubmitted: (sessionId: number, focusLevel: string, reflection?: string) => {
+      get().logEvent('feedback_submitted', {
+        session_id: sessionId,
+        focus_level: focusLevel,
+        has_reflection: !!reflection,
+        reflection_length: reflection?.length || 0,
+        submission_time: new Date().toISOString()
+      });
+    },
+
+    // New comprehensive event tracking methods - now synchronous and non-blocking
+    logUserAction: (action: string, context?: Record<string, any>) => {
+      get().logEvent('user_action', {
+        action,
+        timestamp: new Date().toISOString(),
+        ...context
+      });
+    },
+
+    logSessionGeneration: (projectDetails: string, success: boolean, taskCount?: number) => {
+      get().logEvent('session_generation', {
+        project_details: projectDetails,
+        success,
+        task_count: taskCount,
+        generation_time: new Date().toISOString()
+      });
+    },
+
+    logSettingsChange: (settingType: string, oldValue: any, newValue: any) => {
+      get().logEvent('settings_change', {
+        setting_type: settingType,
+        old_value: oldValue,
+        new_value: newValue,
+        change_time: new Date().toISOString()
+      });
+    },
+
+    logScheduleGeneration: (taskCount: number, totalTime: number, success: boolean) => {
+      get().logEvent('schedule_generation', {
+        task_count: taskCount,
+        total_time: totalTime,
+        success,
+        generation_time: new Date().toISOString()
+      });
+    },
+
+    logTaskEdit: (taskId: number, changeType: string, details?: Record<string, any>) => {
+      get().logEvent('task_edit', {
+        task_id: taskId,
+        change_type: changeType,
+        edit_time: new Date().toISOString(),
+        ...details
+      });
+    },
+
+    logNavigationEvent: (fromPage: string, toPage: string) => {
+      get().logEvent('navigation', {
+        from_page: fromPage,
+        to_page: toPage,
+        navigation_time: new Date().toISOString()
+      });
+    },
+
+    logTimerReset: (sessionId: number, phase: string, timeRemaining: number) => {
+      get().logEvent('timer_reset', {
+        session_id: sessionId,
+        phase,
+        time_remaining: timeRemaining,
+        reset_time: new Date().toISOString()
+      });
+    },
+
+    logBreakSkip: (sessionId: number, breakType: string) => {
+      get().logEvent('break_skip', {
+        session_id: sessionId,
+        break_type: breakType,
+        skip_time: new Date().toISOString()
+      });
+    },
+
+    logModalOpen: (modalType: string, context?: Record<string, any>) => {
+      get().logEvent('modal_open', {
+        modal_type: modalType,
+        open_time: new Date().toISOString(),
+        ...context
+      });
+    },
+
+    logModalClose: (modalType: string, action: string) => {
+      get().logEvent('modal_close', {
+        modal_type: modalType,
+        close_action: action,
+        close_time: new Date().toISOString()
+      });
+    },
+  };
+});

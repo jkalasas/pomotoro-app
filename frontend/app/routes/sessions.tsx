@@ -8,6 +8,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { Plus, Edit, Trash2, GripVertical, Clock, Target } from "lucide-react";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
+import { useAnalyticsStore } from "~/stores/analytics";
 import { DragDropContext, Droppable, Draggable, type DropResult, type DroppableProvided, type DraggableProvided, type DraggableStateSnapshot } from "@hello-pangea/dnd";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 
@@ -24,6 +25,8 @@ export default function Sessions() {
     deleteTask,
     reorderTasks,
   } = useTaskStore();
+
+  const analyticsStore = useAnalyticsStore();
 
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isEditingSession, setIsEditingSession] = useState(false);
@@ -48,15 +51,43 @@ export default function Sessions() {
   });
 
   useEffect(() => {
+    // Log page view
+    analyticsStore.logNavigationEvent('unknown', 'sessions');
+    analyticsStore.logUserAction('page_view', {
+      page: 'sessions',
+      timestamp: new Date().toISOString()
+    });
+
     loadSessions();
-  }, [loadSessions]);
+
+    // Return cleanup function
+    return () => {
+      analyticsStore.logUserAction('page_exit', {
+        page: 'sessions',
+        timestamp: new Date().toISOString()
+      });
+    };
+  }, [loadSessions, analyticsStore]);
 
   const handleSelectSession = async (sessionId: number) => {
     try {
       const session = await getSession(sessionId);
       setSelectedSession(session);
+      
+      // Log session selection
+      analyticsStore.logUserAction('session_selected', {
+        session_id: sessionId,
+        session_name: session.name,
+        task_count: session.tasks.length
+      });
     } catch (error) {
       console.error("Failed to load session:", error);
+      
+      // Log session selection failure
+      analyticsStore.logUserAction('session_selection_failed', {
+        session_id: sessionId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   };
 

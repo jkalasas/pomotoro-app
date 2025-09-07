@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 from sqlmodel import select, and_
 
@@ -39,6 +39,55 @@ def log_analytics_event(
         event_type=event.event_type,
         event_data=event.event_data,
         created_at=event.created_at
+    )
+
+
+@router.post("/user-action", response_model=AnalyticsEventPublic)
+def log_user_action(
+    db: SessionDep,
+    current_user: ActiveUserDep,
+    action: str,
+    context: Optional[Dict[str, Any]] = None
+):
+    """Log a user interface action"""
+    event = AnalyticsService.log_user_action(
+        db=db,
+        user_id=current_user.id,
+        action=action,
+        context=context
+    )
+    
+    return AnalyticsEventPublic(
+        id=event.id,
+        event_type=event.event_type,
+        event_data=event.event_data,
+        created_at=event.created_at
+    )
+
+
+@router.post("/pomodoro-event", response_model=AnalyticsEventPublic)
+def log_pomodoro_event(
+    db: SessionDep,
+    current_user: ActiveUserDep,
+    event: str,
+    session_id: int,
+    context: Optional[Dict[str, Any]] = None
+):
+    """Log a pomodoro-related event"""
+    kwargs = context or {}
+    analytics_event = AnalyticsService.log_pomodoro_event(
+        db=db,
+        user_id=current_user.id,
+        event=event,
+        session_id=session_id,
+        **kwargs
+    )
+    
+    return AnalyticsEventPublic(
+        id=analytics_event.id,
+        event_type=analytics_event.event_type,
+        event_data=analytics_event.event_data,
+        created_at=analytics_event.created_at
     )
 
 

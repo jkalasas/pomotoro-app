@@ -230,24 +230,24 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           <InsightsCard insights={dashboardData.productivity_insights} />
           <Card>
             <CardHeader>
-              <CardTitle>Productivity Heatmap</CardTitle>
+              <CardTitle>Activity History</CardTitle>
               <CardDescription>
-                Your productivity score over time
+                Your recent activity and patterns
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-2">
-                {dashboardData.productivity_heatmap.slice(-28).map((data, index) => (
-                  <div
-                    key={index}
-                    className="aspect-square rounded flex items-center justify-center text-xs font-medium"
-                    style={{
-                      backgroundColor: `hsl(var(--primary) / ${(data.productivity || 0) / 100})`,
-                      color: (data.productivity || 0) > 50 ? 'white' : 'inherit'
-                    }}
-                    title={`${new Date(data.date).toLocaleDateString()}: ${(data.productivity || 0).toFixed(0)}%`}
-                  >
-                    {(data.productivity || 0).toFixed(0)}
+              <div className="space-y-4">
+                {dashboardData.daily_stats.slice(-14).map((stat, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(stat.date).toLocaleDateString()}
+                    </span>
+                    <div className="text-right">
+                      <div className="font-medium">{(stat.total_focus_time / 3600).toFixed(1)}h focus</div>
+                      <div className="text-sm text-muted-foreground">
+                        {stat.tasks_completed} tasks, {stat.pomodoros_completed} pomodoros
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

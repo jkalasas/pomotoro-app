@@ -63,7 +63,8 @@ class DailyStats(SQLModel, table=True):
     # Productivity metrics
     average_focus_duration: Optional[float] = None  # average length of focus periods
     interruptions_count: int = 0
-    productivity_score: Optional[float] = None  # calculated score based on various factors
+    # productivity_score removed but kept as optional for backward compatibility
+    productivity_score: Optional[float] = None  # deprecated field
     
     created_at: datetime = SQLField(default_factory=datetime.utcnow)
     updated_at: datetime = SQLField(default_factory=datetime.utcnow)

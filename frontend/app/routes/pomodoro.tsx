@@ -17,6 +17,7 @@ import { TextRoller } from "~/components/pomotoro/animations/text-roller";
 import { cn } from "~/lib/utils";
 import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
 import { usePomodoroStore } from "~/stores/pomodoro";
+import { useAnalyticsStore } from "~/stores/analytics";
 import { useEffect, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import { apiClient } from "~/lib/api";
@@ -68,14 +69,31 @@ export default function Pomodoro() {
     submitSessionFeedback,
   } = usePomodoroStore();
 
+  const analyticsStore = useAnalyticsStore();
+
   // Timer ticking, backend sync and rest-overlay are handled centrally by
   // the pomodoro store background ticker so page-level intervals are not
   // required. The page simply reads state from the store for rendering.
 
-  // Load active session on component mount
+  // Load active session on component mount and log page view
   useEffect(() => {
+    // Log page view
+    analyticsStore.logNavigationEvent('unknown', 'pomodoro');
+    analyticsStore.logUserAction('page_view', {
+      page: 'pomodoro',
+      timestamp: new Date().toISOString()
+    });
+
     loadActiveSession();
-  }, [loadActiveSession]);
+
+    // Return cleanup function
+    return () => {
+      analyticsStore.logUserAction('page_exit', {
+        page: 'pomodoro',
+        timestamp: new Date().toISOString()
+      });
+    };
+  }, [loadActiveSession, analyticsStore]);
 
   // Handle rest overlay display
   useEffect(() => {
@@ -109,15 +127,45 @@ export default function Pomodoro() {
 
           <div className="flex justify-center gap-2 mb-4">
             {!isRunning ? (
-              <Button type="button" onClick={startTimer} disabled={isLoading}>
+              <Button 
+                type="button" 
+                onClick={() => {
+                  analyticsStore.logUserAction('timer_start_from_pomodoro_page', {
+                    phase,
+                    time_remaining: time
+                  });
+                  startTimer();
+                }} 
+                disabled={isLoading}
+              >
                 <Play className="size-4" />
               </Button>
             ) : (
-              <Button type="button" onClick={pauseTimer} disabled={isLoading}>
+              <Button 
+                type="button" 
+                onClick={() => {
+                  analyticsStore.logUserAction('timer_pause_from_pomodoro_page', {
+                    phase,
+                    time_remaining: time
+                  });
+                  pauseTimer();
+                }} 
+                disabled={isLoading}
+              >
                 <Pause className="size-4" />
               </Button>
             )}
-            <Button type="button" onClick={resetTimer} disabled={isLoading}>
+            <Button 
+              type="button" 
+              onClick={() => {
+                analyticsStore.logUserAction('timer_reset_from_pomodoro_page', {
+                  phase,
+                  time_remaining: time
+                });
+                resetTimer();
+              }} 
+              disabled={isLoading}
+            >
               <RefreshCw className="size-4" />
             </Button>
           </div>

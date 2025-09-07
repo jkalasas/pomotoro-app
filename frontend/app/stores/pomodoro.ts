@@ -205,7 +205,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       // Initialize timer if not set
-      const { time, maxTime, settings } = get();
+      const { time, maxTime, settings, sessionId } = get();
       if (time === 0 && maxTime === 0) {
         const focusDuration = settings.focus_duration * 60; // Convert to seconds
         set({ time: focusDuration, maxTime: focusDuration });
@@ -216,6 +216,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Then update local state
       set({ isRunning: true });
+      
+      // Log analytics event
+      if (sessionId) {
+        useAnalyticsStore.getState().logTimerStart(sessionId, get().phase);
+        useAnalyticsStore.getState().logUserAction('timer_start_button_clicked', {
+          session_id: sessionId,
+          phase: get().phase
+        });
+      }
     } catch (error) {
       // Failed to start timer
     } finally {
@@ -226,7 +235,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   pauseTimer: async () => {
     set({ isLoading: true });
     try {
-      const { time } = get();
+      const { time, sessionId } = get();
       
       // Update backend first with current time and paused state
       await apiClient.updateActiveSession({ 
@@ -236,6 +245,16 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Then update local state
       set({ isRunning: false });
+      
+      // Log analytics event
+      if (sessionId) {
+        useAnalyticsStore.getState().logTimerPause(sessionId, get().phase);
+        useAnalyticsStore.getState().logUserAction('timer_pause_button_clicked', {
+          session_id: sessionId,
+          phase: get().phase,
+          time_remaining: time
+        });
+      }
     } catch (error) {
       // Failed to pause timer
     } finally {
@@ -247,7 +266,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       // Get current settings
-      const { settings } = get();
+      const { settings, sessionId, phase, time } = get();
       const resetTime = settings.focus_duration * 60; // Convert to seconds
       
       // Update backend first
@@ -264,6 +283,16 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         maxTime: resetTime,
         phase: "focus"
       });
+      
+      // Log analytics event
+      if (sessionId) {
+        useAnalyticsStore.getState().logTimerReset(sessionId, phase, time);
+        useAnalyticsStore.getState().logUserAction('timer_reset_button_clicked', {
+          session_id: sessionId,
+          previous_phase: phase,
+          time_remaining: time
+        });
+      }
     } catch (error) {
       // Failed to reset timer
     } finally {
@@ -280,7 +309,19 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     long_break_duration: number;
     long_break_per_pomodoros: number;
   }) => {
+    const oldSettings = get().settings;
     set({ settings: newSettings });
+    
+    // Log settings changes
+    Object.keys(newSettings).forEach(key => {
+      if (oldSettings[key as keyof typeof oldSettings] !== newSettings[key as keyof typeof newSettings]) {
+        useAnalyticsStore.getState().logSettingsChange(
+          key,
+          oldSettings[key as keyof typeof oldSettings],
+          newSettings[key as keyof typeof newSettings]
+        );
+      }
+    });
     
     // Only update timer with new focus duration if currently in focus phase AND timer is not running
     // This prevents resetting the timer during task transitions when the timer is actively running
@@ -596,7 +637,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   skipRest: async () => {
-    const { sessionId } = get();
+    const { sessionId, phase } = get();
     
     if (!sessionId) {
       console.error('No active session found for skip rest');
@@ -633,6 +674,13 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         time: focusDuration,
         maxTime: focusDuration,
         isRunning: false,
+      });
+      
+      // Log analytics event
+      useAnalyticsStore.getState().logBreakSkip(sessionId, phase);
+      useAnalyticsStore.getState().logUserAction('break_skip_button_clicked', {
+        session_id: sessionId,
+        skipped_phase: phase
       });
       
       await get().loadActiveSession();

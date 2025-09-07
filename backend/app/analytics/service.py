@@ -24,6 +24,37 @@ class AnalyticsService:
         return event
     
     @staticmethod
+    def log_user_action(db: SessionDep, user_id: int, action: str, context: Optional[Dict[str, Any]] = None):
+        """Log a user interface action"""
+        event_data = {
+            "action": action,
+            "timestamp": datetime.utcnow().isoformat(),
+            **(context or {})
+        }
+        return AnalyticsService.log_event(db, user_id, "user_action", event_data)
+    
+    @staticmethod
+    def log_pomodoro_event(db: SessionDep, user_id: int, event: str, session_id: int, **kwargs):
+        """Log pomodoro-specific events"""
+        event_data = {
+            "session_id": session_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            **kwargs
+        }
+        return AnalyticsService.log_event(db, user_id, f"pomodoro_{event}", event_data)
+    
+    @staticmethod
+    def log_session_generation(db: SessionDep, user_id: int, generation_type: str, project_details: str, **kwargs):
+        """Log AI session generation events"""
+        event_data = {
+            "generation_type": generation_type,
+            "project_details": project_details,
+            "timestamp": datetime.utcnow().isoformat(),
+            **kwargs
+        }
+        return AnalyticsService.log_event(db, user_id, "session_generation", event_data)
+    
+    @staticmethod
     def start_session_analytics(db: SessionDep, user_id: int, session_id: int):
         """Start tracking analytics for a session"""
         session_analytics = SessionAnalytics(
@@ -137,15 +168,8 @@ class AnalyticsService:
         if daily_stats.pomodoros_completed > 0:
             daily_stats.average_focus_duration = daily_stats.total_focus_time / daily_stats.pomodoros_completed
         
-        # Calculate productivity score (0-100)
-        productivity_score = 0
-        if daily_stats.sessions_completed > 0:
-            completion_rate = sum(sa.completion_rate or 0 for sa in session_analytics) / len(session_analytics)
-            focus_efficiency = min(daily_stats.total_focus_time / (8 * 3600), 1.0)  # 8 hours max
-            interruption_penalty = max(0, 1 - (daily_stats.interruptions_count * 0.1))
-            productivity_score = (completion_rate * 0.4 + focus_efficiency * 0.4 + interruption_penalty * 0.2) * 100
-        
-        daily_stats.productivity_score = productivity_score
+        # Remove productivity score calculation
+        daily_stats.productivity_score = None
         daily_stats.updated_at = datetime.utcnow()
         
         db.add(daily_stats)

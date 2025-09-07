@@ -13,9 +13,7 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
   const totalFocusHours = stats.reduce((sum, stat) => sum + stat.total_focus_time, 0) / 3600;
   const totalTasksCompleted = stats.reduce((sum, stat) => sum + stat.tasks_completed, 0);
   const totalSessions = stats.reduce((sum, stat) => sum + stat.sessions_completed, 0);
-  const avgProductivityScore = stats.length > 0 
-    ? stats.reduce((sum, stat) => sum + (stat.productivity_score || 0), 0) / stats.length 
-    : 0;
+  const totalPomodoros = stats.reduce((sum, stat) => sum + stat.pomodoros_completed, 0);
 
   // Calculate streaks and trends
   const currentStreak = calculateCurrentStreak(stats);
@@ -51,12 +49,14 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Productivity Score</CardTitle>
-          <div className="h-4 w-4 text-muted-foreground">📊</div>
+          <CardTitle className="text-sm font-medium">Pomodoros Completed</CardTitle>
+          <div className="h-4 w-4 text-muted-foreground">🍅</div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{avgProductivityScore.toFixed(0)}%</div>
-          <Progress value={avgProductivityScore} className="mt-2" />
+          <div className="text-2xl font-bold">{totalPomodoros}</div>
+          <p className="text-xs text-muted-foreground">
+            Focus sessions completed
+          </p>
         </CardContent>
       </Card>
 

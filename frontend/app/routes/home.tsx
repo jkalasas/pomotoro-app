@@ -114,41 +114,65 @@ export default function Home() {
 
   // Load user data and sessions on mount
   useEffect(() => {
+    // Only log page view once per mount
+    analyticsStore.logNavigationEvent('unknown', 'home');
+    analyticsStore.logUserAction('page_view', {
+      page: 'home',
+      timestamp: new Date().toISOString()
+    });
+
+    // Return cleanup function to log page exit
+    return () => {
+      analyticsStore.logUserAction('page_exit', {
+        page: 'home',
+        timestamp: new Date().toISOString()
+      });
+    };
+  }, []); // Run only once on mount
+
+  // Handle auth and data loading separately
+  useEffect(() => {
     if (authStore.token && !authStore.user) {
       authStore.loadUser();
     }
+  }, [authStore.token]);
+
+  useEffect(() => {
     if (authStore.user) {
       tasksStore.loadSessions();
-      // Load active pomodoro session on mount
       pomodoroStore.loadActiveSession();
-      // Also refresh current session if pomodoro store has an active session
-      if (pomodoroStore.sessionId && !tasksStore.currentSession) {
-        tasksStore.loadSession(pomodoroStore.sessionId);
-      }
     }
-  }, [authStore.token, authStore.user, pomodoroStore.sessionId]);
+  }, [authStore.user]);
+
+  useEffect(() => {
+    if (pomodoroStore.sessionId && !tasksStore.currentSession) {
+      tasksStore.loadSession(pomodoroStore.sessionId);
+    }
+  }, [pomodoroStore.sessionId]);
 
   // Listen for session completion events to refresh data
   useEffect(() => {
     const handleSessionCompleted = () => {
       tasksStore.refreshAllData();
-      // Also refresh analytics
-      analyticsStore.updateDailyStats();
-      analyticsStore.fetchInsights();
+      // Defer analytics updates to prevent blocking UI
+      setTimeout(() => {
+        analyticsStore.updateDailyStats();
+        analyticsStore.fetchInsights();
+      }, 100);
     };
 
     const handleSessionReset = () => {
       tasksStore.refreshAllData();
-      // Refresh analytics after session reset
-      analyticsStore.updateDailyStats();
+      // Defer analytics update
+      setTimeout(() => analyticsStore.updateDailyStats(), 100);
     };
 
     const handleTaskCompleted = () => {
       if (tasksStore.currentSession) {
         tasksStore.loadSession(tasksStore.currentSession.id);
       }
-      // Update daily stats after task changes
-      analyticsStore.updateDailyStats();
+      // Defer analytics update
+      setTimeout(() => analyticsStore.updateDailyStats(), 100);
     };
 
     if (typeof window !== "undefined") {
@@ -185,12 +209,22 @@ export default function Home() {
   useEffect(() => {
     if (sessionInfo) {
       setIsSessionDialogOpen(true);
+      // Log analytics for session dialog opening
+      analyticsStore.logModalOpen('session_editor', {
+        task_count: sessionInfo.tasks.length,
+        total_estimated_time: sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0)
+      });
     }
-  }, [sessionInfo]);
+  }, [sessionInfo, analyticsStore]);
 
   const startGenerating = async (projectDetails: string) => {
     if (isGenerating) return;
     setIsGenerating(true);
+
+    // Log analytics for session generation attempt
+    analyticsStore.logUserAction('session_generation_started', {
+      project_details_length: projectDetails.length
+    });
 
     const toastId = toast.loading("Generating tasks...", {
       duration: Infinity,
@@ -229,11 +263,21 @@ export default function Home() {
 
       setSessionInfo(sessionInfo);
 
+      // Log successful session generation
+      analyticsStore.logSessionGeneration(
+        projectDetails,
+        true,
+        recommendations.generated_tasks.length
+      );
+
       toast.success("Tasks generated successfully!", {
         id: toastId,
         duration: 5000,
       });
     } catch (error) {
+      // Log failed session generation
+      analyticsStore.logSessionGeneration(projectDetails, false);
+      
       toast.error("Failed to generate tasks", {
         id: toastId,
         duration: 5000,
@@ -253,6 +297,12 @@ export default function Home() {
       toast.error("A session with this name or description already exists");
       return;
     }
+
+    // Log analytics for session creation attempt
+    analyticsStore.logUserAction('session_creation_from_generated', {
+      task_count: sessionInfo.tasks.length,
+      total_estimated_time: sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0)
+    });
 
     try {
       const sessionData = {
@@ -275,10 +325,23 @@ export default function Home() {
       const createdSession = await tasksStore.createSession(sessionData);
       tasksStore.setCurrentSession(createdSession);
       await pomodoroStore.setSession(createdSession.id);
+      
+      // Log successful session creation and start
+      analyticsStore.logUserAction('session_created_and_started', {
+        session_id: createdSession.id,
+        session_name: createdSession.name,
+        task_count: sessionInfo.tasks.length
+      });
+      
       setIsSessionDialogOpen(false);
       setSessionInfo(undefined); // Clear the generated session info
       toast.success("Session created and started!");
     } catch (error) {
+      // Log failed session creation
+      analyticsStore.logUserAction('session_creation_failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       toast.error("Failed to create session");
     }
   };
@@ -287,6 +350,11 @@ export default function Home() {
     // Load current settings from pomodoro store
     setSessionSettings(pomodoroStore.settings);
     setIsSessionSettingsOpen(true);
+    
+    // Log analytics for opening settings modal
+    analyticsStore.logModalOpen('session_settings', {
+      current_settings: pomodoroStore.settings
+    });
   };
 
   const saveSessionSettings = async () => {
@@ -294,8 +362,20 @@ export default function Home() {
       // Update pomodoro store settings
       pomodoroStore.updateSettings(sessionSettings);
       setIsSessionSettingsOpen(false);
+      
+      // Log analytics for settings save
+      analyticsStore.logModalClose('session_settings', 'saved');
+      analyticsStore.logUserAction('session_settings_saved', {
+        new_settings: sessionSettings
+      });
+      
       toast.success("Pomodoro settings updated!");
     } catch (error) {
+      // Log analytics for settings save failure
+      analyticsStore.logUserAction('session_settings_save_failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       toast.error("Failed to update settings");
     }
   };
@@ -308,6 +388,9 @@ export default function Home() {
       long_break_duration: 15,
       long_break_per_pomodoros: 4,
     });
+    
+    // Log analytics for settings cancel
+    analyticsStore.logModalClose('session_settings', 'cancelled');
   };
 
   return (
@@ -336,7 +419,14 @@ export default function Home() {
 
           <Dialog
             open={isNewSessionDialogOpen}
-            onOpenChange={setIsNewSessionDialogOpen}
+            onOpenChange={(open) => {
+              setIsNewSessionDialogOpen(open);
+              if (open) {
+                analyticsStore.logModalOpen('new_session_form');
+              } else {
+                analyticsStore.logModalClose('new_session_form', 'closed');
+              }
+            }}
           >
             <DialogTrigger disabled={isGenerating}>
               <Button
@@ -351,6 +441,10 @@ export default function Home() {
               <SessionInfoForm
                 className="w-full"
                 onSubmit={({ data }) => {
+                  // Log analytics for session form submission
+                  analyticsStore.logUserAction('new_session_form_submitted', {
+                    project_details_length: data.projectDetails.length
+                  });
                   startGenerating(data.projectDetails);
                   setIsNewSessionDialogOpen(false);
                 }}
@@ -364,7 +458,12 @@ export default function Home() {
       {/* Session Editor Dialog */}
       <SessionEditorDialog
         isOpen={isSessionDialogOpen}
-        onOpenChange={setIsSessionDialogOpen}
+        onOpenChange={(open) => {
+          setIsSessionDialogOpen(open);
+          if (!open) {
+            analyticsStore.logModalClose('session_editor', sessionInfo ? 'dismissed' : 'closed');
+          }
+        }}
         sessionInfo={sessionInfo || null}
         onSessionChange={setSessionInfo}
         onCreateSession={createSessionFromGenerated}
@@ -374,7 +473,12 @@ export default function Home() {
       {/* Session Settings Dialog */}
       <Dialog
         open={isSessionSettingsOpen}
-        onOpenChange={setIsSessionSettingsOpen}
+        onOpenChange={(open) => {
+          setIsSessionSettingsOpen(open);
+          if (!open) {
+            analyticsStore.logModalClose('session_settings', 'dismissed');
+          }
+        }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -509,9 +613,19 @@ export default function Home() {
                 className="flex items-center gap-3"
                 variant="ghost"
                 onClick={() => {
+                  // Log analytics for timer control
                   if (pomodoroStore.isRunning) {
+                    analyticsStore.logUserAction('timer_pause_from_home', {
+                      session_id: pomodoroStore.sessionId,
+                      phase: pomodoroStore.phase,
+                      time_remaining: pomodoroStore.time
+                    });
                     pomodoroStore.pauseTimer();
                   } else {
+                    analyticsStore.logUserAction('timer_start_from_home', {
+                      session_id: pomodoroStore.sessionId,
+                      phase: pomodoroStore.phase
+                    });
                     pomodoroStore.startTimer();
                   }
                 }}
@@ -531,7 +645,15 @@ export default function Home() {
               </Button>
               <Button
                 className="flex items-center gap-3"
-                onClick={() => pomodoroStore.resetTimer()}
+                onClick={() => {
+                  // Log analytics for timer reset
+                  analyticsStore.logUserAction('timer_reset_from_home', {
+                    session_id: pomodoroStore.sessionId,
+                    phase: pomodoroStore.phase,
+                    time_remaining: pomodoroStore.time
+                  });
+                  pomodoroStore.resetTimer();
+                }}
                 disabled={pomodoroStore.isLoading}
               >
                 <RotateCcw />
@@ -543,6 +665,12 @@ export default function Home() {
                   onClick={() => {
                     const currentTask = schedulerStore.getCurrentTask();
                     if (currentTask) {
+                      // Log analytics for task completion
+                      analyticsStore.logUserAction('task_completed_from_home', {
+                        task_id: currentTask.id,
+                        task_name: currentTask.name,
+                        session_id: pomodoroStore.sessionId
+                      });
                       schedulerStore.completeScheduledTask(currentTask.id);
                     }
                   }}
@@ -604,9 +732,18 @@ export default function Home() {
                     <Checkbox
                       checked={task.completed || false}
                       onCheckedChange={() => {
+                        // Log analytics for task toggle
                         if (task.completed) {
+                          analyticsStore.logUserAction('task_uncompleted_from_checklist', {
+                            task_id: task.id,
+                            task_name: task.name
+                          });
                           schedulerStore.uncompleteScheduledTask(task.id);
                         } else {
+                          analyticsStore.logUserAction('task_completed_from_checklist', {
+                            task_id: task.id,
+                            task_name: task.name
+                          });
                           schedulerStore.completeScheduledTask(task.id);
                         }
                       }}
