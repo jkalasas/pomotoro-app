@@ -693,7 +693,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                         <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
                                       </div>
                                       <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex flex-col items-start gap-2 mb-1">
                                           <h4 className="font-medium">{task.name}</h4>
                                           <Badge variant="secondary">{task.category}</Badge>
                                           <Badge variant="outline">
@@ -707,7 +707,7 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex gap-1 ml-2">
+                                    <div className="flex flex-col gap-1 ml-2">
                                       <Button
                                         variant="outline"
                                         size="sm"
