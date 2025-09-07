@@ -235,6 +235,13 @@ class ApiClient {
     });
   }
 
+  async refineSession(description: string) {
+    return this.request('/recommendations/refine-session', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  }
+
   // Scheduler endpoints
   async generateSchedule(sessionIds: number[]) {
     return this.request('/scheduler/generate-schedule', {

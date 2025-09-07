@@ -9,6 +9,6 @@ export interface Task {
     name: string;
     description?: string;
     difficulty: TaskDifficulty;
-    pomodoros: number;
+    estimatedTime: number; // in minutes
     subtasks?: Task[];
 }

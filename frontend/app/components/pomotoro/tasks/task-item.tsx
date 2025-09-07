@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/utils";
+import { formatMinutes } from "~/lib/time";
 import type { Task } from "~/types/task";
 
 interface Props {
@@ -33,7 +34,7 @@ export function TaskItem({ isDoneValue, isDoneChange, task }: Props) {
             htmlFor={task.id}
             className={cn(isDoneMemo && ["line-through", "text-muted-foreground"])}
           >
-            {task.name} ({task.pomodoros})
+            {task.name} ({formatMinutes(task.estimatedTime)})
           </Label>
         </div>
         {task.description && (

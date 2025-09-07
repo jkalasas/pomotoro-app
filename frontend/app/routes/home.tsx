@@ -56,6 +56,10 @@ import {
 } from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
 import useElementSize from "~/hooks/use-element-size";
+import { 
+  SessionEditorDialog,
+  type GeneratedSessionInfo,
+} from "~/components/pomotoro/session-editor-dialog";
 
 interface GeneratedTask {
   name: string;
@@ -78,27 +82,6 @@ interface RecommendationResponse {
   generated_tasks: GeneratedTask[];
   pomodoro_config: PomodoroConfig;
   total_estimated_time: number;
-}
-
-interface GeneratedSessionInfo {
-  sessionDetails: {
-    title: string;
-    description: string;
-  };
-  pomodoroSetup: {
-    duration: number;
-    shortBreakTime: number;
-    longBreakTime: number;
-    pomodorosBeforeLongBreak: number;
-  };
-  tasks: Array<{
-    id: string;
-    name: string;
-    description: string;
-    difficulty: TaskDifficulty;
-    pomodoros: number;
-    category: string;
-  }>;
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -191,13 +174,13 @@ export default function Home() {
 
   const totalPomodoros = useMemo(() => {
     if (!sessionInfo) return 0;
-    return sessionInfo.tasks.reduce((acc, task) => acc + task.pomodoros, 0);
+    return Math.ceil(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0) / sessionInfo.pomodoroSetup.duration);
   }, [sessionInfo]);
 
   const totalTimeMinutes = useMemo(() => {
     if (!sessionInfo) return 0;
-    return sessionInfo.pomodoroSetup.duration * totalPomodoros;
-  }, [totalPomodoros, sessionInfo]);
+    return sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0);
+  }, [sessionInfo]);
 
   useEffect(() => {
     if (sessionInfo) {
@@ -238,10 +221,7 @@ export default function Home() {
             name: task.name,
             description: "",
             difficulty: TaskDifficulty.MEDIUM,
-            pomodoros: Math.ceil(
-              task.estimated_completion_time /
-                recommendations.pomodoro_config.focus_duration
-            ),
+            estimatedTime: task.estimated_completion_time,
             category: task.category,
           })
         ),
@@ -288,8 +268,7 @@ export default function Home() {
         tasks: sessionInfo.tasks.map((task) => ({
           name: task.name,
           category: task.category,
-          estimated_completion_time:
-            task.pomodoros * sessionInfo.pomodoroSetup.duration,
+          estimated_completion_time: task.estimatedTime,
         })),
       };
 
@@ -381,66 +360,16 @@ export default function Home() {
           </Dialog>
         </div>
       </div>
-      <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{sessionInfo?.sessionDetails.title}</DialogTitle>
-            <DialogDescription>
-              {sessionInfo?.sessionDetails.description}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="my-4 space-y-2 border-t border-b py-4">
-            <h4 className="text-sm font-medium mb-2">Pomodoro Setup</h4>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Focus Duration:</span>
-              <span>{sessionInfo?.pomodoroSetup.duration} min</span>
-              <span className="text-muted-foreground">Short Break:</span>
-              <span>{sessionInfo?.pomodoroSetup.shortBreakTime} min</span>
-              <span className="text-muted-foreground">Long Break:</span>
-              <span>{sessionInfo?.pomodoroSetup.longBreakTime} min</span>
-              <span className="text-muted-foreground">Long Break After:</span>
-              <span>
-                {sessionInfo?.pomodoroSetup.pomodorosBeforeLongBreak} pomodoros
-              </span>
-              <span className="text-muted-foreground">Total Pomodoros:</span>
-              <span>{totalPomodoros} pomodoros</span>
-              <span className="text-muted-foreground">Total Time:</span>
-              <span>{formatMinutes(totalTimeMinutes)}</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Generated Tasks</h4>
-            {sessionInfo?.tasks.map((task) => (
-              <TaskItem key={task.id} task={task} />
-            ))}
-          </div>
-
-          <Button
-            type="button"
-            className="mt-3 w-full"
-            onClick={() => {
-              setIsSessionDialogOpen(false);
-              startGenerating(
-                sessionInfo?.sessionDetails.title +
-                  "\n" +
-                  sessionInfo?.sessionDetails.description
-              );
-            }}
-          >
-            Regenerate Tasks
-          </Button>
-          <Button
-            type="button"
-            className="mt-3 w-full"
-            onClick={createSessionFromGenerated}
-            disabled={!sessionInfo || isGenerating}
-          >
-            Create Session from Tasks
-          </Button>
-        </DialogContent>
-      </Dialog>
+      
+      {/* Session Editor Dialog */}
+      <SessionEditorDialog
+        isOpen={isSessionDialogOpen}
+        onOpenChange={setIsSessionDialogOpen}
+        sessionInfo={sessionInfo || null}
+        onSessionChange={setSessionInfo}
+        onCreateSession={createSessionFromGenerated}
+        isGenerating={isGenerating}
+      />
 
       {/* Session Settings Dialog */}
       <Dialog

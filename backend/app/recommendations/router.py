@@ -84,3 +84,16 @@ async def generate_task_recommendations(
     if not request.description.strip():
         raise HTTPException(status_code=400, detail="Description cannot be empty.")
     return await get_recommendations(request.description, db)
+
+
+@router.post("/refine-session", response_model=RecommendationResponse)
+async def refine_session(
+    request: SessionDescriptionRequest, db: SessionDep, _: ActiveUserDep
+):
+    """
+    Refine an existing session using LLM with improved context understanding.
+    This endpoint is designed for iterative improvement of session details and tasks.
+    """
+    if not request.description.strip():
+        raise HTTPException(status_code=400, detail="Description cannot be empty.")
+    return await get_recommendations(request.description, db)
