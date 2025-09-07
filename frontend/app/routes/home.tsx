@@ -71,6 +71,10 @@ interface PomodoroConfig {
 }
 
 interface RecommendationResponse {
+  session: {
+    name: string;
+    description: string;
+  };
   generated_tasks: GeneratedTask[];
   pomodoro_config: PomodoroConfig;
   total_estimated_time: number;
@@ -218,8 +222,8 @@ export default function Home() {
       // Convert backend format to frontend format for display (don't create session yet)
       const sessionInfo = {
         sessionDetails: {
-          title: projectDetails,
-          description: projectDetails,
+          title: recommendations.session.name,
+          description: recommendations.session.description,
         },
         pomodoroSetup: {
           duration: recommendations.pomodoro_config.focus_duration,
@@ -261,18 +265,19 @@ export default function Home() {
   const createSessionFromGenerated = async () => {
     if (!sessionInfo || !authStore.user || isGenerating) return;
 
-    // Check if a session with this description already exists
+    // Check if a session with this name already exists
     const existingSession = tasksStore.sessions.find(
-      (s) => s.description === sessionInfo.sessionDetails.title
+      (s) => s.name === sessionInfo.sessionDetails.title || s.description === sessionInfo.sessionDetails.description
     );
     if (existingSession) {
-      toast.error("A session with this name already exists");
+      toast.error("A session with this name or description already exists");
       return;
     }
 
     try {
       const sessionData = {
-        description: sessionInfo.sessionDetails.title,
+        name: sessionInfo.sessionDetails.title,
+        description: sessionInfo.sessionDetails.description,
         pomodoro_config: {
           focus_duration: sessionInfo.pomodoroSetup.duration,
           short_break_duration: sessionInfo.pomodoroSetup.shortBreakTime,

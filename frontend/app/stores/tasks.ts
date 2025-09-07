@@ -33,6 +33,7 @@ interface TaskState {
   loadSession: (sessionId: number) => Promise<void>;
   getSession: (sessionId: number) => Promise<Session>;
   createSession: (sessionData: {
+    name?: string;
     description: string;
     pomodoro_config: {
       focus_duration: number;

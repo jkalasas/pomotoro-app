@@ -22,7 +22,13 @@ class PomodoroConfig(BaseModel):
     long_break_per_pomodoros: int
 
 
+class SessionInfo(BaseModel):
+    name: str
+    description: str
+
+
 class RecommendationResponse(BaseModel):
+    session: SessionInfo
     generated_tasks: List[TaskResponse]
     pomodoro_config: PomodoroConfig
     total_estimated_time: int

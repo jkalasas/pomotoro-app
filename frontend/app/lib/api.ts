@@ -84,6 +84,7 @@ class ApiClient {
 
   // Session endpoints
   async createSession(sessionData: {
+    name?: string;
     description: string;
     pomodoro_config: {
       focus_duration: number;
