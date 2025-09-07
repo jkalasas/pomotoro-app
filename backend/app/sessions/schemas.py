@@ -58,6 +58,10 @@ class SessionWithTasksPublic(SessionPublic):
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    focus_duration: Optional[int] = None
+    short_break_duration: Optional[int] = None
+    long_break_duration: Optional[int] = None
+    long_break_per_pomodoros: Optional[int] = None
 
 
 class ActiveSessionCreate(BaseModel):
@@ -101,3 +105,19 @@ class SessionFeedbackPublic(BaseModel):
 class SessionCompleteRequest(BaseModel):
     focus_level: FocusLevel
     session_reflection: Optional[str] = None
+
+
+class TaskCreate(BaseModel):
+    name: str
+    category: str
+    estimated_completion_time: int
+
+
+class TaskUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    estimated_completion_time: Optional[int] = None
+
+
+class TaskReorder(BaseModel):
+    task_ids: List[int]

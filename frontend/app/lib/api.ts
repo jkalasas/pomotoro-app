@@ -84,6 +84,7 @@ class ApiClient {
 
   // Session endpoints
   async createSession(sessionData: {
+    name?: string;
     description: string;
     pomodoro_config: {
       focus_duration: number;
@@ -111,7 +112,14 @@ class ApiClient {
     return this.request(`/sessions/${sessionId}`);
   }
 
-  async updateSession(sessionId: number, updates: { name?: string; description?: string }) {
+  async updateSession(sessionId: number, updates: { 
+    name?: string; 
+    description?: string;
+    focus_duration?: number;
+    short_break_duration?: number;
+    long_break_duration?: number;
+    long_break_per_pomodoros?: number;
+  }) {
     return this.request(`/sessions/${sessionId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
@@ -168,6 +176,42 @@ class ApiClient {
     });
   }
 
+  // Task management endpoints
+  async addTaskToSession(sessionId: number, taskData: {
+    name: string;
+    category: string;
+    estimated_completion_time: number;
+  }) {
+    return this.request(`/sessions/${sessionId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async updateTask(taskId: number, taskData: {
+    name?: string;
+    category?: string;
+    estimated_completion_time?: number;
+  }) {
+    return this.request(`/sessions/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async deleteTask(taskId: number) {
+    return this.request(`/sessions/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderTasks(sessionId: number, taskIds: number[]) {
+    return this.request(`/sessions/${sessionId}/tasks/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ task_ids: taskIds }),
+    });
+  }
+
   // Session feedback
   async completeSession(sessionId: number, focusLevel: string, sessionReflection?: string) {
     return this.request(`/sessions/${sessionId}/complete`, {
@@ -191,9 +235,36 @@ class ApiClient {
     });
   }
 
-  // Daily progress
-  async getDailyProgress() {
-    return this.request('/sessions/daily-progress');
+  async refineSession(description: string) {
+    return this.request('/recommendations/refine-session', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  }
+
+  // Scheduler endpoints
+  async generateSchedule(sessionIds: number[]) {
+    return this.request('/scheduler/generate-schedule', {
+      method: 'POST',
+      body: JSON.stringify({ session_ids: sessionIds }),
+    });
+  }
+
+  async getUserInsights() {
+    return this.request('/scheduler/user-insights');
+  }
+
+  async updateDailyStats() {
+    return this.request('/scheduler/update-daily-stats', {
+      method: 'POST',
+    });
+  }
+
+  async reorderSchedule(taskIds: number[]) {
+    return this.request('/scheduler/reorder-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({ task_ids: taskIds }),
+    });
   }
 }
 

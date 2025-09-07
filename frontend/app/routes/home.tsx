@@ -1,9 +1,9 @@
-import { Link } from "react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import type { Route } from "./+types/home";
 import { useTaskStore } from "~/stores/tasks";
 import { useAnalyticsStore } from "~/stores/analytics";
+import { useSchedulerStore } from "~/stores/scheduler";
 import {
   Card,
   CardContent,
@@ -12,22 +12,22 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
+import { LogoIcon } from "~/components/ui/logo";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Check,
-  CloudLightning,
-  Edit2,
   FilePenLine,
   Pause,
   Play,
   Plus,
   PlusCircle,
   RotateCcw,
-  Timer,
-  X,
+  Settings,
+  Trash2,
 } from "lucide-react";
-import { DailyGoalChart } from "~/components/pomotoro/charts/daily-goal-chart";
-import { DailyProgress } from "~/components/pomotoro/daily-progress";
+import { ScheduleGeneratorDialog } from "~/components/pomotoro/schedule-generator-dialog";
+import { ScheduledTasksList } from "~/components/pomotoro/scheduled-tasks-list";
 import { Checkbox } from "~/components/ui/checkbox";
 import TaskCheckItem from "~/components/pomotoro/tasks/task-check-item";
 import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
@@ -50,9 +50,16 @@ import { usePomodoroStore } from "~/stores/pomodoro";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { useAuthStore } from "~/stores/auth";
 import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
-import { SessionFeedbackModal, type FocusLevel } from "~/components/pomodoro/session-feedback-modal";
+import {
+  SessionFeedbackModal,
+  type FocusLevel,
+} from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
-import { showTestFeatures } from "~/lib/env";
+import useElementSize from "~/hooks/use-element-size";
+import { 
+  SessionEditorDialog,
+  type GeneratedSessionInfo,
+} from "~/components/pomotoro/session-editor-dialog";
 
 interface GeneratedTask {
   name: string;
@@ -68,30 +75,13 @@ interface PomodoroConfig {
 }
 
 interface RecommendationResponse {
+  session: {
+    name: string;
+    description: string;
+  };
   generated_tasks: GeneratedTask[];
   pomodoro_config: PomodoroConfig;
   total_estimated_time: number;
-}
-
-interface GeneratedSessionInfo {
-  sessionDetails: {
-    title: string;
-    description: string;
-  };
-  pomodoroSetup: {
-    duration: number;
-    shortBreakTime: number;
-    longBreakTime: number;
-    pomodorosBeforeLongBreak: number;
-  };
-  tasks: Array<{
-    id: string;
-    name: string;
-    description: string;
-    difficulty: TaskDifficulty;
-    pomodoros: number;
-    category: string;
-  }>;
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -106,13 +96,21 @@ export default function Home() {
   const pomodoroStore = usePomodoroStore();
   const authStore = useAuthStore();
   const analyticsStore = useAnalyticsStore();
+  const schedulerStore = useSchedulerStore();
 
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<GeneratedSessionInfo>();
-  const [editingSessionName, setEditingSessionName] = useState(false);
-  const [sessionNameInput, setSessionNameInput] = useState("");
+  const [isSessionSettingsOpen, setIsSessionSettingsOpen] = useState(false);
+  const [sessionSettings, setSessionSettings] = useState({
+    focus_duration: 25,
+    short_break_duration: 5,
+    long_break_duration: 15,
+    long_break_per_pomodoros: 4,
+  });
+
+  const [pomodoroWidgetRef, pomodoroWidgetSize] = useElementSize();
 
   // Load user data and sessions on mount
   useEffect(() => {
@@ -121,6 +119,8 @@ export default function Home() {
     }
     if (authStore.user) {
       tasksStore.loadSessions();
+      // Load active pomodoro session on mount
+      pomodoroStore.loadActiveSession();
       // Also refresh current session if pomodoro store has an active session
       if (pomodoroStore.sessionId && !tasksStore.currentSession) {
         tasksStore.loadSession(pomodoroStore.sessionId);
@@ -131,7 +131,6 @@ export default function Home() {
   // Listen for session completion events to refresh data
   useEffect(() => {
     const handleSessionCompleted = () => {
-      console.log('Session completed - refreshing data');
       tasksStore.refreshAllData();
       // Also refresh analytics
       analyticsStore.updateDailyStats();
@@ -139,14 +138,12 @@ export default function Home() {
     };
 
     const handleSessionReset = () => {
-      console.log('Session reset - refreshing data');
       tasksStore.refreshAllData();
       // Refresh analytics after session reset
       analyticsStore.updateDailyStats();
     };
 
     const handleTaskCompleted = () => {
-      console.log('Task completed/uncompleted - refreshing current session');
       if (tasksStore.currentSession) {
         tasksStore.loadSession(tasksStore.currentSession.id);
       }
@@ -154,19 +151,19 @@ export default function Home() {
       analyticsStore.updateDailyStats();
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('session-completed', handleSessionCompleted);
-      window.addEventListener('session-reset', handleSessionReset);
-      window.addEventListener('task-completed', handleTaskCompleted);
-      window.addEventListener('task-uncompleted', handleTaskCompleted);
+    if (typeof window !== "undefined") {
+      window.addEventListener("session-completed", handleSessionCompleted);
+      window.addEventListener("session-reset", handleSessionReset);
+      window.addEventListener("task-completed", handleTaskCompleted);
+      window.addEventListener("task-uncompleted", handleTaskCompleted);
     }
 
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('session-completed', handleSessionCompleted);
-        window.removeEventListener('session-reset', handleSessionReset);
-        window.removeEventListener('task-completed', handleTaskCompleted);
-        window.removeEventListener('task-uncompleted', handleTaskCompleted);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("session-completed", handleSessionCompleted);
+        window.removeEventListener("session-reset", handleSessionReset);
+        window.removeEventListener("task-completed", handleTaskCompleted);
+        window.removeEventListener("task-uncompleted", handleTaskCompleted);
       }
     };
   }, [tasksStore]);
@@ -177,13 +174,13 @@ export default function Home() {
 
   const totalPomodoros = useMemo(() => {
     if (!sessionInfo) return 0;
-    return sessionInfo.tasks.reduce((acc, task) => acc + task.pomodoros, 0);
+    return Math.ceil(sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0) / sessionInfo.pomodoroSetup.duration);
   }, [sessionInfo]);
 
   const totalTimeMinutes = useMemo(() => {
     if (!sessionInfo) return 0;
-    return sessionInfo.pomodoroSetup.duration * totalPomodoros;
-  }, [totalPomodoros, sessionInfo]);
+    return sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0);
+  }, [sessionInfo]);
 
   useEffect(() => {
     if (sessionInfo) {
@@ -201,28 +198,33 @@ export default function Home() {
 
     try {
       // First generate recommendations
-      const recommendations = await apiClient.getRecommendations(projectDetails) as RecommendationResponse;
-      
+      const recommendations = (await apiClient.getRecommendations(
+        projectDetails
+      )) as RecommendationResponse;
+
       // Convert backend format to frontend format for display (don't create session yet)
       const sessionInfo = {
         sessionDetails: {
-          title: projectDetails,
-          description: projectDetails,
+          title: recommendations.session.name,
+          description: recommendations.session.description,
         },
         pomodoroSetup: {
           duration: recommendations.pomodoro_config.focus_duration,
           shortBreakTime: recommendations.pomodoro_config.short_break_duration,
           longBreakTime: recommendations.pomodoro_config.long_break_duration,
-          pomodorosBeforeLongBreak: recommendations.pomodoro_config.long_break_per_pomodoros,
+          pomodorosBeforeLongBreak:
+            recommendations.pomodoro_config.long_break_per_pomodoros,
         },
-        tasks: recommendations.generated_tasks.map((task: GeneratedTask, index: number) => ({
-          id: `temp-${index}`,
-          name: task.name,
-          description: "",
-          difficulty: TaskDifficulty.MEDIUM,
-          pomodoros: Math.ceil(task.estimated_completion_time / recommendations.pomodoro_config.focus_duration),
-          category: task.category,
-        })),
+        tasks: recommendations.generated_tasks.map(
+          (task: GeneratedTask, index: number) => ({
+            id: `temp-${index}`,
+            name: task.name,
+            description: "",
+            difficulty: TaskDifficulty.MEDIUM,
+            estimatedTime: task.estimated_completion_time,
+            category: task.category,
+          })
+        ),
       };
 
       setSessionInfo(sessionInfo);
@@ -232,7 +234,6 @@ export default function Home() {
         duration: 5000,
       });
     } catch (error) {
-      console.error("Failed to generate tasks:", error);
       toast.error("Failed to generate tasks", {
         id: toastId,
         duration: 5000,
@@ -244,26 +245,30 @@ export default function Home() {
   const createSessionFromGenerated = async () => {
     if (!sessionInfo || !authStore.user || isGenerating) return;
 
-    // Check if a session with this description already exists
-    const existingSession = tasksStore.sessions.find(s => s.description === sessionInfo.sessionDetails.title);
+    // Check if a session with this name already exists
+    const existingSession = tasksStore.sessions.find(
+      (s) => s.name === sessionInfo.sessionDetails.title || s.description === sessionInfo.sessionDetails.description
+    );
     if (existingSession) {
-      toast.error("A session with this name already exists");
+      toast.error("A session with this name or description already exists");
       return;
     }
 
     try {
       const sessionData = {
-        description: sessionInfo.sessionDetails.title,
+        name: sessionInfo.sessionDetails.title,
+        description: sessionInfo.sessionDetails.description,
         pomodoro_config: {
           focus_duration: sessionInfo.pomodoroSetup.duration,
           short_break_duration: sessionInfo.pomodoroSetup.shortBreakTime,
           long_break_duration: sessionInfo.pomodoroSetup.longBreakTime,
-          long_break_per_pomodoros: sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
+          long_break_per_pomodoros:
+            sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
         },
         tasks: sessionInfo.tasks.map((task) => ({
           name: task.name,
           category: task.category,
-          estimated_completion_time: task.pomodoros * sessionInfo.pomodoroSetup.duration,
+          estimated_completion_time: task.estimatedTime,
         })),
       };
 
@@ -274,54 +279,51 @@ export default function Home() {
       setSessionInfo(undefined); // Clear the generated session info
       toast.success("Session created and started!");
     } catch (error) {
-      console.error("Failed to create session:", error);
       toast.error("Failed to create session");
     }
   };
 
-  const startEditingSessionName = () => {
-    if (tasksStore.currentSession) {
-      setSessionNameInput(tasksStore.currentSession.name);
-      setEditingSessionName(true);
+  const openSessionSettings = () => {
+    // Load current settings from pomodoro store
+    setSessionSettings(pomodoroStore.settings);
+    setIsSessionSettingsOpen(true);
+  };
+
+  const saveSessionSettings = async () => {
+    try {
+      // Update pomodoro store settings
+      pomodoroStore.updateSettings(sessionSettings);
+      setIsSessionSettingsOpen(false);
+      toast.success("Pomodoro settings updated!");
+    } catch (error) {
+      toast.error("Failed to update settings");
     }
   };
 
-  const saveSessionName = async () => {
-    if (tasksStore.currentSession && sessionNameInput.trim()) {
-      try {
-        await tasksStore.updateSession(tasksStore.currentSession.id, { name: sessionNameInput.trim() });
-        setEditingSessionName(false);
-        toast.success("Session name updated!");
-      } catch (error) {
-        console.error("Failed to update session name:", error);
-        toast.error("Failed to update session name");
-      }
-    }
-  };
-
-  const cancelEditingSessionName = () => {
-    setEditingSessionName(false);
-    setSessionNameInput("");
+  const cancelSessionSettings = () => {
+    setIsSessionSettingsOpen(false);
+    setSessionSettings({
+      focus_duration: 25,
+      short_break_duration: 5,
+      long_break_duration: 15,
+      long_break_per_pomodoros: 4,
+    });
   };
 
   return (
-    <main className="flex flex-col items-center justify-center pb-4 gap-3 p-5">
-      <div className="w-full flex justify-between">
+    <main className="flex flex-col pb-4 gap-4 p-5">
+      <div className="w-full flex justify-between items-center">
         <SidebarTrigger />
-        <div className="flex justify-end gap-3">
-          <Link to="/analytics">
-            <Button variant="outline" className="inline-flex items-center gap-2">
-              <CloudLightning />
-              <span>Analytics</span>
-            </Button>
-          </Link>
-          <Link to="/pomodoro">
-            <Button variant="outline" className="inline-flex items-center gap-2">
-              <Timer />
-              <span>Pomodoro Timer</span>
-            </Button>
-          </Link>
-          
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-muted-foreground">
+            {schedulerStore.currentSchedule && schedulerStore.currentSchedule.length > 0
+              ? `${Math.floor(
+                  schedulerStore.currentSchedule
+                    .filter(task => !task.completed)
+                    .reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60
+                )} hours remaining`
+              : "No schedule"}
+          </span>
           {sessionInfo && (
             <Button
               type="button"
@@ -332,9 +334,15 @@ export default function Home() {
             </Button>
           )}
 
-          <Dialog open={isNewSessionDialogOpen} onOpenChange={setIsNewSessionDialogOpen}>
+          <Dialog
+            open={isNewSessionDialogOpen}
+            onOpenChange={setIsNewSessionDialogOpen}
+          >
             <DialogTrigger disabled={isGenerating}>
-              <Button className="inline-flex items-center gap-2" disabled={isGenerating}>
+              <Button
+                className="inline-flex items-center gap-2"
+                disabled={isGenerating}
+              >
                 <Plus />
                 <span>New Session</span>
               </Button>
@@ -352,117 +360,127 @@ export default function Home() {
           </Dialog>
         </div>
       </div>
-      <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
+      
+      {/* Session Editor Dialog */}
+      <SessionEditorDialog
+        isOpen={isSessionDialogOpen}
+        onOpenChange={setIsSessionDialogOpen}
+        sessionInfo={sessionInfo || null}
+        onSessionChange={setSessionInfo}
+        onCreateSession={createSessionFromGenerated}
+        isGenerating={isGenerating}
+      />
+
+      {/* Session Settings Dialog */}
+      <Dialog
+        open={isSessionSettingsOpen}
+        onOpenChange={setIsSessionSettingsOpen}
+      >
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{sessionInfo?.sessionDetails.title}</DialogTitle>
+            <DialogTitle>Session Settings</DialogTitle>
             <DialogDescription>
-              {sessionInfo?.sessionDetails.description}
+              Customize the timing for your Pomodoro session
             </DialogDescription>
           </DialogHeader>
 
-          <div className="my-4 space-y-2 border-t border-b py-4">
-            <h4 className="text-sm font-medium mb-2">Pomodoro Setup</h4>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Focus Duration:</span>
-              <span>{sessionInfo?.pomodoroSetup.duration} min</span>
-              <span className="text-muted-foreground">Short Break:</span>
-              <span>{sessionInfo?.pomodoroSetup.shortBreakTime} min</span>
-              <span className="text-muted-foreground">Long Break:</span>
-              <span>{sessionInfo?.pomodoroSetup.longBreakTime} min</span>
-              <span className="text-muted-foreground">Long Break After:</span>
-              <span>
-                {sessionInfo?.pomodoroSetup.pomodorosBeforeLongBreak} pomodoros
-              </span>
-              <span className="text-muted-foreground">Total Pomodoros:</span>
-              <span>{totalPomodoros} pomodoros</span>
-              <span className="text-muted-foreground">Total Time:</span>
-              <span>{formatMinutes(totalTimeMinutes)}</span>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
+              <Input
+                id="focus-duration"
+                type="number"
+                min="1"
+                max="120"
+                value={sessionSettings.focus_duration}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    focus_duration: parseInt(e.target.value) || 25,
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="short-break">
+                Short Break Duration (minutes)
+              </Label>
+              <Input
+                id="short-break"
+                type="number"
+                min="1"
+                max="30"
+                value={sessionSettings.short_break_duration}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    short_break_duration: parseInt(e.target.value) || 5,
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
+              <Input
+                id="long-break"
+                type="number"
+                min="1"
+                max="60"
+                value={sessionSettings.long_break_duration}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_duration: parseInt(e.target.value) || 15,
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="long-break-frequency">
+                Long Break After (pomodoros)
+              </Label>
+              <Input
+                id="long-break-frequency"
+                type="number"
+                min="1"
+                max="10"
+                value={sessionSettings.long_break_per_pomodoros}
+                onChange={(e) =>
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_per_pomodoros: parseInt(e.target.value) || 4,
+                  })
+                }
+              />
             </div>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Generated Tasks</h4>
-            {sessionInfo?.tasks.map((task) => (
-              <TaskItem key={task.id} task={task} />
-            ))}
+          <div className="flex gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={cancelSessionSettings}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveSessionSettings} className="flex-1">
+              Save Settings
+            </Button>
           </div>
-
-          <Button
-            type="button"
-            className="mt-3 w-full"
-            onClick={() => {
-              setIsSessionDialogOpen(false);
-              startGenerating(
-                sessionInfo?.sessionDetails.title +
-                  "\n" +
-                  sessionInfo?.sessionDetails.description
-              );
-            }}
-          >
-            Regenerate Tasks
-          </Button>
-          <Button
-            type="button"
-            className="mt-3 w-full"
-            onClick={createSessionFromGenerated}
-            disabled={!sessionInfo || isGenerating}
-          >
-            Create Session from Tasks
-          </Button>
         </DialogContent>
       </Dialog>
-      <div className="flex justify-between w-full">
-        <div className="flex items-center gap-2">
-          {editingSessionName ? (
-            <>
-              <Input
-                value={sessionNameInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSessionNameInput(e.target.value)}
-                className="font-bold text-lg"
-                placeholder="Session name"
-                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                  if (e.key === 'Enter') saveSessionName();
-                  if (e.key === 'Escape') cancelEditingSessionName();
-                }}
-                autoFocus
-              />
-              <Button size="sm" variant="ghost" onClick={saveSessionName}>
-                <Check className="size-4" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={cancelEditingSessionName}>
-                <X className="size-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="font-bold">
-                {tasksStore.currentSession?.name || "No Session Selected"}
-              </span>
-              {tasksStore.currentSession && (
-                <Button size="sm" variant="ghost" onClick={startEditingSessionName}>
-                  <Edit2 className="size-4" />
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-        <span className="font-medium">
-          {tasksStore.currentSession 
-            ? `${Math.floor(tasksStore.currentSession.tasks.reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60)} hours allotted`
-            : "0 hours allotted"
-          }
-        </span>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-5">
-        <Card className="row-span-3">
+
+      <div className="flex flex-col xl:flex-row gap-6 w-full items-stretch h-full">
+        {/* Pomodoro Widget */}
+        <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
           <CardContent>
             <div className="flex flex-col items-center">
               <span className="font-bold text-center">Current Task</span>
               <span className="font-thin text-center">
-                {pomodoroStore.currentTaskId
-                  ? `Task ${pomodoroStore.currentTaskId}`
-                  : "No active task"}
+                {schedulerStore.getCurrentTask()?.name || "No active task"}
               </span>
             </div>
             <div className="mx-aut">
@@ -478,10 +496,11 @@ export default function Home() {
                 ? "Short break"
                 : "Long break"}
             </p>
-            
+
             {pomodoroStore.showRestOverlay && (
               <p className="text-center text-sm text-orange-600 font-medium">
-                🍅 Rest Overlay Active
+                <LogoIcon className="h-5 w-5 mr-2" />
+                Rest Overlay Active
               </p>
             )}
 
@@ -515,15 +534,16 @@ export default function Home() {
                 onClick={() => pomodoroStore.resetTimer()}
                 disabled={pomodoroStore.isLoading}
               >
-                <CloudLightning />
+                <RotateCcw />
                 <span>Reset Timer</span>
               </Button>
-              {pomodoroStore.currentTaskId && (
+              {schedulerStore.getCurrentTask() && (
                 <Button
                   className="flex items-center gap-3"
                   onClick={() => {
-                    if (pomodoroStore.currentTaskId) {
-                      tasksStore.completeTask(pomodoroStore.currentTaskId);
+                    const currentTask = schedulerStore.getCurrentTask();
+                    if (currentTask) {
+                      schedulerStore.completeScheduledTask(currentTask.id);
                     }
                   }}
                 >
@@ -531,195 +551,89 @@ export default function Home() {
                   <span>Finish Task</span>
                 </Button>
               )}
-
-              {tasksStore.currentSession && !tasksStore.currentSession.completed && (
+            </div>
+          </CardContent>
+        </Card>
+        {/* AI Scheduler Widget */}
+        <Card
+          className="flex-2"
+          style={{
+            maxHeight: pomodoroWidgetSize.height
+              ? `${pomodoroWidgetSize.height}px`
+              : "auto",
+          }}
+        >
+          <CardContent className="max-h-full overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-bold">Schedule</span>
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  className="flex items-center gap-3"
-                  onClick={() => {
-                    tasksStore.completeSessionManually();
-                  }}
+                  size="sm"
+                  onClick={() => schedulerStore.clearSchedule()}
+                  disabled={!schedulerStore.currentSchedule || schedulerStore.currentSchedule.length === 0}
                 >
-                  <FilePenLine />
-                  <span>Complete Session</span>
+                  <Trash2 className="size-4 mr-2" />
+                  Clear
                 </Button>
-              )}
-              
-              {showTestFeatures() && (
-                <div className="border-t pt-3 mt-3">
-                  <p className="text-sm text-muted-foreground mb-2 text-center">Test Features</p>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2 bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
-                      onClick={async () => {
-                        // Test rest overlay with 5 minutes - create new overlay window
-                        await pomodoroStore.updateTimer({
-                          phase: "short_break",
-                          time_remaining: 300, // 5 minutes
-                        });
-                        pomodoroStore.setShowRestOverlay(true);
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <Timer />
-                      <span>Test Rest Overlay (5min)</span>
-                    </Button>
-                  
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                      onClick={async () => {
-                        // Test long break overlay - create new overlay window
-                        await pomodoroStore.updateTimer({
-                          phase: "long_break",
-                          time_remaining: 900, // 15 minutes
-                        });
-                        pomodoroStore.setShowRestOverlay(true);
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <Timer />
-                      <span>Test Long Break (15min)</span>
-                    </Button>
-                  
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                      onClick={async () => {
-                        // Force close overlay window
-                        const windowStore = useWindowStore.getState();
-                        await windowStore.closeOverlayWindow();
-                        pomodoroStore.setShowRestOverlay(false);
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <X />
-                      <span>Force Hide Overlay</span>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="row-span-2 col-span-2">
-          <CardContent>
-            <DailyProgress />
-          </CardContent>
-        </Card>
-        <Card className="row-span-3 col-span-2">
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <span className="font-bold">Tasks</span>
-              <div className="flex gap-2">
-                {tasksStore.sessions.map((session) => (
-                  <Button
-                    key={session.id}
-                    variant={tasksStore.currentSession?.id === session.id ? "default" : "outline"}
-                    size="sm"
-                    disabled={session.completed}
-                    className={session.completed ? "opacity-50" : ""}
-                    onClick={async () => {
-                      try {
-                        await tasksStore.loadSession(session.id);
-                        await pomodoroStore.setSession(session.id);
-                      } catch (error) {
-                        console.error("Failed to start session:", error);
-                        // You could add a toast notification here
-                      }
-                    }}
-                  >
-                    <span className="flex items-center gap-2">
-                      {session.completed && <Check className="size-3" />}
-                      {session.name || session.description}
-                    </span>
-                  </Button>
-                ))}
+                <ScheduleGeneratorDialog
+                  onScheduleGenerated={() => {
+                    // Schedule generated successfully
+                  }}
+                />
               </div>
             </div>
-            <div className="h-96 overflow-y-auto">
-              {tasksStore.currentSession && tasksStore.currentSession.tasks ? (
-                <div className="space-y-2">
-                  {tasksStore.currentSession.tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`p-3 border rounded-lg ${
-                        task.completed ? "bg-muted border-border/50 opacity-75" : "bg-card border-border"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className={task.completed ? "line-through text-muted-foreground" : ""}>
-                          {task.name}
-                        </span>
-                        <div className="flex gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {task.estimated_completion_time} min
-                          </span>
-                          <Button
-                            size="sm"
-                            variant={task.completed ? "outline" : "default"}
-                            onClick={() => {
-                              if (task.completed) {
-                                tasksStore.uncompleteTask(task.id);
-                              } else {
-                                tasksStore.completeTask(task.id);
-                              }
-                            }}
-                          >
-                            {task.completed ? (
-                              <span className="flex items-center gap-1">
-                                <RotateCcw className="size-4" />
-                                Undo
-                              </span>
-                            ) : (
-                              <Check className="size-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Category: {task.category}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  {tasksStore.currentSession ? "Loading tasks..." : "Select a session to view tasks"}
-                </div>
-              )}
+            <div className="max-h-full overflow-y-auto pb-12">
+              <ScheduledTasksList 
+                sessionSettings={pomodoroStore.settings}
+                onOpenSettings={openSessionSettings}
+              />
             </div>
           </CardContent>
         </Card>
-        <Card className="place-self-stretch">
+      </div>
+      <div className="flex gap-5 w-full">
+        <Card className="flex-1">
           <CardContent>
-            <p className="font-bold">Checklist</p>
+            <p className="font-bold">Quick Checklist</p>
             <div className="flex flex-col gap-1">
-              {tasksStore.currentSession?.tasks ? (
-                tasksStore.currentSession.tasks.map((task) => (
+              {schedulerStore.currentSchedule &&
+              schedulerStore.currentSchedule.length > 0 ? (
+                schedulerStore.currentSchedule.slice(0, 5).map((task) => (
                   <div key={task.id} className="flex items-center gap-2">
                     <Checkbox
-                      checked={task.completed}
+                      checked={task.completed || false}
                       onCheckedChange={() => {
                         if (task.completed) {
-                          tasksStore.uncompleteTask(task.id);
+                          schedulerStore.uncompleteScheduledTask(task.id);
                         } else {
-                          tasksStore.completeTask(task.id);
+                          schedulerStore.completeScheduledTask(task.id);
                         }
                       }}
                     />
-                    <span className={task.completed ? "line-through text-muted-foreground" : ""}>
+                    <span
+                      className={
+                        task.completed
+                          ? "line-through text-muted-foreground"
+                          : ""
+                      }
+                    >
                       {task.name}
                     </span>
                   </div>
                 ))
               ) : (
-                <span className="text-muted-foreground">No tasks available</span>
+                <span className="text-muted-foreground">
+                  Generate a schedule to see tasks here
+                </span>
               )}
+              {schedulerStore.currentSchedule &&
+                schedulerStore.currentSchedule.length > 5 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    +{schedulerStore.currentSchedule.length - 5} more tasks in
+                    full schedule
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>
@@ -738,7 +652,6 @@ export default function Home() {
               analyticsStore.fetchEvents();
               analyticsStore.updateDailyStats();
             } catch (error) {
-              console.error("Failed to submit feedback:", error);
               toast.error("Failed to submit feedback. Please try again.");
             }
           }}

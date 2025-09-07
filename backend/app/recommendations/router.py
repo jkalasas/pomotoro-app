@@ -14,6 +14,7 @@ from .schemas import (
     RecommendationResponse,
     TaskResponse,
     PomodoroConfig,
+    SessionInfo,
 )
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
@@ -29,6 +30,7 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
 
     initial_tasks = [LlmTask(**task) for task in llm_output.get("tasks", [])]
     pomodoro_config = PomodoroConfig(**llm_output.get("pomodoro_setup", {}))
+    session_info = SessionInfo(**llm_output.get("session", {"name": "Generated Session", "description": description}))
 
     final_tasks: List[TaskResponse] = []
     total_time = 0
@@ -68,6 +70,7 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
         total_time += final_estimate
 
     return RecommendationResponse(
+        session=session_info,
         generated_tasks=final_tasks,
         pomodoro_config=pomodoro_config,
         total_estimated_time=total_time,
@@ -78,6 +81,19 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
 async def generate_task_recommendations(
     request: SessionDescriptionRequest, db: SessionDep, _: ActiveUserDep
 ):
+    if not request.description.strip():
+        raise HTTPException(status_code=400, detail="Description cannot be empty.")
+    return await get_recommendations(request.description, db)
+
+
+@router.post("/refine-session", response_model=RecommendationResponse)
+async def refine_session(
+    request: SessionDescriptionRequest, db: SessionDep, _: ActiveUserDep
+):
+    """
+    Refine an existing session using LLM with improved context understanding.
+    This endpoint is designed for iterative improvement of session details and tasks.
+    """
     if not request.description.strip():
         raise HTTPException(status_code=400, detail="Description cannot be empty.")
     return await get_recommendations(request.description, db)

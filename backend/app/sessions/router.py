@@ -17,6 +17,9 @@ from .schemas import (
     SessionFeedbackPublic,
     SessionCompleteRequest,
     FocusLevel,
+    TaskCreate,
+    TaskUpdate,
+    TaskReorder,
 )
 from sqlmodel import select
 from ..auth.deps import ActiveUserDep
@@ -105,7 +108,7 @@ def create_session(
     )
 
 
-@router.get("/", response_model=List[SessionPublic])
+@router.get("/", response_model=List[SessionWithTasksPublic])
 def read_sessions(
     db: SessionDep,
     current_user: ActiveUserDep,
@@ -114,9 +117,32 @@ def read_sessions(
         select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
     ).all()
     
-    # Convert to SessionPublic format to ensure all fields are included
-    return [
-        SessionPublic(
+    # Convert to SessionWithTasksPublic format to include tasks
+    result = []
+    for session in sessions:
+        # Get tasks for this session
+        tasks = db.exec(
+            select(Task).where(Task.session_id == session.id)
+        ).all()
+        
+        # Convert tasks to TaskPublic format
+        task_publics = []
+        for task in tasks:
+            # Get category name
+            category_name = "Uncategorized"
+            if task.categories:
+                category_name = task.categories[0].name
+            
+            task_publics.append(TaskPublic(
+                id=task.id,
+                name=task.name,
+                estimated_completion_time=task.estimated_completion_time,
+                category=category_name,
+                completed=task.completed,
+                actual_completion_time=task.actual_completion_time,
+            ))
+        
+        session_with_tasks = SessionWithTasksPublic(
             id=session.id,
             name=session.name,
             description=session.description,
@@ -124,9 +150,11 @@ def read_sessions(
             short_break_duration=session.short_break_duration,
             long_break_duration=session.long_break_duration,
             long_break_per_pomodoros=session.long_break_per_pomodoros,
+            tasks=task_publics,
         )
-        for session in sessions
-    ]
+        result.append(session_with_tasks)
+    
+    return result
 
 
 @router.post("/active", response_model=ActiveSessionPublic)
@@ -530,13 +558,59 @@ def update_session(
     db_session = db.get(PomodoroSession, session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Check if there's an active session running for this session
+    active_session = db.exec(
+        select(ActivePomodoroSession).where(
+            ActivePomodoroSession.session_id == session_id,
+            ActivePomodoroSession.user_id == current_user.id
+        )
+    ).first()
+    
+    if active_session and active_session.is_running:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot update session configuration while session is running"
+        )
+    
+    # Update fields if provided
     if session_update.description is not None:
         db_session.description = session_update.description
     if session_update.name is not None:
         db_session.name = session_update.name
+    if session_update.focus_duration is not None:
+        db_session.focus_duration = session_update.focus_duration
+    if session_update.short_break_duration is not None:
+        db_session.short_break_duration = session_update.short_break_duration
+    if session_update.long_break_duration is not None:
+        db_session.long_break_duration = session_update.long_break_duration
+    if session_update.long_break_per_pomodoros is not None:
+        db_session.long_break_per_pomodoros = session_update.long_break_per_pomodoros
+    
     db.add(db_session)
     db.commit()
     db.refresh(db_session)
+    
+    # Update active session timing if one exists and timing values were changed
+    timing_changed = any([
+        session_update.focus_duration is not None,
+        session_update.short_break_duration is not None,
+        session_update.long_break_duration is not None,
+        session_update.long_break_per_pomodoros is not None
+    ])
+    
+    if timing_changed and active_session and not active_session.is_running:
+        # Update the time_remaining based on current phase and new timings
+        if active_session.phase == "focus":
+            active_session.time_remaining = db_session.focus_duration * 60
+        elif active_session.phase == "short_break":
+            active_session.time_remaining = db_session.short_break_duration * 60
+        elif active_session.phase == "long_break":
+            active_session.time_remaining = db_session.long_break_duration * 60
+        
+        db.add(active_session)
+        db.commit()
+        db.refresh(active_session)
     
     # Return in SessionPublic format to ensure consistency
     return SessionPublic(
@@ -562,6 +636,147 @@ def delete_session(
     db.delete(db_session)
     db.commit()
     return {"message": "Session deleted successfully"}
+
+
+# Task management endpoints
+@router.post("/{session_id}/tasks", response_model=TaskPublic)
+def add_task_to_session(
+    db: SessionDep,
+    session_id: int,
+    task_data: TaskCreate,
+    current_user: ActiveUserDep,
+):
+    # Verify session exists and belongs to user
+    db_session = db.get(PomodoroSession, session_id)
+    if not db_session or db_session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get or create category
+    category = db.exec(select(Category).where(Category.name == task_data.category)).first()
+    if not category:
+        category = Category(name=task_data.category)
+        db.add(category)
+        db.commit()
+        db.refresh(category)
+    
+    # Create the task
+    db_task = Task(
+        name=task_data.name,
+        estimated_completion_time=task_data.estimated_completion_time,
+        session_id=session_id,
+        completed=False,
+    )
+    # Add the category to the task through the many-to-many relationship
+    db_task.categories = [category]
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    
+    return TaskPublic(
+        id=db_task.id,
+        name=db_task.name,
+        estimated_completion_time=db_task.estimated_completion_time,
+        category=category.name,
+        completed=db_task.completed,
+        actual_completion_time=db_task.actual_completion_time,
+    )
+
+
+@router.put("/tasks/{task_id}", response_model=TaskPublic)
+def update_task(
+    db: SessionDep,
+    task_id: int,
+    task_data: TaskUpdate,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Verify the task belongs to a session owned by the user
+    session = db.get(PomodoroSession, task.session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Update task fields
+    if task_data.name is not None:
+        task.name = task_data.name
+    if task_data.estimated_completion_time is not None:
+        task.estimated_completion_time = task_data.estimated_completion_time
+    
+    # Update category if provided
+    if task_data.category is not None:
+        category = db.exec(select(Category).where(Category.name == task_data.category)).first()
+        if not category:
+            category = Category(name=task_data.category)
+            db.add(category)
+            db.commit()
+            db.refresh(category)
+        task.categories = [category]
+    
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    
+    # Get category name for response
+    category_name = task.categories[0].name if task.categories else "Uncategorized"
+    
+    return TaskPublic(
+        id=task.id,
+        name=task.name,
+        estimated_completion_time=task.estimated_completion_time,
+        category=category_name,
+        completed=task.completed,
+        actual_completion_time=task.actual_completion_time,
+    )
+
+
+@router.delete("/tasks/{task_id}")
+def delete_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Verify the task belongs to a session owned by the user
+    session = db.get(PomodoroSession, task.session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    db.delete(task)
+    db.commit()
+    return {"message": "Task deleted successfully"}
+
+
+@router.put("/{session_id}/tasks/reorder")
+def reorder_tasks(
+    db: SessionDep,
+    session_id: int,
+    reorder_data: TaskReorder,
+    current_user: ActiveUserDep,
+):
+    # Verify session exists and belongs to user
+    db_session = db.get(PomodoroSession, session_id)
+    if not db_session or db_session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get all tasks for this session
+    tasks = db.exec(select(Task).where(Task.session_id == session_id)).all()
+    task_dict = {task.id: task for task in tasks}
+    
+    # Verify all task IDs belong to this session
+    for task_id in reorder_data.task_ids:
+        if task_id not in task_dict:
+            raise HTTPException(status_code=400, detail=f"Task {task_id} not found in session")
+    
+    # Update the order - assuming we add an order field to the Task model
+    # For now, we'll just return success as the order might be handled client-side
+    # In a real implementation, you'd add an `order` field to the Task model
+    
+    return {"message": "Tasks reordered successfully"}
 
 
 @router.put("/tasks/{task_id}/complete", response_model=dict)

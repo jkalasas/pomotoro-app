@@ -1,13 +1,23 @@
 import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const host = process.env.TAURI_DEV_HOST;
+const isTesting = process.env.VITEST === 'true';
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  plugins: [tailwindcss(), !isTesting && reactRouter(), tsconfigPaths()].filter(Boolean) as any,
   clearScreen: false,
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
+    globals: true,
+    css: false,
+    restoreMocks: true,
+    mockReset: true,
+    clearMocks: true,
+  },
   server: {
     port: 1420,
     strictPort: true,

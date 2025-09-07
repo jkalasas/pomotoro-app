@@ -31,7 +31,9 @@ interface TaskState {
   refreshAllData: () => Promise<void>;
   loadSessions: () => Promise<void>;
   loadSession: (sessionId: number) => Promise<void>;
+  getSession: (sessionId: number) => Promise<Session>;
   createSession: (sessionData: {
+    name?: string;
     description: string;
     pomodoro_config: {
       focus_duration: number;
@@ -45,11 +47,34 @@ interface TaskState {
       estimated_completion_time: number;
     }>;
   }) => Promise<Session>;
-  updateSession: (sessionId: number, updates: { name?: string; description?: string }) => Promise<void>;
+  updateSession: (sessionId: number, updates: { 
+    name?: string; 
+    description?: string;
+    focus_duration?: number;
+    short_break_duration?: number;
+    long_break_duration?: number;
+    long_break_per_pomodoros?: number;
+  }) => Promise<void>;
+  deleteSession: (sessionId: number) => Promise<void>;
   completeTask: (taskId: number) => Promise<void>;
   uncompleteTask: (taskId: number) => Promise<void>;
   completeSessionManually: () => Promise<void>;
   setCurrentSession: (session: Session | null) => void;
+  // Task management methods
+  addTaskToSession: (sessionId: number, taskData: {
+    name: string;
+    category: string;
+    estimated_completion_time: number;
+  }) => Promise<void>;
+  updateTask: (taskId: number, taskData: {
+    name?: string;
+    category?: string;
+    estimated_completion_time?: number;
+  }) => Promise<void>;
+  deleteTask: (taskId: number) => Promise<void>;
+  reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
+  // New method for handling next task with pomodoro config updates
+  handleNextTaskTransition: (completedTaskId: number) => Promise<void>;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -70,7 +95,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ isLoading: true });
     try {
       const sessions = await apiClient.getSessions() as Session[];
-      set({ sessions });
+      // Ensure all sessions have a tasks array
+      const sessionsWithTasks = sessions.map(session => ({
+        ...session,
+        tasks: session.tasks || []
+      }));
+      set({ sessions: sessionsWithTasks });
     } catch (error) {
       console.error("Failed to load sessions:", error);
     } finally {
@@ -82,11 +112,30 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ isLoading: true });
     try {
       const session = await apiClient.getSession(sessionId) as Session;
-      set({ currentSession: session });
+      // Ensure session has a tasks array
+      const sessionWithTasks = {
+        ...session,
+        tasks: session.tasks || []
+      };
+      set({ currentSession: sessionWithTasks });
     } catch (error) {
       console.error("Failed to load session:", error);
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  getSession: async (sessionId: number) => {
+    try {
+      const session = await apiClient.getSession(sessionId) as Session;
+      // Ensure session has a tasks array
+      return {
+        ...session,
+        tasks: session.tasks || []
+      };
+    } catch (error) {
+      console.error("Failed to get session:", error);
+      throw error;
     }
   },
 
@@ -126,6 +175,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     try {
       await apiClient.completeTask(taskId);
       
+      // Handle next task transition for pomodoro configuration updates
+      await get().handleNextTaskTransition(taskId);
+      
       // Get task details for analytics logging
       const currentSession = get().currentSession;
       const task = currentSession?.tasks.find(t => t.id === taskId);
@@ -153,13 +205,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             
             // Trigger session completion via custom event
             if (typeof window !== "undefined") {
-              console.log('Triggering session completion event:', {
-                sessionId: updatedSession.id,
-                sessionName: updatedSession.name || updatedSession.description,
-                totalTasks: updatedSession.tasks.length,
-                completedTasks: completedTasksCount,
-                focusDuration
-              });
               window.dispatchEvent(new CustomEvent('session-completion', {
                 detail: {
                   sessionId: updatedSession.id,
@@ -174,8 +219,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       }
       
-      // Refresh daily progress after completing a task
-      // Import and call the daily progress refresh function
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));
       }
@@ -187,9 +230,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   uncompleteTask: async (taskId: number) => {
     try {
-      console.log('Uncompleting task:', taskId);
       const response = await apiClient.uncompleteTask(taskId) as { message: string; session_reset: boolean };
-      console.log('Uncomplete task response:', response);
       
       // Get task details for analytics logging
       const currentSession = get().currentSession;
@@ -219,7 +260,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         
         // Check if session was reset due to uncompleting the task
         if (response.session_reset) {
-          console.log('Session was reset due to uncompleting task');
+          // Session was reset, need to reload pomodoro state
           // Dispatch event to notify other parts of the app
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('session-reset', {
@@ -229,7 +270,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       }
       
-      // Refresh daily progress after uncompleting a task
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-uncompleted'));
       }
@@ -252,13 +292,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     
     // Trigger session completion via custom event
     if (typeof window !== "undefined") {
-      console.log('Manually triggering session completion event:', {
-        sessionId: currentSession.id,
-        sessionName: currentSession.name || currentSession.description,
-        totalTasks: currentSession.tasks.length,
-        completedTasks: completedTasksCount,
-        focusDuration
-      });
       window.dispatchEvent(new CustomEvent('session-completion', {
         detail: {
           sessionId: currentSession.id,
@@ -272,4 +305,187 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   setCurrentSession: (session: Session | null) => set({ currentSession: session }),
+
+  deleteSession: async (sessionId: number) => {
+    try {
+      await apiClient.deleteSession(sessionId);
+      // Remove from local state
+      set((state) => ({
+        sessions: state.sessions.filter(session => session.id !== sessionId),
+        currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      throw error;
+    }
+  },
+
+  addTaskToSession: async (sessionId: number, taskData) => {
+    try {
+      const newTask = await apiClient.addTaskToSession(sessionId, taskData) as Task;
+      // Update the local state by adding the task to the session
+      set((state) => ({
+        sessions: state.sessions.map(session =>
+          session.id === sessionId
+            ? { ...session, tasks: [...(session.tasks || []), newTask] }
+            : session
+        ),
+        currentSession: state.currentSession?.id === sessionId
+          ? { ...state.currentSession, tasks: [...(state.currentSession.tasks || []), newTask] }
+          : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to add task:", error);
+      throw error;
+    }
+  },
+
+  updateTask: async (taskId: number, taskData) => {
+    try {
+      const updatedTask = await apiClient.updateTask(taskId, taskData) as Task;
+      // Update the local state
+      set((state) => ({
+        sessions: state.sessions.map(session => ({
+          ...session,
+          tasks: (session.tasks || []).map(task =>
+            task.id === taskId ? updatedTask : task
+          ),
+        })),
+        currentSession: state.currentSession ? {
+          ...state.currentSession,
+          tasks: (state.currentSession.tasks || []).map(task =>
+            task.id === taskId ? updatedTask : task
+          ),
+        } : null,
+      }));
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      throw error;
+    }
+  },
+
+  deleteTask: async (taskId: number) => {
+    try {
+      await apiClient.deleteTask(taskId);
+      // Remove from local state
+      set((state) => ({
+        sessions: state.sessions.map(session => ({
+          ...session,
+          tasks: (session.tasks || []).filter(task => task.id !== taskId),
+        })),
+        currentSession: state.currentSession ? {
+          ...state.currentSession,
+          tasks: (state.currentSession.tasks || []).filter(task => task.id !== taskId),
+        } : null,
+      }));
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      throw error;
+    }
+  },
+
+  reorderTasks: async (sessionId: number, taskIds) => {
+    try {
+      await apiClient.reorderTasks(sessionId, taskIds);
+      // Update the local state to reflect the new order
+      set((state) => ({
+        sessions: state.sessions.map(session => {
+          if (session.id === sessionId && session.tasks) {
+            const taskMap = new Map(session.tasks.map(task => [task.id, task]));
+            const reorderedTasks = taskIds.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+            return { ...session, tasks: reorderedTasks };
+          }
+          return session;
+        }),
+        currentSession: state.currentSession?.id === sessionId && state.currentSession?.tasks ? (() => {
+          const taskMap = new Map(state.currentSession.tasks.map(task => [task.id, task]));
+          const reorderedTasks = taskIds.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+          return { ...state.currentSession, tasks: reorderedTasks };
+        })() : state.currentSession,
+      }));
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      throw error;
+    }
+  },
+
+  // New method for handling next task with pomodoro config updates
+  handleNextTaskTransition: async (completedTaskId: number) => {
+    try {
+      const { usePomodoroStore } = await import('./pomodoro');
+      const { useSchedulerStore } = await import('./scheduler');
+      
+      // Get the current schedule to find next task
+      const schedulerState = useSchedulerStore.getState();
+      const currentSchedule = schedulerState.currentSchedule;
+      
+      if (!currentSchedule) {
+        return;
+      }
+      
+      // Find the completed task and the next task
+      const completedTaskIndex = currentSchedule.findIndex(task => task.id === completedTaskId);
+      const nextTask = currentSchedule.find((task, index) => 
+        index > completedTaskIndex && !task.completed
+      );
+      
+      if (!nextTask) {
+        return;
+      }
+      
+      // Get the current pomodoro state BEFORE any updates
+      const pomodoroStore = usePomodoroStore.getState();
+      const currentTime = pomodoroStore.time;
+      const currentPhase = pomodoroStore.phase;
+      const isRunning = pomodoroStore.isRunning;
+      const currentTimeRemaining = pomodoroStore.time; // This is the actual remaining time
+      
+      // Get the current and next task sessions
+      const completedTask = currentSchedule[completedTaskIndex];
+      const currentSessionId = completedTask?.session_id;
+      const nextSessionId = nextTask.session_id;
+      
+      // If timer is running, preserve the current time regardless of session changes
+      if (isRunning && currentPhase === "focus") {
+        // Only update the current task, preserving the timer state
+        await pomodoroStore.updateTimer({
+          current_task_id: nextTask.id,
+          is_running: true, // Keep timer running
+          // Do NOT update time_remaining - let it preserve the current countdown
+        });
+        
+        // If session changed, update settings silently without affecting the timer
+        if (currentSessionId !== nextSessionId) {
+          // Update settings in the background for future timer resets, but don't affect current timer
+          await pomodoroStore.updateSettingsFromTask(nextSessionId);
+        }
+      } else {
+        // Timer is not running or not in focus phase, handle normally
+        
+        // If the next task is from a different session, update pomodoro configuration
+        if (currentSessionId !== nextSessionId) {
+          await pomodoroStore.updateSettingsFromTask(nextSessionId);
+          
+          // Get the updated settings after updateSettingsFromTask
+          const updatedSettings = usePomodoroStore.getState().settings;
+          const newFocusDuration = updatedSettings.focus_duration * 60; // Convert to seconds
+          
+          // For non-running timer, use new focus duration
+          await pomodoroStore.updateTimer({
+            time_remaining: newFocusDuration,
+            current_task_id: nextTask.id,
+            is_running: false,
+          });
+        } else {
+          // Same session, just update the current task
+          await pomodoroStore.updateTimer({
+            current_task_id: nextTask.id,
+            is_running: false,
+          });
+        }
+      }
+    } catch (error) {
+      // Failed to handle next task transition
+    }
+  },
 }));

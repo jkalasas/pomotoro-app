@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useSearchParams } from "react-router";
+import { Logo } from "~/components/ui/logo";
 
 export default function Overlay() {
   const [searchParams] = useSearchParams();
@@ -43,7 +44,21 @@ export default function Overlay() {
   // Countdown timer
   useEffect(() => {
     if (timeRemaining <= 0) {
-      handleSkip();
+      // When the overlay timer naturally reaches zero, simply close
+      // the overlay window without emitting the 'skip-rest' event.
+      // Emitting 'skip-rest' causes the skipRest() handler in the
+      // main window to set is_running: false on the backend which can
+      // race with the main store's phase transition logic that should
+      // set is_running: true when moving back to focus. Only emit
+      // 'skip-rest' for user-initiated skips (button / ESC).
+      (async () => {
+        try {
+          const currentWindow = getCurrentWindow();
+          await currentWindow.close();
+        } catch (error) {
+          console.error('Failed to close overlay window on natural expiry:', error);
+        }
+      })();
       return;
     }
 
@@ -73,6 +88,17 @@ export default function Overlay() {
       } catch (closeError) {
         console.error("Failed to close overlay window:", closeError);
       }
+    }
+  };
+
+  // Close overlay without skipping the rest period in the main window.
+  // This only closes the overlay window and does not emit 'skip-rest'.
+  const handleClose = async () => {
+    try {
+      const currentWindow = getCurrentWindow();
+      await currentWindow.close();
+    } catch (error) {
+      console.error('Failed to close overlay window:', error);
     }
   };
 
@@ -107,8 +133,7 @@ export default function Overlay() {
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           {/* Left side - Logo and branding */}
           <div className="flex items-center space-x-3">
-            <div className="text-2xl">🍅</div>
-            <span className="text-xl font-bold tracking-wide">POMOTORO</span>
+            <Logo showText className="h-8 w-8" textClassName="text-xl font-bold tracking-wide" />
           </div>
 
           {/* Right side - Timer and controls */}
@@ -126,21 +151,31 @@ export default function Overlay() {
               </div>
             </div>
 
-            {/* Skip button - minimal style */}
-            <button
-              onClick={handleSkip}
-              className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
-            >
-              Skip Rest
-            </button>
+            {/* Controls - Skip (emit) and Close (dismiss only) */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleSkip}
+                className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
+              >
+                Skip Rest
+              </button>
+
+              <button
+                onClick={handleClose}
+                className="px-3 py-2 text-sm bg-primary-foreground/5 border border-primary-foreground/10 rounded hover:bg-primary-foreground/10 transition-colors"
+                title="Close overlay without skipping the rest"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
         
         {/* ESC hint at bottom */}
         <div className="text-center mt-4">
-          <p className="text-xs opacity-60">
-            Press ESC to skip this rest period
-          </p>
+            <p className="text-xs opacity-60">
+              Press ESC to skip this rest period — or press Close to simply dismiss the overlay
+            </p>
         </div>
       </div>
     </div>

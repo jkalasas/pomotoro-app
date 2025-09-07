@@ -1,9 +1,7 @@
 import {
-  CalendarClock,
   ChartPie,
-  CircleUser,
   Hourglass,
-  Timer,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
@@ -15,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar";
+import { Logo } from "~/components/ui/logo";
 import { cn } from "~/lib/utils";
 import { useAuthStore } from "~/stores/auth";
 import { Button } from "~/components/ui/button";
@@ -33,24 +32,14 @@ const items: SidebarItem[] = [
     icon: Hourglass,
   },
   {
-    label: "Pomodoro Timer",
-    url: "/pomodoro",
-    icon: Timer,
-  },
-  {
-    label: "Session Overview",
-    url: "#",
-    icon: CalendarClock,
+    label: "Sessions",
+    url: "/sessions",
+    icon: Settings,
   },
   {
     label: "Insight",
     url: "/analytics",
     icon: ChartPie,
-  },
-  {
-    label: "My Profile",
-    url: "#",
-    icon: CircleUser,
   },
 ];
 
@@ -60,14 +49,22 @@ export default function AppSidebar() {
 
   return (
     <Sidebar className="mt-10" variant="inset">
-      <SidebarHeader>
+      <SidebarHeader className="mt-10 lg:mt-0">
+        <div className="px-4 py-2">
+          <Logo showText className="h-8 w-8" textClassName="text-lg font-bold" />
+        </div>
         {user && (
-          <div className="px-4 py-2">
+        <div className="flex justify-between gap-3">
+          <div>
             <p className="text-sm font-medium">
               {user.first_name} {user.last_name}
             </p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <p className="text-xs text-white/75">{user.email}</p>
           </div>
+          <Button variant="ghost" size='sm' onClick={logout}>
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
         )}
       </SidebarHeader>
       <SidebarContent>
@@ -86,17 +83,6 @@ export default function AppSidebar() {
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
-        <div className="px-4 py-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="w-full justify-start"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
-        </div>
       </SidebarContent>
     </Sidebar>
   );
