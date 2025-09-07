@@ -663,10 +663,11 @@ def add_task_to_session(
     db_task = Task(
         name=task_data.name,
         estimated_completion_time=task_data.estimated_completion_time,
-        category_id=category.id,
         session_id=session_id,
         completed=False,
     )
+    # Add the category to the task through the many-to-many relationship
+    db_task.categories = [category]
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -711,20 +712,20 @@ def update_task(
             db.add(category)
             db.commit()
             db.refresh(category)
-        task.category_id = category.id
+        task.categories = [category]
     
     db.add(task)
     db.commit()
     db.refresh(task)
     
     # Get category name for response
-    category = db.get(Category, task.category_id)
+    category_name = task.categories[0].name if task.categories else "Uncategorized"
     
     return TaskPublic(
         id=task.id,
         name=task.name,
         estimated_completion_time=task.estimated_completion_time,
-        category=category.name if category else "",
+        category=category_name,
         completed=task.completed,
         actual_completion_time=task.actual_completion_time,
     )
