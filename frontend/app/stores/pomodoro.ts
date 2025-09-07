@@ -1,4 +1,8 @@
 import { create } from "zustand";
+// NOTE: Timer now runs continuously across phase transitions (focus <-> break).
+// handlePhaseCompletion auto-starts the next phase. User initiated actions
+// like reset still pause per their semantics. skipRest now fast-forwards to
+// the next focus phase and CONTINUES running (was previously pausing).
 import { listen } from "@tauri-apps/api/event";
 import { apiClient } from "~/lib/api";
 import { useWindowStore } from "./window";
@@ -596,20 +600,20 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         nextDuration = session.focus_duration * 60;
       }
 
-      // Update the backend with new phase but DON'T auto-start timer
+      // Update the backend with new phase and KEEP the timer running for a continuous experience
       await apiClient.updateActiveSession({
         phase: nextPhase,
         time_remaining: nextDuration,
-        is_running: false, // Don't auto-start timer after phase completion
+        is_running: true, // Auto-continue into next phase
         pomodoros_completed: newPomodorosCompleted
       });
       
-      // Update local state (including total pomodoros)
+      // Update local state (including total pomodoros) and keep running
       set({
         phase: nextPhase,
         time: nextDuration,
         maxTime: nextDuration,
-        isRunning: false, // Don't auto-start timer after phase completion
+        isRunning: true, // Continuous timer across phases
         pomodorosCompleted: newPomodorosCompleted,
         totalPomodorosCompleted: newTotalPomodorosCompleted
       });
@@ -700,51 +704,58 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   skipRest: async () => {
-    const { sessionId, phase } = get();
+    const { sessionId, phase, isRunning } = get();
     
     if (!sessionId) {
       console.error('No active session found for skip rest');
       return;
     }
+    // Only meaningful during a break; ignore if already in focus
+    if (!phase.includes('break')) {
+      return;
+    }
     
     set({ isLoading: true });
     try {
-      // First, update the overlay state
-      set({ showRestOverlay: false });
+      // Hide overlay if visible
+      if (get().showRestOverlay) {
+        set({ showRestOverlay: false });
+        try { await useWindowStore.getState().closeOverlayWindow(); } catch { /* ignore */ }
+      }
       
-      // Close the overlay window
-      await useWindowStore.getState().closeOverlayWindow();
+      // Fetch session to get correct focus duration
+      const session = await apiClient.getSession(sessionId) as { focus_duration: number };
+      const focusDuration = session.focus_duration * 60; // seconds
       
-      // Get session configuration to use correct focus duration
-      const session = await apiClient.getSession(sessionId) as {
-        focus_duration: number;
-      };
-      
-      const focusDuration = session.focus_duration * 60; // Convert minutes to seconds
-      
-      // Skip to focus phase with correct duration but don't auto-start
+      // Fast-forward to focus phase AND keep timer running (continuous flow)
       await apiClient.updateActiveSession({
-        phase: "focus",
-        // When the user explicitly skips rest, set up the focus period
-        // but let them manually start it when ready
-        is_running: false,
+        phase: 'focus',
+        is_running: true, // continue running instead of pausing
         time_remaining: focusDuration,
       });
-
-      // Update local state but don't auto-start the timer
+      
+      // Local state update
       set({
-        phase: "focus",
+        phase: 'focus',
         time: focusDuration,
         maxTime: focusDuration,
-        isRunning: false,
+        isRunning: true,
       });
       
-      // Log analytics event
-      useAnalyticsStore.getState().logBreakSkip(sessionId, phase);
-      
-      await get().loadActiveSession();
+      // Analytics
+      try {
+        useAnalyticsStore.getState().logBreakSkip(sessionId, phase);
+        useAnalyticsStore.getState().logEvent('phase_change', {
+          session_id: sessionId,
+          from_phase: phase,
+          to_phase: 'focus',
+          change_time: new Date().toISOString(),
+          skipped: true,
+          was_running: isRunning
+        });
+      } catch { /* ignore analytics errors */ }
     } catch (error) {
-      // Failed to skip rest
+      // On failure, ensure timer doesn't get stuck; leave existing state
     } finally {
       set({ isLoading: false });
     }
