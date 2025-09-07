@@ -51,43 +51,16 @@ export default function Sessions() {
   });
 
   useEffect(() => {
-    // Log page view
-    analyticsStore.logNavigationEvent('unknown', 'sessions');
-    analyticsStore.logUserAction('page_view', {
-      page: 'sessions',
-      timestamp: new Date().toISOString()
-    });
-
     loadSessions();
-
-    // Return cleanup function
-    return () => {
-      analyticsStore.logUserAction('page_exit', {
-        page: 'sessions',
-        timestamp: new Date().toISOString()
-      });
-    };
-  }, [loadSessions, analyticsStore]);
+    // No need to log page navigation
+  }, [loadSessions]);
 
   const handleSelectSession = async (sessionId: number) => {
     try {
       const session = await getSession(sessionId);
       setSelectedSession(session);
-      
-      // Log session selection
-      analyticsStore.logUserAction('session_selected', {
-        session_id: sessionId,
-        session_name: session.name,
-        task_count: session.tasks.length
-      });
     } catch (error) {
       console.error("Failed to load session:", error);
-      
-      // Log session selection failure
-      analyticsStore.logUserAction('session_selection_failed', {
-        session_id: sessionId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
     }
   };
 

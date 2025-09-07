@@ -13,20 +13,7 @@ export default function Analytics() {
   const analyticsStore = useAnalyticsStore();
 
   useEffect(() => {
-    // Log page view
-    analyticsStore.logNavigationEvent('unknown', 'analytics');
-    analyticsStore.logUserAction('page_view', {
-      page: 'analytics',
-      timestamp: new Date().toISOString()
-    });
-
-    // Return cleanup function to log page exit if needed
-    return () => {
-      analyticsStore.logUserAction('page_exit', {
-        page: 'analytics',
-        timestamp: new Date().toISOString()
-      });
-    };
+    // No need to log page navigation for analytics
   }, [analyticsStore]);
 
   return (

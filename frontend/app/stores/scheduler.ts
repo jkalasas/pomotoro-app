@@ -67,13 +67,6 @@ export const useSchedulerStore = create<SchedulerState>()(
         response.total_schedule_time,
         true
       );
-      
-      analyticsStore.logUserAction('schedule_generated', {
-        session_ids: sessionIds,
-        task_count: response.scheduled_tasks.length,
-        total_time: response.total_schedule_time,
-        fitness_score: response.fitness_score
-      });
     } catch (error) {
       console.error("Failed to generate schedule:", error);
       
@@ -83,10 +76,6 @@ export const useSchedulerStore = create<SchedulerState>()(
       
       // Log failed schedule generation
       analyticsStore.logScheduleGeneration(0, 0, false);
-      analyticsStore.logUserAction('schedule_generation_failed', {
-        session_ids: sessionIds,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
       
       set({
         error: error instanceof Error ? error.message : "Failed to generate schedule",
@@ -96,14 +85,6 @@ export const useSchedulerStore = create<SchedulerState>()(
   },
 
   clearSchedule: () => {
-    // Import analytics store for logging
-    import('./analytics').then(({ useAnalyticsStore }) => {
-      const analyticsStore = useAnalyticsStore.getState();
-      analyticsStore.logUserAction('schedule_cleared', {
-        previous_task_count: get().currentSchedule?.length || 0
-      });
-    });
-    
     set({
       currentSchedule: null,
       selectedSessionIds: [],
@@ -177,24 +158,11 @@ export const useSchedulerStore = create<SchedulerState>()(
     try {
       await apiClient.completeTask(taskId);
       
-      // Log analytics for task completion
-      const currentSchedule = get().currentSchedule;
-      const task = currentSchedule?.find(t => t.id === taskId);
-      if (task) {
-        import('./analytics').then(({ useAnalyticsStore }) => {
-          const analyticsStore = useAnalyticsStore.getState();
-          analyticsStore.logUserAction('scheduled_task_completed', {
-            task_id: taskId,
-            task_name: task.name,
-            session_id: task.session_id
-          });
-        });
-      }
-      
       // Handle next task transition for pomodoro configuration updates
       const { useTaskStore } = await import('./tasks');
       await useTaskStore.getState().handleNextTaskTransition(taskId);
       
+      const currentSchedule = get().currentSchedule;
       if (currentSchedule) {
         const updatedSchedule = currentSchedule.map(task =>
           task.id === taskId ? { ...task, completed: true } : task
@@ -211,20 +179,7 @@ export const useSchedulerStore = create<SchedulerState>()(
     try {
       await apiClient.uncompleteTask(taskId);
       
-      // Log analytics for task uncompletion
       const currentSchedule = get().currentSchedule;
-      const task = currentSchedule?.find(t => t.id === taskId);
-      if (task) {
-        import('./analytics').then(({ useAnalyticsStore }) => {
-          const analyticsStore = useAnalyticsStore.getState();
-          analyticsStore.logUserAction('scheduled_task_uncompleted', {
-            task_id: taskId,
-            task_name: task.name,
-            session_id: task.session_id
-          });
-        });
-      }
-      
       if (currentSchedule) {
         const updatedSchedule = currentSchedule.map(task =>
           task.id === taskId ? { ...task, completed: false } : task

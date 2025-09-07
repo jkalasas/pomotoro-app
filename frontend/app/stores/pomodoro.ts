@@ -297,10 +297,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Log analytics event
       if (sessionId) {
         useAnalyticsStore.getState().logTimerStart(sessionId, get().phase);
-        useAnalyticsStore.getState().logUserAction('timer_start_button_clicked', {
-          session_id: sessionId,
-          phase: get().phase
-        });
       }
     } catch (error) {
       // Failed to start timer
@@ -326,11 +322,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Log analytics event
       if (sessionId) {
         useAnalyticsStore.getState().logTimerPause(sessionId, get().phase);
-        useAnalyticsStore.getState().logUserAction('timer_pause_button_clicked', {
-          session_id: sessionId,
-          phase: get().phase,
-          time_remaining: time
-        });
       }
     } catch (error) {
       // Failed to pause timer
@@ -364,11 +355,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Log analytics event
       if (sessionId) {
         useAnalyticsStore.getState().logTimerReset(sessionId, phase, time);
-        useAnalyticsStore.getState().logUserAction('timer_reset_button_clicked', {
-          session_id: sessionId,
-          previous_phase: phase,
-          time_remaining: time
-        });
       }
     } catch (error) {
       // Failed to reset timer
@@ -755,10 +741,6 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Log analytics event
       useAnalyticsStore.getState().logBreakSkip(sessionId, phase);
-      useAnalyticsStore.getState().logUserAction('break_skip_button_clicked', {
-        session_id: sessionId,
-        skipped_phase: phase
-      });
       
       await get().loadActiveSession();
     } catch (error) {

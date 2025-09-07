@@ -75,25 +75,11 @@ export default function Pomodoro() {
   // the pomodoro store background ticker so page-level intervals are not
   // required. The page simply reads state from the store for rendering.
 
-  // Load active session on component mount and log page view
+  // Load active session on component mount
   useEffect(() => {
-    // Log page view
-    analyticsStore.logNavigationEvent('unknown', 'pomodoro');
-    analyticsStore.logUserAction('page_view', {
-      page: 'pomodoro',
-      timestamp: new Date().toISOString()
-    });
-
     loadActiveSession();
-
-    // Return cleanup function
-    return () => {
-      analyticsStore.logUserAction('page_exit', {
-        page: 'pomodoro',
-        timestamp: new Date().toISOString()
-      });
-    };
-  }, [loadActiveSession, analyticsStore]);
+    // No need to log page navigation
+  }, [loadActiveSession]);
 
   // Handle rest overlay display
   useEffect(() => {
@@ -130,10 +116,6 @@ export default function Pomodoro() {
               <Button 
                 type="button" 
                 onClick={() => {
-                  analyticsStore.logUserAction('timer_start_from_pomodoro_page', {
-                    phase,
-                    time_remaining: time
-                  });
                   startTimer();
                 }} 
                 disabled={isLoading}
@@ -144,10 +126,6 @@ export default function Pomodoro() {
               <Button 
                 type="button" 
                 onClick={() => {
-                  analyticsStore.logUserAction('timer_pause_from_pomodoro_page', {
-                    phase,
-                    time_remaining: time
-                  });
                   pauseTimer();
                 }} 
                 disabled={isLoading}
@@ -158,10 +136,6 @@ export default function Pomodoro() {
             <Button 
               type="button" 
               onClick={() => {
-                analyticsStore.logUserAction('timer_reset_from_pomodoro_page', {
-                  phase,
-                  time_remaining: time
-                });
                 resetTimer();
               }} 
               disabled={isLoading}
