@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from sqlmodel import SQLModel, create_engine, Session, select
+from sqlalchemy import text
 from app.config import settings
 from app.models import PomodoroSession
 # Import analytics models to ensure they're registered
@@ -29,11 +30,34 @@ def create_db_and_tables():
         except Exception:
             # If there's an error, the column might not exist, try to add it
             try:
-                session.exec("ALTER TABLE session ADD COLUMN name TEXT DEFAULT ''")
+                session.exec(text("ALTER TABLE session ADD COLUMN name TEXT DEFAULT ''"))
                 session.commit()
                 print("Added name column to session table")
             except Exception as e:
                 print(f"Could not add name column: {e}")
+
+        # Add archived columns if they don't exist
+        try:
+            session.exec(text("SELECT archived FROM session LIMIT 1"))
+        except Exception:
+            try:
+                session.exec(text("ALTER TABLE session ADD COLUMN archived BOOLEAN DEFAULT 0"))
+                session.exec(text("ALTER TABLE session ADD COLUMN archived_at TIMESTAMP NULL"))
+                session.commit()
+                print("Added archived columns to session table")
+            except Exception as e:
+                print(f"Could not add archived columns: {e}")
+
+        try:
+            session.exec(text("SELECT archived FROM task LIMIT 1"))
+        except Exception:
+            try:
+                session.exec(text("ALTER TABLE task ADD COLUMN archived BOOLEAN DEFAULT 0"))
+                session.exec(text("ALTER TABLE task ADD COLUMN archived_at TIMESTAMP NULL"))
+                session.commit()
+                print("Added archived columns to task table")
+            except Exception as e:
+                print(f"Could not add archived columns to task: {e}")
 
     # seed basic categories if empty
     from .models import Category

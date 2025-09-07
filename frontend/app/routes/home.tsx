@@ -340,10 +340,10 @@ export default function Home() {
         <SidebarTrigger />
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">
-            {schedulerStore.currentSchedule && schedulerStore.currentSchedule.length > 0
+      {schedulerStore.currentSchedule && schedulerStore.currentSchedule.filter(t => !t.completed && !(t as any).archived).length > 0
               ? `${Math.floor(
                   schedulerStore.currentSchedule
-                    .filter(task => !task.completed)
+        .filter(task => !task.completed && !(task as any).archived)
                     .reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60
                 )} hours remaining`
               : "No schedule"}
@@ -630,8 +630,8 @@ export default function Home() {
             <p className="font-bold">Quick Checklist</p>
             <div className="flex flex-col gap-1">
               {schedulerStore.currentSchedule &&
-              schedulerStore.currentSchedule.length > 0 ? (
-                schedulerStore.currentSchedule.slice(0, 5).map((task) => (
+              schedulerStore.currentSchedule.filter(t => !(t as any).archived).length > 0 ? (
+                schedulerStore.currentSchedule.filter(t => !(t as any).archived).slice(0, 5).map((task) => (
                   <div key={task.id} className="flex items-center gap-2">
                     <Checkbox
                       checked={task.completed || false}
@@ -660,9 +660,9 @@ export default function Home() {
                 </span>
               )}
               {schedulerStore.currentSchedule &&
-                schedulerStore.currentSchedule.length > 5 && (
+                schedulerStore.currentSchedule.filter(t => !(t as any).archived).length > 5 && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    +{schedulerStore.currentSchedule.length - 5} more tasks in
+                    +{schedulerStore.currentSchedule.filter(t => !(t as any).archived).length - 5} more tasks in
                     full schedule
                   </div>
                 )}

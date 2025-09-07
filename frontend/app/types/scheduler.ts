@@ -7,6 +7,7 @@ export interface ScheduledTask {
   due_date?: string;
   completed?: boolean;
   actual_completion_time?: number | null;
+  archived?: boolean; // optional flag if backend starts returning it
 }
 
 export interface ScheduleResponse {

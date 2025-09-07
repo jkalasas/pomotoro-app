@@ -6,7 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
-import { Plus, Edit, Trash2, GripVertical, Clock, Target } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical, Clock, Target, Archive, ArchiveRestore } from "lucide-react";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
 import { useAnalyticsStore } from "~/stores/analytics";
 import { DragDropContext, Droppable, Draggable, type DropResult, type DroppableProvided, type DraggableProvided, type DraggableStateSnapshot } from "@hello-pangea/dnd";
@@ -17,18 +17,25 @@ export default function Sessions() {
     sessions,
     isLoading,
     loadSessions,
+  loadArchivedSessions,
     getSession,
     updateSession,
     deleteSession,
+  archiveSession,
+  unarchiveSession,
     addTaskToSession,
     updateTask,
     deleteTask,
     reorderTasks,
+  archiveTask,
+  unarchiveTask,
   } = useTaskStore();
 
   const analyticsStore = useAnalyticsStore();
 
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
   const [isEditingSession, setIsEditingSession] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -50,6 +57,15 @@ export default function Sessions() {
     estimated_completion_time: 30,
   });
 
+  useEffect(() => {
+    const fetchArchived = async () => {
+      try {
+  const archived = await loadArchivedSessions();
+  setArchivedSessions(archived);
+      } catch (e) {}
+    };
+    if (showArchived) fetchArchived();
+  }, [showArchived]);
   useEffect(() => {
     loadSessions();
     // No need to log page navigation
@@ -197,10 +213,13 @@ export default function Sessions() {
         <div className="lg:col-span-1">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold">Sessions</h1>
+            <Button variant="outline" size="sm" onClick={() => setShowArchived(a => !a)}>
+              {showArchived ? 'Hide Archived' : 'Show Archived'}
+            </Button>
           </div>
           
           <div className="space-y-4">
-            {sessions.map((session) => (
+            {(showArchived ? archivedSessions : sessions).map((session) => (
               <Card
                 key={session.id}
                 className={`cursor-pointer transition-colors hover:bg-muted/50 ${
@@ -222,6 +241,9 @@ export default function Sessions() {
                       <Badge variant="secondary" className="ml-auto">
                         Completed
                       </Badge>
+                    )}
+                    {session.archived && (
+                      <Badge variant="outline" className="ml-auto">Archived</Badge>
                     )}
                   </div>
                 </CardContent>
@@ -325,6 +347,25 @@ export default function Sessions() {
                       </div>
                     </DialogContent>
                   </Dialog>
+                  {!selectedSession.archived ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => { await archiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => { await unarchiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
+                    >
+                      <ArchiveRestore className="h-4 w-4 mr-2" />
+                      Unarchive
+                    </Button>
+                  )}
                   
                   <Button 
                     variant="destructive" 
@@ -510,6 +551,15 @@ export default function Sessions() {
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
+                                      {!task.archived ? (
+                                        <Button variant="ghost" size="sm" onClick={async () => { await archiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
+                                          <Archive className="h-4 w-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button variant="ghost" size="sm" onClick={async () => { await unarchiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
+                                          <ArchiveRestore className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 </CardContent>

@@ -92,6 +92,8 @@ def create_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            archived=task.archived,
+            archived_at=task.archived_at,
         )
         for task in db_session.tasks
     ]
@@ -105,6 +107,8 @@ def create_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+    archived=db_session.archived,
+    archived_at=db_session.archived_at,
     )
 
 
@@ -112,10 +116,12 @@ def create_session(
 def read_sessions(
     db: SessionDep,
     current_user: ActiveUserDep,
+    include_archived: bool = False,
 ):
-    sessions = db.exec(
-        select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
-    ).all()
+    query = select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    if not include_archived:
+        query = query.where(PomodoroSession.archived == False)  # noqa: E712
+    sessions = db.exec(query).all()
     
     # Convert to SessionWithTasksPublic format to include tasks
     result = []
@@ -140,6 +146,8 @@ def read_sessions(
                 category=category_name,
                 completed=task.completed,
                 actual_completion_time=task.actual_completion_time,
+                archived=task.archived,
+                archived_at=task.archived_at,
             ))
         
         session_with_tasks = SessionWithTasksPublic(
@@ -151,10 +159,78 @@ def read_sessions(
             long_break_duration=session.long_break_duration,
             long_break_per_pomodoros=session.long_break_per_pomodoros,
             tasks=task_publics,
+            archived=session.archived,
+            archived_at=session.archived_at,
         )
         result.append(session_with_tasks)
     
     return result
+
+
+@router.post("/{session_id}/archive", response_model=SessionPublic)
+def archive_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
+    session = db.get(PomodoroSession, session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.archived:
+        return SessionPublic(
+            id=session.id,
+            name=session.name,
+            description=session.description,
+            focus_duration=session.focus_duration,
+            short_break_duration=session.short_break_duration,
+            long_break_duration=session.long_break_duration,
+            long_break_per_pomodoros=session.long_break_per_pomodoros,
+            archived=session.archived,
+            archived_at=session.archived_at,
+        )
+    session.archived = True
+    session.archived_at = datetime.utcnow()
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return SessionPublic(
+        id=session.id,
+        name=session.name,
+        description=session.description,
+        focus_duration=session.focus_duration,
+        short_break_duration=session.short_break_duration,
+        long_break_duration=session.long_break_duration,
+        long_break_per_pomodoros=session.long_break_per_pomodoros,
+        archived=session.archived,
+        archived_at=session.archived_at,
+    )
+
+
+@router.post("/{session_id}/unarchive", response_model=SessionPublic)
+def unarchive_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
+    session = db.get(PomodoroSession, session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.archived = False
+    session.archived_at = None
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return SessionPublic(
+        id=session.id,
+        name=session.name,
+        description=session.description,
+        focus_duration=session.focus_duration,
+        short_break_duration=session.short_break_duration,
+        long_break_duration=session.long_break_duration,
+        long_break_per_pomodoros=session.long_break_per_pomodoros,
+        archived=session.archived,
+        archived_at=session.archived_at,
+    )
 
 
 @router.post("/active", response_model=ActiveSessionPublic)
@@ -519,11 +595,13 @@ def read_session(
     db: SessionDep,
     session_id: int,
     current_user: ActiveUserDep,
+    include_archived: bool = False,
 ):
     db_session = db.get(PomodoroSession, session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    visible_tasks = [t for t in db_session.tasks if include_archived or not t.archived]
     tasks_public = [
         TaskPublic(
             id=task.id,
@@ -532,8 +610,10 @@ def read_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            archived=task.archived,
+            archived_at=task.archived_at,
         )
-        for task in db_session.tasks
+        for task in visible_tasks
     ]
 
     return SessionWithTasksPublic(
@@ -545,6 +625,8 @@ def read_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+    archived=db_session.archived,
+    archived_at=db_session.archived_at,
     )
 
 
@@ -621,6 +703,8 @@ def update_session(
         short_break_duration=db_session.short_break_duration,
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
+        archived=db_session.archived,
+        archived_at=db_session.archived_at,
     )
 
 
@@ -751,6 +835,58 @@ def delete_task(
     return {"message": "Task deleted successfully"}
 
 
+@router.post("/tasks/{task_id}/archive", response_model=TaskPublic)
+def archive_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task or (task.session and task.session.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.archived = True
+    task.archived_at = datetime.utcnow()
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return TaskPublic(
+        id=task.id,
+        name=task.name,
+        estimated_completion_time=task.estimated_completion_time,
+        category=task.categories[0].name if task.categories else "Uncategorized",
+        completed=task.completed,
+        actual_completion_time=task.actual_completion_time,
+        archived=task.archived,
+        archived_at=task.archived_at,
+    )
+
+
+@router.post("/tasks/{task_id}/unarchive", response_model=TaskPublic)
+def unarchive_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task or (task.session and task.session.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.archived = False
+    task.archived_at = None
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return TaskPublic(
+        id=task.id,
+        name=task.name,
+        estimated_completion_time=task.estimated_completion_time,
+        category=task.categories[0].name if task.categories else "Uncategorized",
+        completed=task.completed,
+        actual_completion_time=task.actual_completion_time,
+        archived=task.archived,
+        archived_at=task.archived_at,
+    )
+
+
 @router.put("/{session_id}/tasks/reorder")
 def reorder_tasks(
     db: SessionDep,
@@ -795,6 +931,9 @@ def complete_task(
     
     task.completed = True
     task.completed_at = datetime.utcnow()
+    # Treat completed task as archived
+    task.archived = True
+    task.archived_at = datetime.utcnow()
     # For now, set actual_completion_time to estimated if not set
     if task.actual_completion_time is None:
         task.actual_completion_time = task.estimated_completion_time
@@ -850,6 +989,9 @@ def uncomplete_task(
     task.completed = False
     task.completed_at = None
     task.actual_completion_time = None
+    # Unarchive when marking incomplete per new requirement
+    task.archived = False
+    task.archived_at = None
     
     db.add(task)
     
@@ -933,6 +1075,10 @@ def complete_session(
             task.completed = True
             task.completed_at = datetime.utcnow()
             incomplete_tasks.append(task.id)
+        # Ensure all tasks (newly or previously completed) are archived
+        task.archived = True
+        if not task.archived_at:
+            task.archived_at = datetime.utcnow()
     
     # Log which tasks were auto-completed
     if incomplete_tasks:
