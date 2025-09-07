@@ -49,7 +49,7 @@ export default function AppSidebar() {
 
   return (
     <Sidebar className="mt-10" variant="inset">
-      <SidebarHeader className="mt-10 lg:mt-0">
+      <SidebarHeader className="mt-10 lg:mt-0 mb-4">
         <div className="px-4 py-2">
           <Logo showText className="h-8 w-8" textClassName="text-lg font-bold" />
         </div>
