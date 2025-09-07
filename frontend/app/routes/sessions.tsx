@@ -40,6 +40,7 @@ export default function Sessions() {
   const [isEditingTask, setIsEditingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'completed' | 'archived'>('all');
 
   // Form states
   const [sessionForm, setSessionForm] = useState({
@@ -171,8 +172,23 @@ export default function Sessions() {
     }
   };
 
+  const getFilteredTasks = (tasks: Task[] | undefined) => {
+    if (!tasks) return [];
+    
+    switch (taskFilter) {
+      case 'active':
+        return tasks.filter(task => !task.completed && !task.archived);
+      case 'completed':
+        return tasks.filter(task => task.completed);
+      case 'archived':
+        return tasks.filter(task => task.archived);
+      default:
+        return tasks;
+    }
+  };
+
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination || !selectedSession?.tasks) return;
+    if (!result.destination || !selectedSession?.tasks || taskFilter !== 'all') return;
 
     const items = Array.from(selectedSession.tasks);
     const [reorderedItem] = items.splice(result.source.index, 1);
@@ -462,22 +478,75 @@ export default function Sessions() {
                   </Dialog>
                 </div>
 
+                {/* Task Filters */}
+                <div className="flex flex-col gap-2 mb-4">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={taskFilter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTaskFilter('all')}
+                    >
+                      All Tasks ({selectedSession.tasks?.length || 0})
+                    </Button>
+                    <Button
+                      variant={taskFilter === 'active' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTaskFilter('active')}
+                    >
+                      Active ({selectedSession.tasks?.filter(t => !t.completed && !t.archived).length || 0})
+                    </Button>
+                    <Button
+                      variant={taskFilter === 'completed' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTaskFilter('completed')}
+                    >
+                      Completed ({selectedSession.tasks?.filter(t => t.completed).length || 0})
+                    </Button>
+                    <Button
+                      variant={taskFilter === 'archived' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTaskFilter('archived')}
+                    >
+                      Archived ({selectedSession.tasks?.filter(t => t.archived).length || 0})
+                    </Button>
+                  </div>
+                  {taskFilter !== 'all' && (
+                    <p className="text-xs text-muted-foreground">
+                      Task reordering is only available when viewing all tasks
+                    </p>
+                  )}
+                </div>
+
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="tasks">
                     {(provided: DroppableProvided) => (
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
-                        {selectedSession.tasks?.map((task, index) => (
-                          <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                        {getFilteredTasks(selectedSession.tasks)?.map((task, index) => (
+                          <Draggable 
+                            key={task.id} 
+                            draggableId={task.id.toString()} 
+                            index={index}
+                            isDragDisabled={taskFilter !== 'all'}
+                          >
                             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                               <Card
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className={`${snapshot.isDragging ? "shadow-lg" : ""}`}
+                                className={`${snapshot.isDragging ? "shadow-lg" : ""} ${
+                                  task.completed ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" : 
+                                  task.archived ? "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800" : ""
+                                }`}
                               >
                                 <CardContent className="p-4">
                                   <div className="flex items-center gap-3">
                                     <div {...provided.dragHandleProps}>
-                                      <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                      <GripVertical 
+                                        className={`h-5 w-5 ${
+                                          taskFilter === 'all' 
+                                            ? 'text-muted-foreground cursor-grab' 
+                                            : 'text-muted-foreground/30 cursor-not-allowed'
+                                        }`} 
+                                      />
                                     </div>
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
@@ -573,9 +642,16 @@ export default function Sessions() {
                   </Droppable>
                 </DragDropContext>
 
-                {(!selectedSession.tasks || selectedSession.tasks.length === 0) && (
+                {(getFilteredTasks(selectedSession.tasks)?.length === 0) && (
                   <div className="text-center text-muted-foreground py-8">
-                    No tasks yet. Add some tasks to get started!
+                    {taskFilter === 'all' 
+                      ? "No tasks yet. Add some tasks to get started!"
+                      : taskFilter === 'active'
+                      ? "No active tasks found."
+                      : taskFilter === 'completed'
+                      ? "No completed tasks found."
+                      : "No archived tasks found."
+                    }
                   </div>
                 )}
               </div>
