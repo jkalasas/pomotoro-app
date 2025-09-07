@@ -14,13 +14,12 @@ export default function Titlebar() {
     <div
       data-tauri-drag-region
       className={cn(
-        "justify-between bg-background/95 backdrop-blur items-center pl-3 items-center h-10 sticky top-0 left-0 z-99 border-b border-border/50",
+        "justify-between bg-background/95 backdrop-blur items-center pl-3 items-center h-10 sticky top-0 left-0 z-99 bg-primary",
         isFullscreen ? "hidden" : "flex"
       )}
     >
       <Link to="/">
         <Logo 
-          showText 
           textClassName="text-sm" 
           withBackground 
           backgroundClassName="bg-primary border-primary/30"
@@ -28,6 +27,7 @@ export default function Titlebar() {
       </Link>
       <div>
         <Button
+        className="text-white"
           type="button"
           variant="ghost"
           onClick={() => window?.minimize()}
@@ -35,13 +35,14 @@ export default function Titlebar() {
           <Minimize2 className="size-4" />
         </Button>
         <Button
+        className="text-white"
           type="button"
           variant="ghost"
           onClick={() => window?.toggleMaximize()}
         >
           <Maximize2 className="size-4" />
         </Button>
-        <Button type="button" variant="ghost" onClick={() => window?.close()}>
+        <Button className="text-white" type="button" variant="ghost" onClick={() => window?.close()}>
           <X className="size-4" />
         </Button>
       </div>

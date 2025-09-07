@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useWindowStore } from "~/stores/window";
 import type { Route } from "./+types/home";
@@ -18,7 +17,6 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
   Check,
-  CloudLightning,
   FilePenLine,
   Pause,
   Play,
@@ -26,7 +24,7 @@ import {
   PlusCircle,
   RotateCcw,
   Settings,
-  Timer,
+  Trash2,
 } from "lucide-react";
 import { ScheduleGeneratorDialog } from "~/components/pomotoro/schedule-generator-dialog";
 import { ScheduledTasksList } from "~/components/pomotoro/scheduled-tasks-list";
@@ -329,29 +327,19 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center pb-4 gap-3 p-5">
-      <div className="w-full flex justify-between">
+    <main className="flex flex-col pb-4 gap-4 p-5">
+      <div className="w-full flex justify-between items-center">
         <SidebarTrigger />
-        <div className="flex justify-end gap-3">
-          <Link to="/analytics">
-            <Button
-              variant="outline"
-              className="inline-flex items-center gap-2"
-            >
-              <CloudLightning />
-              <span>Analytics</span>
-            </Button>
-          </Link>
-          <Link to="/pomodoro">
-            <Button
-              variant="outline"
-              className="inline-flex items-center gap-2"
-            >
-              <Timer />
-              <span>Pomodoro Timer</span>
-            </Button>
-          </Link>
-
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-muted-foreground">
+            {schedulerStore.currentSchedule && schedulerStore.currentSchedule.length > 0
+              ? `${Math.floor(
+                  schedulerStore.currentSchedule
+                    .filter(task => !task.completed)
+                    .reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60
+                )} hours remaining`
+              : "No schedule"}
+          </span>
           {sessionInfo && (
             <Button
               type="button"
@@ -551,23 +539,7 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex justify-between w-full">
-        <div className="flex items-center gap-2">
-          <span className="font-bold">
-            Schedule
-          </span>
-        </div>
-        <span className="font-medium">
-          {schedulerStore.currentSchedule
-            ? `${Math.floor(
-                schedulerStore.currentSchedule
-                  .filter(task => !task.completed)
-                  .reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60
-              )} hours remaining`
-            : "No schedule"}
-        </span>
-      </div>
-      <div className="flex flex-col lg:flex-row gap-5 w-full items-stretch">
+      <div className="flex flex-col xl:flex-row gap-6 w-full items-stretch h-full">
         {/* Pomodoro Widget */}
         <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
           <CardContent>
@@ -628,7 +600,7 @@ export default function Home() {
                 onClick={() => pomodoroStore.resetTimer()}
                 disabled={pomodoroStore.isLoading}
               >
-                <CloudLightning />
+                <RotateCcw />
                 <span>Reset Timer</span>
               </Button>
               {schedulerStore.getCurrentTask() && (
@@ -660,7 +632,16 @@ export default function Home() {
           <CardContent className="max-h-full overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <span className="font-bold">Schedule</span>
-              <div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => schedulerStore.clearSchedule()}
+                  disabled={!schedulerStore.currentSchedule || schedulerStore.currentSchedule.length === 0}
+                >
+                  <Trash2 className="size-4 mr-2" />
+                  Clear
+                </Button>
                 <ScheduleGeneratorDialog
                   onScheduleGenerated={() => {
                     // Schedule generated successfully

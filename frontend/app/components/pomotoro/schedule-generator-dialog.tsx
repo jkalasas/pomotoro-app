@@ -68,7 +68,7 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full" size="sm">
+        <Button size="sm">
           <Zap className="size-4 mr-2" />
           Generate
         </Button>

@@ -81,39 +81,9 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
 
   return (
     <>
-      {/* Session Settings at the top */}
-      <div className="mb-4 p-3 bg-muted/30 rounded-lg border">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-medium">Pomodoro Settings</h4>
-          <Button size="sm" variant="ghost" onClick={onOpenSettings}>
-            <Settings className="size-4" />
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <span className="text-muted-foreground">Focus Duration:</span>
-          <span>{sessionSettings.focus_duration} min</span>
-          <span className="text-muted-foreground">Short Break:</span>
-          <span>{sessionSettings.short_break_duration} min</span>
-          <span className="text-muted-foreground">Long Break:</span>
-          <span>{sessionSettings.long_break_duration} min</span>
-          <span className="text-muted-foreground">Long Break After:</span>
-          <span>{sessionSettings.long_break_per_pomodoros} pomodoros</span>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={clearSchedule}
-        >
-          <Trash2 className="size-4 mr-2" />
-          Clear Schedule
-        </Button>
-      </div>
       
       {/* Schedule Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
         <div className="space-y-1">
           <span className="text-muted-foreground">Progress</span>
           <div className="font-medium">{completedTasks}/{totalTasks} tasks</div>
@@ -125,10 +95,6 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
         <div className="space-y-1">
           <span className="text-muted-foreground">Total Time</span>
           <div className="font-medium">{totalScheduleTime} min</div>
-        </div>
-        <div className="space-y-1">
-          <span className="text-muted-foreground">AI Score</span>
-          <div className="font-medium">{fitnessScore.toFixed(2)}</div>
         </div>
       </div>
 
