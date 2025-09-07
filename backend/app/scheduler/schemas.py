@@ -14,12 +14,17 @@ class ScheduledTaskResponse(BaseModel):
     session_id: int
     category: str
     due_date: Optional[str] = None  # ISO format datetime string
+    completed: bool = False
 
 
 class ScheduleResponse(BaseModel):
     scheduled_tasks: List[ScheduledTaskResponse]
     total_schedule_time: int
     fitness_score: float = 0.0
+
+
+class ScheduleReorderRequest(BaseModel):
+    task_ids: List[int]
 
 
 class UserAnalyticsResponse(BaseModel):

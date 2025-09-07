@@ -54,6 +54,7 @@ def schedule_tasks_with_ga(session_ids: List[int], db: SessionDep, user: ActiveU
             session_id=task.session_id,
             category=task.categories[0].name if task.categories else "Uncategorized",
             due_date=task.due_date.isoformat() if task.due_date else None,
+            completed=task.completed
         )
         for task in optimized_schedule
     ]

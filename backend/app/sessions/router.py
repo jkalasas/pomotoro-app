@@ -108,7 +108,7 @@ def create_session(
     )
 
 
-@router.get("/", response_model=List[SessionPublic])
+@router.get("/", response_model=List[SessionWithTasksPublic])
 def read_sessions(
     db: SessionDep,
     current_user: ActiveUserDep,
@@ -117,9 +117,32 @@ def read_sessions(
         select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
     ).all()
     
-    # Convert to SessionPublic format to ensure all fields are included
-    return [
-        SessionPublic(
+    # Convert to SessionWithTasksPublic format to include tasks
+    result = []
+    for session in sessions:
+        # Get tasks for this session
+        tasks = db.exec(
+            select(Task).where(Task.session_id == session.id)
+        ).all()
+        
+        # Convert tasks to TaskPublic format
+        task_publics = []
+        for task in tasks:
+            # Get category name
+            category_name = "Uncategorized"
+            if task.categories:
+                category_name = task.categories[0].name
+            
+            task_publics.append(TaskPublic(
+                id=task.id,
+                name=task.name,
+                estimated_completion_time=task.estimated_completion_time,
+                category=category_name,
+                completed=task.completed,
+                actual_completion_time=task.actual_completion_time,
+            ))
+        
+        session_with_tasks = SessionWithTasksPublic(
             id=session.id,
             name=session.name,
             description=session.description,
@@ -127,9 +150,11 @@ def read_sessions(
             short_break_duration=session.short_break_duration,
             long_break_duration=session.long_break_duration,
             long_break_per_pomodoros=session.long_break_per_pomodoros,
+            tasks=task_publics,
         )
-        for session in sessions
-    ]
+        result.append(session_with_tasks)
+    
+    return result
 
 
 @router.post("/active", response_model=ActiveSessionPublic)

@@ -233,6 +233,31 @@ class ApiClient {
       body: JSON.stringify({ description }),
     });
   }
+
+  // Scheduler endpoints
+  async generateSchedule(sessionIds: number[]) {
+    return this.request('/scheduler/generate-schedule', {
+      method: 'POST',
+      body: JSON.stringify({ session_ids: sessionIds }),
+    });
+  }
+
+  async getUserInsights() {
+    return this.request('/scheduler/user-insights');
+  }
+
+  async updateDailyStats() {
+    return this.request('/scheduler/update-daily-stats', {
+      method: 'POST',
+    });
+  }
+
+  async reorderSchedule(taskIds: number[]) {
+    return this.request('/scheduler/reorder-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({ task_ids: taskIds }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

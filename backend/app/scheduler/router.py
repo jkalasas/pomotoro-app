@@ -5,7 +5,7 @@ from sqlmodel import select
 from ..auth.deps import ActiveUserDep
 from ..db import SessionDep
 from ..models import PomodoroSession, Task
-from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse, UserAnalyticsResponse
+from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse, UserAnalyticsResponse, ScheduleReorderRequest
 from .genetic_algorithm import GeneticAlgorithmScheduler
 from ..services.analytics import UserAnalyticsService
 
@@ -53,8 +53,9 @@ def schedule_tasks_with_ga(session_ids: List[int], db, user: ActiveUserDep) -> S
             name=task.name,
             estimated_completion_time=task.estimated_completion_time,
             session_id=task.session_id,
-            category=task.categories[0].name if task.categories else "Uncategorized",
+            category="",  # Empty since we're showing session names instead
             due_date=task.due_date.isoformat() if task.due_date else None,
+            completed=task.completed
         )
         for task in optimized_schedule
     ]
@@ -127,3 +128,66 @@ def update_daily_stats(db: SessionDep, user: ActiveUserDep):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating daily stats: {str(e)}")
+
+
+@router.put("/reorder-schedule", response_model=ScheduleResponse)
+def reorder_schedule(
+    request: ScheduleReorderRequest, 
+    db: SessionDep, 
+    user: ActiveUserDep
+):
+    """
+    Reorder the current generated schedule based on user preference.
+    This allows users to manually adjust the AI-generated optimal schedule.
+    """
+    try:
+        # Get all tasks by their IDs and verify they belong to user sessions
+        tasks = []
+        for task_id in request.task_ids:
+            task = db.get(Task, task_id)
+            if not task:
+                raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+            
+            # Verify the task belongs to a session owned by the user
+            session = db.get(PomodoroSession, task.session_id)
+            if not session or session.user_id != user.id:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Task {task_id} does not belong to user sessions"
+                )
+            tasks.append(task)
+        
+        # Convert to ScheduledTaskResponse format maintaining the requested order
+        scheduled_tasks = []
+        total_time = 0
+        
+        for task in tasks:
+            # Get category name
+            category_name = "Uncategorized"
+            if task.categories:
+                category_name = task.categories[0].name
+                
+            scheduled_task = ScheduledTaskResponse(
+                id=task.id,
+                name=task.name,
+                estimated_completion_time=task.estimated_completion_time,
+                session_id=task.session_id,
+                category=category_name,
+                due_date=task.due_date.isoformat() if task.due_date else None,
+                completed=task.completed
+            )
+            scheduled_tasks.append(scheduled_task)
+            total_time += task.estimated_completion_time
+        
+        # Return the reordered schedule with a default fitness score
+        # In a more sophisticated implementation, you could recalculate fitness
+        return ScheduleResponse(
+            scheduled_tasks=scheduled_tasks,
+            total_schedule_time=total_time,
+            fitness_score=0.0  # User-modified schedules get neutral score
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reordering schedule: {str(e)}")

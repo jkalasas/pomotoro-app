@@ -72,6 +72,8 @@ interface TaskState {
   }) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
+  // New method for handling next task with pomodoro config updates
+  handleNextTaskTransition: (completedTaskId: number) => Promise<void>;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -172,6 +174,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     try {
       await apiClient.completeTask(taskId);
       
+      // Handle next task transition for pomodoro configuration updates
+      await get().handleNextTaskTransition(taskId);
+      
       // Get task details for analytics logging
       const currentSession = get().currentSession;
       const task = currentSession?.tasks.find(t => t.id === taskId);
@@ -199,13 +204,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             
             // Trigger session completion via custom event
             if (typeof window !== "undefined") {
-              console.log('Triggering session completion event:', {
-                sessionId: updatedSession.id,
-                sessionName: updatedSession.name || updatedSession.description,
-                totalTasks: updatedSession.tasks.length,
-                completedTasks: completedTasksCount,
-                focusDuration
-              });
               window.dispatchEvent(new CustomEvent('session-completion', {
                 detail: {
                   sessionId: updatedSession.id,
@@ -231,9 +229,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   uncompleteTask: async (taskId: number) => {
     try {
-      console.log('Uncompleting task:', taskId);
       const response = await apiClient.uncompleteTask(taskId) as { message: string; session_reset: boolean };
-      console.log('Uncomplete task response:', response);
       
       // Get task details for analytics logging
       const currentSession = get().currentSession;
@@ -263,7 +259,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         
         // Check if session was reset due to uncompleting the task
         if (response.session_reset) {
-          console.log('Session was reset due to uncompleting task');
+          // Session was reset, need to reload pomodoro state
           // Dispatch event to notify other parts of the app
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('session-reset', {
@@ -295,13 +291,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     
     // Trigger session completion via custom event
     if (typeof window !== "undefined") {
-      console.log('Manually triggering session completion event:', {
-        sessionId: currentSession.id,
-        sessionName: currentSession.name || currentSession.description,
-        totalTasks: currentSession.tasks.length,
-        completedTasks: completedTasksCount,
-        focusDuration
-      });
       window.dispatchEvent(new CustomEvent('session-completion', {
         detail: {
           sessionId: currentSession.id,
@@ -416,6 +405,86 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     } catch (error) {
       console.error("Failed to reorder tasks:", error);
       throw error;
+    }
+  },
+
+  // New method for handling next task with pomodoro config updates
+  handleNextTaskTransition: async (completedTaskId: number) => {
+    try {
+      const { usePomodoroStore } = await import('./pomodoro');
+      const { useSchedulerStore } = await import('./scheduler');
+      
+      // Get the current schedule to find next task
+      const schedulerState = useSchedulerStore.getState();
+      const currentSchedule = schedulerState.currentSchedule;
+      
+      if (!currentSchedule) {
+        return;
+      }
+      
+      // Find the completed task and the next task
+      const completedTaskIndex = currentSchedule.findIndex(task => task.id === completedTaskId);
+      const nextTask = currentSchedule.find((task, index) => 
+        index > completedTaskIndex && !task.completed
+      );
+      
+      if (!nextTask) {
+        return;
+      }
+      
+      // Get the current pomodoro state BEFORE any updates
+      const pomodoroStore = usePomodoroStore.getState();
+      const currentTime = pomodoroStore.time;
+      const currentPhase = pomodoroStore.phase;
+      const isRunning = pomodoroStore.isRunning;
+      const currentTimeRemaining = pomodoroStore.time; // This is the actual remaining time
+      
+      // Get the current and next task sessions
+      const completedTask = currentSchedule[completedTaskIndex];
+      const currentSessionId = completedTask?.session_id;
+      const nextSessionId = nextTask.session_id;
+      
+      // If timer is running, preserve the current time regardless of session changes
+      if (isRunning && currentPhase === "focus") {
+        // Only update the current task, preserving the timer state
+        await pomodoroStore.updateTimer({
+          current_task_id: nextTask.id,
+          is_running: true, // Keep timer running
+          // Do NOT update time_remaining - let it preserve the current countdown
+        });
+        
+        // If session changed, update settings silently without affecting the timer
+        if (currentSessionId !== nextSessionId) {
+          // Update settings in the background for future timer resets, but don't affect current timer
+          await pomodoroStore.updateSettingsFromTask(nextSessionId);
+        }
+      } else {
+        // Timer is not running or not in focus phase, handle normally
+        
+        // If the next task is from a different session, update pomodoro configuration
+        if (currentSessionId !== nextSessionId) {
+          await pomodoroStore.updateSettingsFromTask(nextSessionId);
+          
+          // Get the updated settings after updateSettingsFromTask
+          const updatedSettings = usePomodoroStore.getState().settings;
+          const newFocusDuration = updatedSettings.focus_duration * 60; // Convert to seconds
+          
+          // For non-running timer, use new focus duration
+          await pomodoroStore.updateTimer({
+            time_remaining: newFocusDuration,
+            current_task_id: nextTask.id,
+            is_running: false,
+          });
+        } else {
+          // Same session, just update the current task
+          await pomodoroStore.updateTimer({
+            current_task_id: nextTask.id,
+            is_running: false,
+          });
+        }
+      }
+    } catch (error) {
+      // Failed to handle next task transition
     }
   },
 }));
