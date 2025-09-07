@@ -133,17 +133,25 @@ export const useSchedulerStore = create<SchedulerState>()(
       
       // Only reset timer if:
       // 1. Timer was running on a specific task, AND
-      // 2. That task is no longer the first uncompleted task after reordering
-      const shouldResetTimer = wasTimerRunning && 
-                              currentTaskId !== null && 
-                              newFirstTask && 
-                              currentTaskId !== newFirstTask.id;
-      
+      // 2. The active task changes (different first uncompleted), AND
+      // 3. The focus duration of the new task's session is LESS than the remaining time
+      let shouldResetTimer = false;
+      if (wasTimerRunning && currentTaskId !== null && newFirstTask && currentTaskId !== newFirstTask.id) {
+        try {
+          // Fetch session to determine its focus duration
+            const session = await apiClient.getSession(newFirstTask.session_id) as { focus_duration: number };
+            const remainingTime = pomodoroStore.time; // seconds
+            if (session.focus_duration * 60 < remainingTime) {
+              shouldResetTimer = true;
+            }
+        } catch (e) {
+          // If we fail to fetch session data, be conservative: do NOT reset
+          shouldResetTimer = false;
+        }
+      }
+
       if (shouldResetTimer) {
-        // Reset the timer
         await pomodoroStore.resetTimer();
-        
-        // Start the timer again for the new first task
         await pomodoroStore.startTimer();
       }
     } catch (error) {
