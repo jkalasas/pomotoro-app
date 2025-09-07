@@ -2,6 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 class ApiClient {
   private token: string | null = null;
+  private refreshTokenCallback: (() => Promise<boolean>) | null = null;
 
   setToken(token: string) {
     this.token = token;
@@ -11,9 +12,14 @@ class ApiClient {
     this.token = null;
   }
 
+  setRefreshTokenCallback(callback: () => Promise<boolean>) {
+    this.refreshTokenCallback = callback;
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryCount = 0
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
@@ -35,6 +41,19 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // If we get a 401 and have a refresh callback, try to refresh the token
+      if (response.status === 401 && this.refreshTokenCallback && retryCount === 0 && endpoint !== '/auth/token/refresh') {
+        try {
+          const refreshed = await this.refreshTokenCallback();
+          if (refreshed) {
+            // Retry the request with the new token
+            return this.request<T>(endpoint, options, retryCount + 1);
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+        }
+      }
+      
       const error = await response.text();
       throw new Error(`API Error: ${response.status} - ${error}`);
     }
@@ -80,6 +99,24 @@ class ApiClient {
 
   async getCurrentUser() {
     return this.request('/auth/me');
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ access_token: string; refresh_token: string }> {
+    const response = await this.request<{
+      access_token: string;
+      refresh_token: string;
+      token_type: string;
+    }>('/auth/token/refresh', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${refreshToken}`,
+      },
+    });
+
+    return {
+      access_token: response.access_token,
+      refresh_token: response.refresh_token
+    };
   }
 
   // Session endpoints

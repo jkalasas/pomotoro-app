@@ -49,7 +49,9 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
     )
 
 
-async def access_token_from_refresh_token(session: SessionDep, refresh_token: str):
+async def access_token_from_refresh_token(
+    session: SessionDep, refresh_token: Annotated[str, Depends(oauth2_scheme)]
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

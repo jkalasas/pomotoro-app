@@ -26,6 +26,7 @@ import { Button } from "./components/ui/button";
 import { VolumeOff } from "lucide-react";
 import { AuthForm } from "./components/auth/AuthForm";
 import { useAuthStore } from "./stores/auth";
+import { setupAuthRefresh } from "./lib/auth-setup";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -61,6 +62,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isOverlayRoute = location.pathname === '/overlay';
 
   useEffect(() => {
+    // Set up automatic token refresh
+    setupAuthRefresh();
+
     // Skip authentication initialization for overlay route
     if (isOverlayRoute) {
       initWindow();
