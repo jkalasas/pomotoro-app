@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { Badge } from '~/components/ui/badge';
+import { LogoIcon } from '~/components/ui/logo';
 import type { AnalyticsEvent } from '~/lib/analytics';
 
 interface ActivityTimelineProps {
@@ -18,7 +19,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
       case 'task_complete':
         return '✅';
       case 'pomodoro_complete':
-        return '🍅';
+        return <LogoIcon />;
       case 'break_start':
         return '☕';
       case 'timer_start':

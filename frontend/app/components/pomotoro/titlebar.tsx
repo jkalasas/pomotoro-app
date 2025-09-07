@@ -3,6 +3,7 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
+import { Logo } from "~/components/ui/logo";
 import { cn } from "~/lib/utils";
 import { useWindowStore } from "~/stores/window";
 
@@ -17,7 +18,14 @@ export default function Titlebar() {
         isFullscreen ? "hidden" : "flex"
       )}
     >
-      <Link to="/">Pomotoro</Link>
+      <Link to="/">
+        <Logo 
+          showText 
+          textClassName="text-sm" 
+          withBackground 
+          backgroundClassName="bg-primary border-primary/30"
+        />
+      </Link>
       <div>
         <Button
           type="button"

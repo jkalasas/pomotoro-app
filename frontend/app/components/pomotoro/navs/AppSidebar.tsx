@@ -16,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar";
+import { Logo } from "~/components/ui/logo";
 import { cn } from "~/lib/utils";
 import { useAuthStore } from "~/stores/auth";
 import { Button } from "~/components/ui/button";
@@ -67,6 +68,9 @@ export default function AppSidebar() {
   return (
     <Sidebar className="mt-10" variant="inset">
       <SidebarHeader>
+        <div className="px-4 py-2">
+          <Logo showText className="h-8 w-8" textClassName="text-lg font-bold" />
+        </div>
         {user && (
           <div className="px-4 py-2">
             <p className="text-sm font-medium">

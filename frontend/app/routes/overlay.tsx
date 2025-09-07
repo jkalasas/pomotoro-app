@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useSearchParams } from "react-router";
+import { Logo } from "~/components/ui/logo";
 
 export default function Overlay() {
   const [searchParams] = useSearchParams();
@@ -132,8 +133,7 @@ export default function Overlay() {
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           {/* Left side - Logo and branding */}
           <div className="flex items-center space-x-3">
-            <div className="text-2xl">🍅</div>
-            <span className="text-xl font-bold tracking-wide">POMOTORO</span>
+            <Logo showText className="h-8 w-8" textClassName="text-xl font-bold tracking-wide" />
           </div>
 
           {/* Right side - Timer and controls */}

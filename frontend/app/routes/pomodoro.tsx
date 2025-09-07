@@ -1,5 +1,6 @@
 import type { Route } from "./+types/home";
 import { Button } from "~/components/ui/button";
+import { LogoIcon } from "~/components/ui/logo";
 import { toast } from "sonner";
 import { Pause, Play, RefreshCw } from "lucide-react";
 
@@ -100,7 +101,8 @@ export default function Pomodoro() {
             <p className="text-lg font-medium">Phase: {phase}</p>
             {showRestOverlay && (
               <p className="text-sm text-orange-600 font-medium mt-1">
-                🍅 Rest Overlay Active
+                <LogoIcon className="h-5 w-5 mr-2" />
+                Rest Overlay Active
               </p>
             )}
           </div>

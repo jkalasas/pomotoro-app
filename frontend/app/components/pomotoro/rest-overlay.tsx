@@ -1,4 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
+import { Logo } from "~/components/ui/logo";
 import { useWindowStore } from "~/stores/window";
 
 interface RestOverlayProps {
@@ -78,8 +81,7 @@ export function RestOverlay({ timeRemaining, onSkip }: RestOverlayProps) {
           <div className="flex items-center space-x-3">
             {/* Pomodoro logo/icon */}
             <div className="flex items-center space-x-2 text-2xl font-bold">
-              <span className="text-white">🍅</span>
-              <span>POMOTORO</span>
+              <Logo showText className="h-8 w-8" textClassName="text-2xl font-bold" />
             </div>
           </div>
         </div>
