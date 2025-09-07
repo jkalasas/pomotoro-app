@@ -16,13 +16,16 @@ def schedule_tasks_with_ga(session_ids: List[int], db, user: ActiveUserDep) -> S
     """
     Schedule tasks using the Genetic Algorithm implementation from IMPLEMENTATION.md
     """
-    # Get all tasks for the specified sessions
-    statement = select(Task).where(Task.session_id.in_(session_ids))
+    # Get all non-completed tasks for the specified sessions
+    statement = select(Task).where(
+        Task.session_id.in_(session_ids),
+        Task.completed == False
+    )
     all_tasks = db.exec(statement).all()
     
     if not all_tasks:
         raise HTTPException(
-            status_code=404, detail="No tasks found for the provided session IDs."
+            status_code=404, detail="No uncompleted tasks found for the provided session IDs."
         )
 
     # Group tasks by session for validation

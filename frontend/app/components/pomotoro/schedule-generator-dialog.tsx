@@ -26,7 +26,11 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
   const [selectedSessions, setSelectedSessions] = useState<number[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  const availableSessions = sessions.filter(session => !session.completed);
+  const availableSessions = sessions.filter(session => 
+    !session.completed && 
+    session.tasks && 
+    session.tasks.some(task => !task.completed)
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -80,7 +84,7 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
             Generate Schedule
           </DialogTitle>
           <DialogDescription>
-            Select sessions to generate an optimized task schedule using genetic algorithm
+            Select sessions to generate an optimized task schedule using genetic algorithm. Only uncompleted tasks will be included in the schedule.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,7 +94,7 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {availableSessions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No available sessions. Create sessions with tasks first.
+                  No available sessions with uncompleted tasks. Create sessions with tasks or ensure your sessions have uncompleted tasks.
                 </p>
               ) : (
                 availableSessions.map((session) => (
@@ -108,13 +112,13 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
                           {session.name || session.description}
                         </span>
                         <Badge variant="secondary" className="text-xs">
-                          {session.tasks?.length || 0} tasks
+                          {session.tasks?.filter(task => !task.completed).length || 0} uncompleted tasks
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="size-3" />
-                          {session.tasks?.reduce((total, task) => total + task.estimated_completion_time, 0) || 0} min
+                          {session.tasks?.filter(task => !task.completed).reduce((total, task) => total + task.estimated_completion_time, 0) || 0} min
                         </span>
                       </div>
                     </div>
