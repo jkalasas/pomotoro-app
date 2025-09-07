@@ -74,6 +74,42 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       get().triggerSessionCompletion(sessionId, sessionName, totalTasks, completedTasks, focusDuration);
     });
 
+    // Listen for Tauri app close events (when user actually quits via tray)
+    if ('__TAURI__' in window) {
+      listen('tauri://close-requested', () => {
+        const state = get();
+        if (state.isRunning) {
+          // App is being properly closed - stop timer immediately
+          apiClient.updateActiveSession({ 
+            time_remaining: state.time,
+            is_running: false
+          }).catch(() => {
+            // Continue even if sync fails
+          });
+        }
+        // Close overlay if open
+        if (state.showRestOverlay) {
+          useWindowStore.getState().closeOverlayWindow().catch(() => {});
+        }
+      });
+      
+      // Also listen for app hide events (when window is hidden but not closed)
+      listen('tauri://window-hide', () => {
+        const state = get();
+        if (state.isRunning) {
+          // Window is being hidden - stop timer to prevent background running
+          apiClient.updateActiveSession({ 
+            time_remaining: state.time,
+            is_running: false
+          }).then(() => {
+            set({ isRunning: false });
+          }).catch(() => {
+            set({ isRunning: false });
+          });
+        }
+      });
+    }
+
     // Background ticker: keep the timer running even when Pomodoro page
     // unmounts. This decrements the stored time every second when
     // `isRunning` is true, performs a backend sync every 10s and handles
@@ -157,26 +193,67 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Also handle app visibility changes (when user switches tabs/apps)
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // App is becoming hidden - sync current state
-        const state = get();
-        if (state.isRunning) {
-          apiClient.updateActiveSession({ 
-            time_remaining: state.time,
-            is_running: state.isRunning
-          }).catch(() => {
-            // Sync failed but continue
-          });
+    // Listen for Tauri window hide events (since close is prevented)
+    if (typeof window !== "undefined" && '__TAURI__' in window) {
+      // For Tauri apps, we need special handling since close is prevented
+      let hideTimer: NodeJS.Timeout | null = null;
+      
+      const handleVisibilityChangeForTauri = () => {
+        if (document.hidden) {
+          // App is becoming hidden - start timer to detect if it's a real app hide vs tab switch
+          hideTimer = setTimeout(() => {
+            const state = get();
+            if (document.hidden && state.isRunning) {
+              // App has been hidden for 500ms and timer is running - stop it
+              apiClient.updateActiveSession({ 
+                time_remaining: state.time,
+                is_running: false
+              }).then(() => {
+                set({ isRunning: false });
+              }).catch(() => {
+                set({ isRunning: false });
+              });
+              
+              // Also close any overlay windows
+              if (state.showRestOverlay) {
+                useWindowStore.getState().closeOverlayWindow().catch(() => {});
+                set({ showRestOverlay: false });
+              }
+            }
+          }, 500);
+        } else {
+          // App is becoming visible - cancel hide timer and reload state
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+          get().loadActiveSession();
         }
-      } else {
-        // App is becoming visible - reload state from backend
-        get().loadActiveSession();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChangeForTauri);
+    } else {
+      // For non-Tauri apps, use normal visibility handling
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          // App is becoming hidden - sync current state
+          const state = get();
+          if (state.isRunning) {
+            apiClient.updateActiveSession({ 
+              time_remaining: state.time,
+              is_running: state.isRunning
+            }).catch(() => {
+              // Sync failed but continue
+            });
+          }
+        } else {
+          // App is becoming visible - reload state from backend
+          get().loadActiveSession();
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
   }
 
   return {
