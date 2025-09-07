@@ -447,18 +447,31 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       
       // If timer is running, preserve the current time regardless of session changes
       if (isRunning && currentPhase === "focus") {
-        // Only update the current task, preserving the timer state
+        // We may need to adjust based on the next task's session focus duration
+        let newTimeRemaining = currentTimeRemaining;
+        let nextSessionFocusSeconds: number | null = null;
+
+        if (currentSessionId !== nextSessionId) {
+          // Update settings for the next session (this won't mutate running timer)
+            await pomodoroStore.updateSettingsFromTask(nextSessionId);
+            const updatedSettings = usePomodoroStore.getState().settings;
+            nextSessionFocusSeconds = updatedSettings.focus_duration * 60;
+            // Only reset (clamp) if remaining time is GREATER than the new focus duration
+            if (newTimeRemaining > nextSessionFocusSeconds) {
+              newTimeRemaining = nextSessionFocusSeconds;
+            }
+        } else {
+          // Same session; derive focus duration from existing settings for maxTime adjustment
+          const settings = usePomodoroStore.getState().settings;
+          nextSessionFocusSeconds = settings.focus_duration * 60;
+        }
+
+        // Always push current (possibly clamped) time to backend to avoid rewind caused by stale backend time
         await pomodoroStore.updateTimer({
           current_task_id: nextTask.id,
-          is_running: true, // Keep timer running
-          // Do NOT update time_remaining - let it preserve the current countdown
+          is_running: true,
+          time_remaining: newTimeRemaining,
         });
-        
-        // If session changed, update settings silently without affecting the timer
-        if (currentSessionId !== nextSessionId) {
-          // Update settings in the background for future timer resets, but don't affect current timer
-          await pomodoroStore.updateSettingsFromTask(nextSessionId);
-        }
       } else {
         // Timer is not running or not in focus phase, handle normally
         
