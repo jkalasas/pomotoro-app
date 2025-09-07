@@ -2,20 +2,25 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { 
-  Check, 
-  RotateCcw, 
-  Clock, 
-  GripVertical, 
-  Trash2, 
+import {
+  Check,
+  RotateCcw,
+  Clock,
+  GripVertical,
+  Trash2,
   Calendar,
-  Settings
+  Settings,
 } from "lucide-react";
 import { useSchedulerStore } from "~/stores/scheduler";
 import { useTaskStore } from "~/stores/tasks";
 import { usePomodoroStore } from "~/stores/pomodoro";
 import type { ScheduledTask } from "~/types/scheduler";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
 
 interface ScheduledTasksListProps {
   sessionSettings: {
@@ -27,17 +32,20 @@ interface ScheduledTasksListProps {
   onOpenSettings: () => void;
 }
 
-export function ScheduledTasksList({ sessionSettings, onOpenSettings }: ScheduledTasksListProps) {
-  const { 
-    currentSchedule, 
-    totalScheduleTime, 
+export function ScheduledTasksList({
+  sessionSettings,
+  onOpenSettings,
+}: ScheduledTasksListProps) {
+  const {
+    currentSchedule,
+    totalScheduleTime,
     fitnessScore,
     reorderScheduleWithTimerReset,
     completeScheduledTask,
     uncompleteScheduledTask,
-    clearSchedule 
+    clearSchedule,
   } = useSchedulerStore();
-  
+
   const { sessions } = useTaskStore();
   const { isRunning } = usePomodoroStore();
 
@@ -73,24 +81,29 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
     reorderScheduleWithTimerReset(newSchedule, isRunning);
   };
 
-  const completedTasks = currentSchedule.filter(task => task.completed).length;
+  const completedTasks = currentSchedule.filter(
+    (task) => task.completed
+  ).length;
   const totalTasks = currentSchedule.length;
   const completedTime = currentSchedule
-    .filter(task => task.completed)
+    .filter((task) => task.completed)
     .reduce((total, task) => total + task.estimated_completion_time, 0);
 
   return (
     <>
-      
       {/* Schedule Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
         <div className="space-y-1">
           <span className="text-muted-foreground">Progress</span>
-          <div className="font-medium">{completedTasks}/{totalTasks} tasks</div>
+          <div className="font-medium">
+            {completedTasks}/{totalTasks} tasks
+          </div>
         </div>
         <div className="space-y-1">
           <span className="text-muted-foreground">Time Left</span>
-          <div className="font-medium">{totalScheduleTime - completedTime} min</div>
+          <div className="font-medium">
+            {totalScheduleTime - completedTime} min
+          </div>
         </div>
         <div className="space-y-1">
           <span className="text-muted-foreground">Total Time</span>
@@ -100,12 +113,12 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
 
       {/* Progress Bar */}
       <div className="w-full bg-muted rounded-full h-2 mb-4">
-        <div 
-          className="bg-primary h-2 rounded-full transition-all duration-300" 
+        <div
+          className="bg-primary h-2 rounded-full transition-all duration-300"
           style={{ width: `${(completedTasks / totalTasks) * 100}%` }}
         />
       </div>
-      
+
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="scheduled-tasks">
           {(provided) => (
@@ -161,7 +174,7 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
                               {task.name}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="size-3" />
@@ -170,10 +183,25 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
                             {task.due_date && (
                               <span className="flex items-center gap-1">
                                 <Calendar className="size-3" />
-                                Due: {new Date(task.due_date).toLocaleDateString()}
+                                Due:{" "}
+                                {new Date(task.due_date).toLocaleDateString()}
                               </span>
                             )}
                           </div>
+                          {/* Session Badge */}
+                          {(() => {
+                            const session = sessions.find(
+                              (s) => s.id === task.session_id
+                            );
+                            return session ? (
+                              <Badge
+                                variant="default"
+                                className="text-white text-xs px-2 py-0.5 shrink-0 font-normal"
+                              >
+                                {session.name}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
 
                         {/* Actions */}
@@ -212,7 +240,7 @@ export function ScheduledTasksList({ sessionSettings, onOpenSettings }: Schedule
 
       {currentSchedule.length > 0 && (
         <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-          <strong>Tip:</strong> Drag and drop tasks to reorder them manually. 
+          <strong>Tip:</strong> Drag and drop tasks to reorder them manually.
           The AI has optimized this schedule for urgency, momentum, and variety.
         </div>
       )}
