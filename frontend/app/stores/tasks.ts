@@ -80,6 +80,7 @@ interface TaskState {
   }) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
+  moveCompletedAndArchivedToBottom: (sessionId: number) => Promise<void>;
   archiveTask: (taskId: number) => Promise<void>;
   unarchiveTask: (taskId: number) => Promise<void>;
   // New method for handling next task with pomodoro config updates
@@ -447,6 +448,28 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }));
     } catch (error) {
       console.error("Failed to reorder tasks:", error);
+      throw error;
+    }
+  },
+
+  moveCompletedAndArchivedToBottom: async (sessionId: number) => {
+    try {
+      const state = get();
+      const session = state.sessions.find(s => s.id === sessionId);
+      if (!session?.tasks) return;
+
+      // Separate tasks into active and completed/archived
+      const activeTasks = session.tasks.filter(task => !task.completed && !task.archived);
+      const completedOrArchivedTasks = session.tasks.filter(task => task.completed || task.archived);
+      
+      // Create new order with active tasks first, then completed/archived
+      const reorderedTasks = [...activeTasks, ...completedOrArchivedTasks];
+      const taskIds = reorderedTasks.map(task => task.id);
+      
+      // Use the existing reorderTasks function to apply the changes to backend
+      await get().reorderTasks(sessionId, taskIds);
+    } catch (error) {
+      console.error("Failed to move completed and archived tasks to bottom:", error);
       throw error;
     }
   },

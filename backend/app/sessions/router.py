@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from datetime import datetime
+from sqlalchemy import func
 
 from ..db import SessionDep, get_session
 from ..models import PomodoroSession, Task, Category, ActivePomodoroSession, SessionFeedback
@@ -126,9 +127,11 @@ def read_sessions(
     # Convert to SessionWithTasksPublic format to include tasks
     result = []
     for session in sessions:
-        # Get tasks for this session
+        # Get tasks for this session ordered by order field
         tasks = db.exec(
-            select(Task).where(Task.session_id == session.id)
+            select(Task)
+            .where(Task.session_id == session.id)
+            .order_by(Task.order)
         ).all()
         
         # Convert tasks to TaskPublic format
@@ -601,7 +604,14 @@ def read_session(
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    visible_tasks = [t for t in db_session.tasks if include_archived or not t.archived]
+    # Get tasks ordered by the order field
+    ordered_tasks = db.exec(
+        select(Task)
+        .where(Task.session_id == session_id)
+        .order_by(Task.order)
+    ).all()
+    
+    visible_tasks = [t for t in ordered_tasks if include_archived or not t.archived]
     tasks_public = [
         TaskPublic(
             id=task.id,
@@ -743,12 +753,19 @@ def add_task_to_session(
         db.commit()
         db.refresh(category)
     
+    # Get the highest order value for tasks in this session
+    max_order_result = db.exec(
+        select(func.max(Task.order)).where(Task.session_id == session_id)
+    ).first()
+    next_order = (max_order_result or 0) + 1
+    
     # Create the task
     db_task = Task(
         name=task_data.name,
         estimated_completion_time=task_data.estimated_completion_time,
         session_id=session_id,
         completed=False,
+        order=next_order,
     )
     # Add the category to the task through the many-to-many relationship
     db_task.categories = [category]
@@ -908,9 +925,17 @@ def reorder_tasks(
         if task_id not in task_dict:
             raise HTTPException(status_code=400, detail=f"Task {task_id} not found in session")
     
-    # Update the order - assuming we add an order field to the Task model
-    # For now, we'll just return success as the order might be handled client-side
-    # In a real implementation, you'd add an `order` field to the Task model
+    # Verify all session tasks are included in the reorder
+    if len(reorder_data.task_ids) != len(tasks):
+        raise HTTPException(status_code=400, detail="All tasks must be included in reorder")
+    
+    # Update the order field for each task
+    for index, task_id in enumerate(reorder_data.task_ids):
+        task = task_dict[task_id]
+        task.order = index
+        db.add(task)
+    
+    db.commit()
     
     return {"message": "Tasks reordered successfully"}
 

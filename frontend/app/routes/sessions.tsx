@@ -6,7 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
-import { Plus, Edit, Trash2, GripVertical, Clock, Target, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical, Clock, Target, Archive, ArchiveRestore, ArrowDown } from "lucide-react";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
 import { useAnalyticsStore } from "~/stores/analytics";
 import { DragDropContext, Droppable, Draggable, type DropResult, type DroppableProvided, type DraggableProvided, type DraggableStateSnapshot } from "@hello-pangea/dnd";
@@ -27,8 +27,9 @@ export default function Sessions() {
     updateTask,
     deleteTask,
     reorderTasks,
-  archiveTask,
-  unarchiveTask,
+    moveCompletedAndArchivedToBottom,
+    archiveTask,
+    unarchiveTask,
   } = useTaskStore();
 
   const analyticsStore = useAnalyticsStore();
@@ -206,6 +207,19 @@ export default function Sessions() {
       // Revert on error
       const originalSession = await getSession(selectedSession.id);
       setSelectedSession(originalSession);
+    }
+  };
+
+  const handleMoveCompletedToBottom = async () => {
+    if (!selectedSession) return;
+    
+    try {
+      await moveCompletedAndArchivedToBottom(selectedSession.id);
+      // Refresh the selected session to get the updated order from the server
+      const updatedSession = await getSession(selectedSession.id);
+      setSelectedSession(updatedSession);
+    } catch (error) {
+      console.error("Failed to move completed/archived tasks to bottom:", error);
     }
   };
 
@@ -510,11 +524,25 @@ export default function Sessions() {
                       Archived ({selectedSession.tasks?.filter(t => t.archived).length || 0})
                     </Button>
                   </div>
-                  {taskFilter !== 'all' && (
-                    <p className="text-xs text-muted-foreground">
-                      Task reordering is only available when viewing all tasks
-                    </p>
-                  )}
+                  <div className="flex justify-between items-center">
+                    {taskFilter !== 'all' && (
+                      <p className="text-xs text-muted-foreground">
+                        Task reordering is only available when viewing all tasks
+                      </p>
+                    )}
+                    {taskFilter === 'all' && selectedSession.tasks && 
+                     selectedSession.tasks.some(t => t.completed || t.archived) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleMoveCompletedToBottom}
+                        className="ml-auto"
+                      >
+                        <ArrowDown className="h-4 w-4 mr-2" />
+                        Move Completed/Archived to Bottom
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <DragDropContext onDragEnd={handleDragEnd}>
