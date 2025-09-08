@@ -31,7 +31,8 @@ class ApiClient {
       headers['Content-Type'] = 'application/json';
     }
 
-    if (this.token) {
+    // Only attach stored access token if caller didn't explicitly set Authorization
+    if (this.token && !headers.Authorization) {
       headers.Authorization = `Bearer ${this.token}`;
     }
 

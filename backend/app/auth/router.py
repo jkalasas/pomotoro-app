@@ -8,11 +8,13 @@ from ..users.schemas import UserPublic
 from .schemas import Token, UserRegister
 from .deps import (
     ActiveUserDep,
-    AccessFromRefreshDep,
     authenticate_user,
     create_access_token,
     create_refresh_token,
+    oauth2_scheme,
 )
+from .deps import get_user  # type: ignore
+from .deps import settings, jwt, InvalidTokenError  # type: ignore
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -56,8 +58,44 @@ def login_for_access_token(
 
 
 @router.post("/token/refresh", response_model=Token)
-def refresh_token_endpoint(access_token: AccessFromRefreshDep):
-    return access_token
+def refresh_token_endpoint(
+    session: SessionDep,
+    refresh_token: str = Depends(oauth2_scheme),
+):
+    """Exchange a valid refresh token for a new access & refresh token.
+
+    The provided bearer token MUST be a refresh token. We decode it, ensure the
+    user still exists, then rotate both tokens (best practice) returning a full
+    Token payload expected by the frontend.
+    """
+    from .schemas import Token as TokenSchema
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(
+            refresh_token, settings.secret_key, algorithms=[settings.algorithm]
+        )
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise credentials_exception
+    except InvalidTokenError:
+        raise credentials_exception
+
+    user = get_user(session, int(user_id))
+    if user is None:
+        raise credentials_exception
+
+    new_access = create_access_token(data={"user_id": str(user.id)})
+    new_refresh = create_refresh_token(data={"user_id": str(user.id)})
+
+    return TokenSchema(
+        access_token=new_access, refresh_token=new_refresh, token_type="bearer"
+    )
 
 
 @router.get("/me", response_model=UserPublic)
