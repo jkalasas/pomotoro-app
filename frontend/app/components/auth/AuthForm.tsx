@@ -23,6 +23,19 @@ export function AuthForm() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Read env flag to allow registration. Vite exposes env vars as strings.
+  const allowRegistration = (() => {
+    const v = import.meta.env.VITE_ALLOW_REGISTRATION;
+    if (v === undefined || v === null) return false;
+    const s = String(v).toLowerCase();
+    return s === "1" || s === "true" || s === "yes";
+  })();
+
+  // If registration is disabled, ensure we always show the login view.
+  useEffect(() => {
+    if (!allowRegistration) setIsLogin(true);
+  }, [allowRegistration]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -95,6 +108,11 @@ export function AuthForm() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!allowRegistration) {
+      toast.error("Registration is disabled");
+      return;
+    }
+
     try {
       await register(registerData);
       toast.success("Registered successfully!");
@@ -146,16 +164,19 @@ export function AuthForm() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setIsLogin(false)}
-              >
-                Don't have an account? Register
-              </Button>
+              {allowRegistration && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setIsLogin(false)}
+                >
+                  Don't have an account? Register
+                </Button>
+              )}
             </form>
           ) : (
+      // Registration form
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
