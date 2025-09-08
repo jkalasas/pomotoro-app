@@ -141,12 +141,14 @@ class ApiClient {
     });
   }
 
-  async getSessions() {
-    return this.request('/sessions/');
+  async getSessions(includeArchived: boolean = false) {
+    const query = includeArchived ? '?include_archived=true' : '';
+    return this.request(`/sessions/${query}`);
   }
 
-  async getSession(sessionId: number) {
-    return this.request(`/sessions/${sessionId}`);
+  async getSession(sessionId: number, includeArchived: boolean = true) {
+    const query = includeArchived ? '?include_archived=true' : '';
+    return this.request(`/sessions/${sessionId}${query}`);
   }
 
   async updateSession(sessionId: number, updates: { 
@@ -166,6 +168,18 @@ class ApiClient {
   async deleteSession(sessionId: number) {
     return this.request(`/sessions/${sessionId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async archiveSession(sessionId: number) {
+    return this.request(`/sessions/${sessionId}/archive`, {
+      method: 'POST',
+    });
+  }
+
+  async unarchiveSession(sessionId: number) {
+    return this.request(`/sessions/${sessionId}/unarchive`, {
+      method: 'POST',
     });
   }
 
@@ -240,6 +254,14 @@ class ApiClient {
     return this.request(`/sessions/tasks/${taskId}`, {
       method: 'DELETE',
     });
+  }
+
+  async archiveTask(taskId: number) {
+    return this.request(`/sessions/tasks/${taskId}/archive`, { method: 'POST' });
+  }
+
+  async unarchiveTask(taskId: number) {
+    return this.request(`/sessions/tasks/${taskId}/unarchive`, { method: 'POST' });
   }
 
   async reorderTasks(sessionId: number, taskIds: number[]) {

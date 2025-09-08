@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWindowStore } from "~/stores/window";
 import type { Route } from "./+types/home";
 import { useTaskStore } from "~/stores/tasks";
@@ -197,147 +197,90 @@ export default function Home() {
     return sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0);
   }, [sessionInfo]);
 
-  useEffect(() => {
-    if (sessionInfo) {
-      setIsSessionDialogOpen(true);
-      // Only log meaningful session creation events, not dialog openings
-    }
-  }, [sessionInfo, analyticsStore]);
+  // Visible schedule: exclude archived tasks (centralized filter)
+  const visibleSchedule = useMemo(() => {
+    return (schedulerStore.currentSchedule || []).filter((t: any) => !t.archived);
+  }, [schedulerStore.currentSchedule]);
 
+  // Generate session from plain text project details using recommendations API
   const startGenerating = async (projectDetails: string) => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-
-    const toastId = toast.loading("Generating tasks...", {
-      duration: Infinity,
-    });
-
     try {
-      // First generate recommendations
-      const recommendations = (await apiClient.getRecommendations(
-        projectDetails
-      )) as RecommendationResponse;
+      setIsGenerating(true);
+      const resp = (await apiClient.getRecommendations(projectDetails)) as RecommendationResponse;
 
-      // Convert backend format to frontend format for display (don't create session yet)
-      const sessionInfo = {
+      const generated: GeneratedSessionInfo = {
         sessionDetails: {
-          title: recommendations.session.name,
-          description: recommendations.session.description,
+          title: resp.session?.name || "Generated Session",
+          description: resp.session?.description || "",
         },
         pomodoroSetup: {
-          duration: recommendations.pomodoro_config.focus_duration,
-          shortBreakTime: recommendations.pomodoro_config.short_break_duration,
-          longBreakTime: recommendations.pomodoro_config.long_break_duration,
-          pomodorosBeforeLongBreak:
-            recommendations.pomodoro_config.long_break_per_pomodoros,
+          duration: resp.pomodoro_config?.focus_duration || 25,
+          shortBreakTime: resp.pomodoro_config?.short_break_duration || 5,
+          longBreakTime: resp.pomodoro_config?.long_break_duration || 15,
+          pomodorosBeforeLongBreak: resp.pomodoro_config?.long_break_per_pomodoros || 4,
         },
-        tasks: recommendations.generated_tasks.map(
-          (task: GeneratedTask, index: number) => ({
-            id: `temp-${index}`,
-            name: task.name,
-            description: "",
-            difficulty: TaskDifficulty.MEDIUM,
-            estimatedTime: task.estimated_completion_time,
-            category: task.category,
-          })
-        ),
+        tasks: (resp.generated_tasks || []).map((t, i) => ({
+          id: `temp-${Date.now()}-${i}`,
+          name: t.name,
+          description: "",
+          difficulty: TaskDifficulty.MEDIUM,
+          estimatedTime: t.estimated_completion_time || 25,
+          category: t.category || "General",
+        })),
       };
 
-      setSessionInfo(sessionInfo);
-
-      // Keep session generation logging as it's a key productivity metric
-      analyticsStore.logSessionGeneration(
-        projectDetails,
-        true,
-        recommendations.generated_tasks.length
-      );
-
-      toast.success("Tasks generated successfully!", {
-        id: toastId,
-        duration: 5000,
-      });
-    } catch (error) {
-      // Keep failure logging for debugging
-      analyticsStore.logSessionGeneration(projectDetails, false);
-
-      toast.error("Failed to generate tasks", {
-        id: toastId,
-        duration: 5000,
-      });
+      setSessionInfo(generated);
+      setIsSessionDialogOpen(true);
+    } catch (err) {
+      console.error("Failed to generate recommendations:", err);
+      toast.error("Failed to generate session recommendations");
+    } finally {
+      setIsGenerating(false);
     }
-    setIsGenerating(false);
   };
 
+  // Create session on backend from generated session info
   const createSessionFromGenerated = async () => {
-    if (!sessionInfo || !authStore.user || isGenerating) return;
-
-    // Check if a session with this name already exists
-    const existingSession = tasksStore.sessions.find(
-      (s) =>
-        s.name === sessionInfo.sessionDetails.title ||
-        s.description === sessionInfo.sessionDetails.description
-    );
-    if (existingSession) {
-      toast.error("A session with this name or description already exists");
-      return;
-    }
-
+    if (!sessionInfo) return;
     try {
-      const sessionData = {
+      const payload = {
         name: sessionInfo.sessionDetails.title,
         description: sessionInfo.sessionDetails.description,
         pomodoro_config: {
           focus_duration: sessionInfo.pomodoroSetup.duration,
           short_break_duration: sessionInfo.pomodoroSetup.shortBreakTime,
           long_break_duration: sessionInfo.pomodoroSetup.longBreakTime,
-          long_break_per_pomodoros:
-            sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
+          long_break_per_pomodoros: sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
         },
-        tasks: sessionInfo.tasks.map((task) => ({
-          name: task.name,
-          category: task.category,
-          estimated_completion_time: task.estimatedTime,
+        tasks: sessionInfo.tasks.map((t) => ({
+          name: t.name,
+          category: t.category,
+          estimated_completion_time: t.estimatedTime,
         })),
       };
 
-      const createdSession = await tasksStore.createSession(sessionData);
-      tasksStore.setCurrentSession(createdSession);
-      await pomodoroStore.setSession(createdSession.id);
-
+      await apiClient.createSession(payload as any);
+      toast.success("Session created");
       setIsSessionDialogOpen(false);
-      setSessionInfo(undefined); // Clear the generated session info
-      toast.success("Session created and started!");
-    } catch (error) {
+      // Refresh sessions/tasks
+      tasksStore.loadSessions();
+    } catch (err) {
+      console.error("Failed to create session:", err);
       toast.error("Failed to create session");
     }
   };
 
-  const openSessionSettings = () => {
-    // Load current settings from pomodoro store
-    setSessionSettings(pomodoroStore.settings);
-    setIsSessionSettingsOpen(true);
-  };
-
-  const saveSessionSettings = async () => {
-    try {
-      // Update pomodoro store settings
-      pomodoroStore.updateSettings(sessionSettings);
-      setIsSessionSettingsOpen(false);
-
-      toast.success("Pomodoro settings updated!");
-    } catch (error) {
-      toast.error("Failed to update settings");
-    }
-  };
+  const openSessionSettings = () => setIsSessionSettingsOpen(true);
 
   const cancelSessionSettings = () => {
     setIsSessionSettingsOpen(false);
-    setSessionSettings({
-      focus_duration: 25,
-      short_break_duration: 5,
-      long_break_duration: 15,
-      long_break_per_pomodoros: 4,
-    });
+    setSessionSettings(pomodoroStore.settings);
+  };
+
+  const saveSessionSettings = () => {
+    pomodoroStore.updateSettings(sessionSettings);
+    setIsSessionSettingsOpen(false);
+    toast.success("Session settings saved");
   };
 
   return (
@@ -348,268 +291,105 @@ export default function Home() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
             <Clock className="h-4 w-4" />
             <span className="font-medium">
-              {schedulerStore.currentSchedule &&
-              schedulerStore.currentSchedule.length > 0
+              {visibleSchedule.filter((t) => !t.completed).length > 0
                 ? `${Math.floor(
-                    schedulerStore.currentSchedule
+                    visibleSchedule
                       .filter((task) => !task.completed)
-                      .reduce(
-                        (acc, task) => acc + task.estimated_completion_time,
-                        0
-                      ) / 60
+                      .reduce((acc, task) => acc + task.estimated_completion_time, 0) / 60
                   )} hours remaining`
                 : "No schedule"}
             </span>
           </div>
           {sessionInfo && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsSessionDialogOpen(true)}
-              className="rounded-full"
-            >
-              Session Details
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsSessionDialogOpen(true)} className="rounded-full">Session Details</Button>
           )}
 
-          <Dialog
-            open={isNewSessionDialogOpen}
-            onOpenChange={(open) => {
-              setIsNewSessionDialogOpen(open);
-            }}
-          >
+          <Dialog open={isNewSessionDialogOpen} onOpenChange={(open) => setIsNewSessionDialogOpen(open)}>
             <DialogTrigger disabled={isGenerating}>
-              <Button
-                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6"
-                disabled={isGenerating}
-              >
+              <Button className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6" disabled={isGenerating}>
                 <Plus className="h-5 w-5" />
                 <span>New Session</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-2xl">
-              <SessionInfoForm
-                className="w-full"
-                onSubmit={({ data }) => {
-                  startGenerating(data.projectDetails);
-                  setIsNewSessionDialogOpen(false);
-                }}
-                disabled={isGenerating}
-              />
+              <SessionInfoForm className="w-full" onSubmit={({ data }) => { startGenerating(data.projectDetails); setIsNewSessionDialogOpen(false); }} disabled={isGenerating} />
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Session Editor Dialog */}
-      <SessionEditorDialog
-        isOpen={isSessionDialogOpen}
-        onOpenChange={(open) => {
-          setIsSessionDialogOpen(open);
-        }}
-        sessionInfo={sessionInfo || null}
-        onSessionChange={setSessionInfo}
-        onCreateSession={createSessionFromGenerated}
-        isGenerating={isGenerating}
-      />
+      <SessionEditorDialog isOpen={isSessionDialogOpen} onOpenChange={(open) => setIsSessionDialogOpen(open)} sessionInfo={sessionInfo || null} onSessionChange={setSessionInfo} onCreateSession={createSessionFromGenerated} isGenerating={isGenerating} />
 
-      {/* Session Settings Dialog */}
-      <Dialog
-        open={isSessionSettingsOpen}
-        onOpenChange={(open) => {
-          setIsSessionSettingsOpen(open);
-        }}
-      >
+      <Dialog open={isSessionSettingsOpen} onOpenChange={(open) => setIsSessionSettingsOpen(open)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Session Settings</DialogTitle>
-            <DialogDescription>
-              Customize the timing for your Pomodoro session
-            </DialogDescription>
+            <CardDescription>Customize the timing for your Pomodoro session</CardDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
-              <Input
-                id="focus-duration"
-                type="number"
-                min="1"
-                max="120"
-                value={sessionSettings.focus_duration}
-                onChange={(e) =>
-                  setSessionSettings({
-                    ...sessionSettings,
-                    focus_duration: parseInt(e.target.value) || 25,
-                  })
-                }
-              />
+              <Input id="focus-duration" type="number" min="1" max="120" value={sessionSettings.focus_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, focus_duration: parseInt(e.target.value) || 25 })} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="short-break">
-                Short Break Duration (minutes)
-              </Label>
-              <Input
-                id="short-break"
-                type="number"
-                min="1"
-                max="30"
-                value={sessionSettings.short_break_duration}
-                onChange={(e) =>
-                  setSessionSettings({
-                    ...sessionSettings,
-                    short_break_duration: parseInt(e.target.value) || 5,
-                  })
-                }
-              />
+              <Label htmlFor="short-break">Short Break Duration (minutes)</Label>
+              <Input id="short-break" type="number" min="1" max="30" value={sessionSettings.short_break_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, short_break_duration: parseInt(e.target.value) || 5 })} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
-              <Input
-                id="long-break"
-                type="number"
-                min="1"
-                max="60"
-                value={sessionSettings.long_break_duration}
-                onChange={(e) =>
-                  setSessionSettings({
-                    ...sessionSettings,
-                    long_break_duration: parseInt(e.target.value) || 15,
-                  })
-                }
-              />
+              <Input id="long-break" type="number" min="1" max="60" value={sessionSettings.long_break_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, long_break_duration: parseInt(e.target.value) || 15 })} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break-frequency">
-                Long Break After (pomodoros)
-              </Label>
-              <Input
-                id="long-break-frequency"
-                type="number"
-                min="1"
-                max="10"
-                value={sessionSettings.long_break_per_pomodoros}
-                onChange={(e) =>
-                  setSessionSettings({
-                    ...sessionSettings,
-                    long_break_per_pomodoros: parseInt(e.target.value) || 4,
-                  })
-                }
-              />
+              <Label htmlFor="long-break-frequency">Long Break After (pomodoros)</Label>
+              <Input id="long-break-frequency" type="number" min="1" max="10" value={sessionSettings.long_break_per_pomodoros} onChange={(e) => setSessionSettings({ ...sessionSettings, long_break_per_pomodoros: parseInt(e.target.value) || 4 })} />
             </div>
           </div>
 
           <div className="flex gap-2 mt-6">
-            <Button
-              variant="outline"
-              onClick={cancelSessionSettings}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button onClick={saveSessionSettings} className="flex-1">
-              Save Settings
-            </Button>
+            <Button variant="outline" onClick={cancelSessionSettings} className="flex-1">Cancel</Button>
+            <Button onClick={saveSessionSettings} className="flex-1">Save Settings</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <div className="flex flex-col xl:flex-row gap-8 w-full items-stretch h-full">
-        {/* Pomodoro Widget */}
         <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
           <CardContent>
             <div className="flex flex-col items-center">
               <span className="font-bold text-center mb-1">Current Task</span>
-              <span className="font-normal text-center">
-                {schedulerStore.getCurrentTask()?.name || "No active task"}
-              </span>
+              <span className="font-normal text-center">{schedulerStore.getCurrentTask()?.name || "No active task"}</span>
             </div>
-            <div className="mx-auto">
-              <PomodoroTimer
-                time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0}
-                endTime={pomodoroStore.maxTime}
-              />
-            </div>
+            <div className="mx-auto"><PomodoroTimer time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0} endTime={pomodoroStore.maxTime} /></div>
             <div className="-mt-4 mb-12 flex flex-col items-center">
               {schedulerStore.getCurrentTask() ? (
                 <>
-                  <p className="text-center">
-                    {pomodoroStore.phase === "focus"
-                      ? "Stay focused!"
-                      : pomodoroStore.phase === "short_break"
-                      ? "Short break"
-                      : "Long break"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {Math.floor(pomodoroStore.time / 60)} minutes remaining
-                  </p>
+                  <p className="text-center">{pomodoroStore.phase === "focus" ? "Stay focused!" : pomodoroStore.phase === "short_break" ? "Short break" : "Long break"}</p>
+                  <p className="text-sm text-muted-foreground">{Math.floor(pomodoroStore.time / 60)} minutes remaining</p>
                 </>
               ) : null}
             </div>
 
             {pomodoroStore.showRestOverlay && (
-              <p className="text-center text-sm text-orange-600 font-medium">
-                <LogoIcon className="h-5 w-5 mr-2" />
-                Rest Overlay Active
-              </p>
+              <p className="text-center text-sm text-orange-600 font-medium"><LogoIcon className="h-5 w-5 mr-2" />Rest Overlay Active</p>
             )}
 
             <div className="mt-3 flex flex-col gap-3">
               {schedulerStore.getCurrentTask() && (
                 <>
                   <div className="flex gap-3">
-                    <Button
-                      className="flex flex-1 items-center gap-3"
-                      variant="default"
-                      onClick={() => {
-                        if (pomodoroStore.isRunning) {
-                          pomodoroStore.pauseTimer();
-                        } else {
-                          pomodoroStore.startTimer();
-                        }
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      {pomodoroStore.isRunning ? (
-                        <>
-                          <Pause />
-                          <span>Pause Task</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play />
-                          <span>Start Task</span>
-                        </>
-                      )}
+                    <Button className="flex flex-1 items-center gap-3" variant="default" onClick={() => { if (pomodoroStore.isRunning) { pomodoroStore.pauseTimer(); } else { pomodoroStore.startTimer(); } }} disabled={pomodoroStore.isLoading}>
+                      {pomodoroStore.isRunning ? (<><Pause /><span>Pause Task</span></>) : (<><Play /><span>Start Task</span></>)}
                     </Button>
-                    <Button
-                      className="flex items-center gap-3"
-                      variant="outline"
-                      onClick={() => {
-                        pomodoroStore.resetTimer();
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <RotateCcw />
-                      {/*  <span>Reset Timer</span> */}
-                    </Button>
+                    <Button className="flex items-center gap-3" variant="outline" onClick={() => { pomodoroStore.resetTimer(); }} disabled={pomodoroStore.isLoading}><RotateCcw /></Button>
                   </div>
                 </>
               )}
               {schedulerStore.getCurrentTask() && (
-                <Button
-                  className="flex items-center gap-3"
-                  variant="outline"
-                  onClick={() => {
-                    const currentTask = schedulerStore.getCurrentTask();
-                    if (currentTask) {
-                      schedulerStore.completeScheduledTask(currentTask.id);
-                    }
-                  }}
-                >
+                <Button className="flex items-center gap-3" variant="outline" onClick={() => { const currentTask = schedulerStore.getCurrentTask(); if (currentTask) { schedulerStore.completeScheduledTask(currentTask.id); } }}>
                   <Check />
                   <span>Mark Task Complete</span>
                 </Button>
@@ -617,109 +397,51 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
-        {/* AI Scheduler Widget */}
-        <Card
-          className="flex-2 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl"
-          style={{
-            maxHeight: pomodoroWidgetSize.height
-              ? `${pomodoroWidgetSize.height}px`
-              : "auto",
-          }}
-        >
+
+        <Card className="flex-2 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl" style={{ maxHeight: pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : "auto" }}>
           <CardContent className="max-h-full overflow-hidden ">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-foreground">
-                Schedule
-              </h2>
+              <h2 className="text-xl font-semibold text-foreground">Schedule</h2>
               <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => schedulerStore.clearSchedule()}
-                  disabled={
-                    !schedulerStore.currentSchedule ||
-                    schedulerStore.currentSchedule.length === 0
-                  }
-                  className="rounded-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all duration-300"
-                >
+                <Button variant="outline" size="sm" onClick={() => schedulerStore.clearSchedule()} disabled={!schedulerStore.currentSchedule || schedulerStore.currentSchedule.length === 0} className="rounded-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all duration-300">
                   <Trash2 className="size-4 mr-2" />
                   Clear
                 </Button>
-                <ScheduleGeneratorDialog
-                  onScheduleGenerated={() => {
-                    // Schedule generated successfully
-                  }}
-                />
+                <ScheduleGeneratorDialog onScheduleGenerated={() => {}} />
               </div>
             </div>
             <div className="max-h-full overflow-y-auto pb-4 custom-scrollbar">
-              <ScheduledTasksList
-                sessionSettings={pomodoroStore.settings}
-                onOpenSettings={openSessionSettings}
-              />
+              <ScheduledTasksList sessionSettings={pomodoroStore.settings} onOpenSettings={openSessionSettings} />
             </div>
           </CardContent>
         </Card>
       </div>
+
       <div className="flex gap-6 w-full mt-4">
         <Card className="flex-1 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
           <CardContent className="">
-            <h3 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
-              Quick Checklist
-            </h3>
+            <h3 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">Quick Checklist</h3>
             <div className="flex flex-col gap-3">
-              {schedulerStore.currentSchedule &&
-              schedulerStore.currentSchedule.length > 0 ? (
-                schedulerStore.currentSchedule
-                  .slice(0, 5)
-                  .map((task, index) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group"
-                    >
-                      <Checkbox
-                        checked={task.completed || false}
-                        onCheckedChange={() => {
-                          if (task.completed) {
-                            schedulerStore.uncompleteScheduledTask(task.id);
-                          } else {
-                            schedulerStore.completeScheduledTask(task.id);
-                          }
-                        }}
-                        className="rounded-md"
-                      />
-                      <span
-                        className={`flex-1 transition-all duration-200 ${
-                          task.completed
-                            ? "line-through text-muted-foreground"
-                            : "group-hover:text-foreground"
-                        }`}
-                      >
-                        {task.name}
-                      </span>
-                      <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">
-                        {index + 1}
-                      </div>
-                    </div>
-                  ))
+              {visibleSchedule.length > 0 ? (
+                visibleSchedule.slice(0, 5).map((task: any, index: number) => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group">
+                    <Checkbox checked={task.completed || false} onCheckedChange={() => { if (task.completed) { schedulerStore.uncompleteScheduledTask(task.id); } else { schedulerStore.completeScheduledTask(task.id); } }} className="rounded-md" />
+                    <span className={`flex-1 transition-all duration-200 ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-foreground"}`}>{task.name}</span>
+                    <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">{index + 1}</div>
+                  </div>
+                ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
                     <PlusCircle className="h-8 w-8" />
                   </div>
                   <p className="font-medium">No tasks yet</p>
-                  <p className="text-sm">
-                    Generate a schedule to see tasks here
-                  </p>
+                  <p className="text-sm">Generate a schedule to see tasks here</p>
                 </div>
               )}
-              {schedulerStore.currentSchedule &&
-                schedulerStore.currentSchedule.length > 5 && (
-                  <div className="text-xs text-muted-foreground text-center mt-2 p-2 bg-muted/20 rounded-lg">
-                    +{schedulerStore.currentSchedule.length - 5} more tasks in
-                    full schedule
-                  </div>
-                )}
+              {visibleSchedule.length > 5 && (
+                <div className="text-xs text-muted-foreground mt-1">+{visibleSchedule.length - 5} more tasks in full schedule</div>
+              )}
             </div>
           </CardContent>
         </Card>

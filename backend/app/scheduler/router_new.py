@@ -15,10 +15,11 @@ def schedule_tasks_with_ga(session_ids: List[int], db: SessionDep, user: ActiveU
     """
     Schedule tasks using the Genetic Algorithm implementation from IMPLEMENTATION.md
     """
-    # Get all non-completed tasks for the specified sessions
+    # Get all non-completed, non-archived tasks for the specified sessions
     statement = select(Task).where(
         Task.session_id.in_(session_ids),
-        Task.completed == False
+        Task.completed == False,
+        Task.archived == False
     )
     all_tasks = db.exec(statement).all()
     

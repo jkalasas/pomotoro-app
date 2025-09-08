@@ -9,6 +9,8 @@ export interface Task {
   category: string;
   completed: boolean;
   actual_completion_time: number | null;
+  archived?: boolean;
+  archived_at?: string | null;
 }
 
 export interface Session {
@@ -21,6 +23,8 @@ export interface Session {
   long_break_per_pomodoros: number;
   completed?: boolean;
   completed_at?: string;
+  archived?: boolean;
+  archived_at?: string | null;
   tasks: Task[];
 }
 
@@ -30,6 +34,7 @@ interface TaskState {
   isLoading: boolean;
   refreshAllData: () => Promise<void>;
   loadSessions: () => Promise<void>;
+  loadArchivedSessions: () => Promise<Session[]>;
   loadSession: (sessionId: number) => Promise<void>;
   getSession: (sessionId: number) => Promise<Session>;
   createSession: (sessionData: {
@@ -56,6 +61,8 @@ interface TaskState {
     long_break_per_pomodoros?: number;
   }) => Promise<void>;
   deleteSession: (sessionId: number) => Promise<void>;
+  archiveSession: (sessionId: number) => Promise<void>;
+  unarchiveSession: (sessionId: number) => Promise<void>;
   completeTask: (taskId: number) => Promise<void>;
   uncompleteTask: (taskId: number) => Promise<void>;
   completeSessionManually: () => Promise<void>;
@@ -73,6 +80,9 @@ interface TaskState {
   }) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
+  moveCompletedAndArchivedToBottom: (sessionId: number) => Promise<void>;
+  archiveTask: (taskId: number) => Promise<void>;
+  unarchiveTask: (taskId: number) => Promise<void>;
   // New method for handling next task with pomodoro config updates
   handleNextTaskTransition: (completedTaskId: number) => Promise<void>;
 }
@@ -94,7 +104,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   loadSessions: async () => {
     set({ isLoading: true });
     try {
-      const sessions = await apiClient.getSessions() as Session[];
+  const sessions = await apiClient.getSessions(false) as Session[];
       // Ensure all sessions have a tasks array
       const sessionsWithTasks = sessions.map(session => ({
         ...session,
@@ -108,10 +118,19 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
+  loadArchivedSessions: async () => {
+    try {
+      const sessions = await apiClient.getSessions(true) as Session[];
+      return sessions.filter(s => s.archived);
+    } catch (e) {
+      return [];
+    }
+  },
+
   loadSession: async (sessionId: number) => {
     set({ isLoading: true });
     try {
-      const session = await apiClient.getSession(sessionId) as Session;
+  const session = await apiClient.getSession(sessionId, true) as Session;
       // Ensure session has a tasks array
       const sessionWithTasks = {
         ...session,
@@ -127,7 +146,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   getSession: async (sessionId: number) => {
     try {
-      const session = await apiClient.getSession(sessionId) as Session;
+  const session = await apiClient.getSession(sessionId, true) as Session;
       // Ensure session has a tasks array
       return {
         ...session,
@@ -320,6 +339,30 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
+  archiveSession: async (sessionId: number) => {
+    try {
+      await apiClient.archiveSession(sessionId);
+      set((state) => ({
+        sessions: state.sessions.filter(s => s.id !== sessionId), // remove from active list
+        currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
+      }));
+    } catch (e) {
+      console.error('Failed to archive session', e);
+      throw e;
+    }
+  },
+
+  unarchiveSession: async (sessionId: number) => {
+    try {
+      await apiClient.unarchiveSession(sessionId);
+      // reload sessions
+      await get().loadSessions();
+    } catch (e) {
+      console.error('Failed to unarchive session', e);
+      throw e;
+    }
+  },
+
   addTaskToSession: async (sessionId: number, taskData) => {
     try {
       const newTask = await apiClient.addTaskToSession(sessionId, taskData) as Task;
@@ -407,6 +450,47 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       console.error("Failed to reorder tasks:", error);
       throw error;
     }
+  },
+
+  moveCompletedAndArchivedToBottom: async (sessionId: number) => {
+    try {
+      const state = get();
+      const session = state.sessions.find(s => s.id === sessionId);
+      if (!session?.tasks) return;
+
+      // Separate tasks into active and completed/archived
+      const activeTasks = session.tasks.filter(task => !task.completed && !task.archived);
+      const completedOrArchivedTasks = session.tasks.filter(task => task.completed || task.archived);
+      
+      // Create new order with active tasks first, then completed/archived
+      const reorderedTasks = [...activeTasks, ...completedOrArchivedTasks];
+      const taskIds = reorderedTasks.map(task => task.id);
+      
+      // Use the existing reorderTasks function to apply the changes to backend
+      await get().reorderTasks(sessionId, taskIds);
+    } catch (error) {
+      console.error("Failed to move completed and archived tasks to bottom:", error);
+      throw error;
+    }
+  },
+
+  archiveTask: async (taskId: number) => {
+    try {
+      const updated = await apiClient.archiveTask(taskId) as Task;
+      set((state) => ({
+        sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
+        currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
+      }));
+    } catch (e) { console.error('archive task failed', e); }
+  },
+  unarchiveTask: async (taskId: number) => {
+    try {
+      const updated = await apiClient.unarchiveTask(taskId) as Task;
+      set((state) => ({
+        sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
+        currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
+      }));
+    } catch (e) { console.error('unarchive task failed', e); }
   },
 
   // New method for handling next task with pomodoro config updates

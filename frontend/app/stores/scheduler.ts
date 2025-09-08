@@ -53,8 +53,10 @@ export const useSchedulerStore = create<SchedulerState>()(
     
     try {
       const response = await apiClient.generateSchedule(sessionIds) as ScheduleResponse;
+      // Filter out archived tasks defensively (backend exclusion) 
+      const visibleTasks = response.scheduled_tasks.filter(t => !t.archived);
       set({
-        currentSchedule: response.scheduled_tasks,
+        currentSchedule: visibleTasks,
         totalScheduleTime: response.total_schedule_time,
         fitnessScore: response.fitness_score,
         selectedSessionIds: sessionIds,
@@ -170,7 +172,7 @@ export const useSchedulerStore = create<SchedulerState>()(
       const { useTaskStore } = await import('./tasks');
       await useTaskStore.getState().handleNextTaskTransition(taskId);
       
-      const currentSchedule = get().currentSchedule;
+  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
       if (currentSchedule) {
         const updatedSchedule = currentSchedule.map(task =>
           task.id === taskId ? { ...task, completed: true } : task
@@ -187,7 +189,7 @@ export const useSchedulerStore = create<SchedulerState>()(
     try {
       await apiClient.uncompleteTask(taskId);
       
-      const currentSchedule = get().currentSchedule;
+  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
       if (currentSchedule) {
         const updatedSchedule = currentSchedule.map(task =>
           task.id === taskId ? { ...task, completed: false } : task
@@ -224,7 +226,7 @@ export const useSchedulerStore = create<SchedulerState>()(
 
   // Helper methods for pomodoro integration
   getCurrentTask: (): ScheduledTask | null => {
-    const currentSchedule = get().currentSchedule;
+  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
     if (!currentSchedule) return null;
     
     // Return the first uncompleted task
@@ -232,7 +234,7 @@ export const useSchedulerStore = create<SchedulerState>()(
   },
 
   getNextTask: (): ScheduledTask | null => {
-    const currentSchedule = get().currentSchedule;
+  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
     if (!currentSchedule) return null;
     
     const incompleteTasks = currentSchedule.filter(task => !task.completed);
@@ -240,8 +242,8 @@ export const useSchedulerStore = create<SchedulerState>()(
   },
 
   hasActiveTasks: (): boolean => {
-    const currentSchedule = get().currentSchedule;
-    return !!(currentSchedule && currentSchedule.some(task => !task.completed));
+  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
+  return !!(currentSchedule && currentSchedule.some(task => !task.completed));
   },
 }),
 {

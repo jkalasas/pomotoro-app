@@ -6,7 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
-import { Plus, Edit, Trash2, GripVertical, Clock, Target } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical, Clock, Target, Archive, ArchiveRestore, ArrowDown } from "lucide-react";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
 import { useAnalyticsStore } from "~/stores/analytics";
 import { DragDropContext, Droppable, Draggable, type DropResult, type DroppableProvided, type DraggableProvided, type DraggableStateSnapshot } from "@hello-pangea/dnd";
@@ -17,23 +17,32 @@ export default function Sessions() {
     sessions,
     isLoading,
     loadSessions,
+  loadArchivedSessions,
     getSession,
     updateSession,
     deleteSession,
+  archiveSession,
+  unarchiveSession,
     addTaskToSession,
     updateTask,
     deleteTask,
     reorderTasks,
+    moveCompletedAndArchivedToBottom,
+    archiveTask,
+    unarchiveTask,
   } = useTaskStore();
 
   const analyticsStore = useAnalyticsStore();
 
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
   const [isEditingSession, setIsEditingSession] = useState(false);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'completed' | 'archived'>('all');
 
   // Form states
   const [sessionForm, setSessionForm] = useState({
@@ -51,6 +60,15 @@ export default function Sessions() {
     estimated_completion_time: 30,
   });
 
+  useEffect(() => {
+    const fetchArchived = async () => {
+      try {
+  const archived = await loadArchivedSessions();
+  setArchivedSessions(archived);
+      } catch (e) {}
+    };
+    if (showArchived) fetchArchived();
+  }, [showArchived]);
   useEffect(() => {
     loadSessions();
     // No need to log page navigation
@@ -187,8 +205,23 @@ export default function Sessions() {
     }
   };
 
+  const getFilteredTasks = (tasks: Task[] | undefined) => {
+    if (!tasks) return [];
+    
+    switch (taskFilter) {
+      case 'active':
+        return tasks.filter(task => !task.completed && !task.archived);
+      case 'completed':
+        return tasks.filter(task => task.completed);
+      case 'archived':
+        return tasks.filter(task => task.archived);
+      default:
+        return tasks;
+    }
+  };
+
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination || !selectedSession?.tasks) return;
+    if (!result.destination || !selectedSession?.tasks || taskFilter !== 'all') return;
 
     const items = Array.from(selectedSession.tasks);
     const [reorderedItem] = items.splice(result.source.index, 1);
@@ -206,6 +239,19 @@ export default function Sessions() {
       // Revert on error
       const originalSession = await getSession(selectedSession.id);
       setSelectedSession(originalSession);
+    }
+  };
+
+  const handleMoveCompletedToBottom = async () => {
+    if (!selectedSession) return;
+    
+    try {
+      await moveCompletedAndArchivedToBottom(selectedSession.id);
+      // Refresh the selected session to get the updated order from the server
+      const updatedSession = await getSession(selectedSession.id);
+      setSelectedSession(updatedSession);
+    } catch (error) {
+      console.error("Failed to move completed/archived tasks to bottom:", error);
     }
   };
 
@@ -335,14 +381,19 @@ export default function Sessions() {
             <CardHeader className="pb-3 border-b border-border/50">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl">Your Sessions</CardTitle>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowArchived(a => !a)}>
+                    {showArchived ? 'Hide Archived' : 'Show Archived'}
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-4">
               <div className="space-y-3">
-                {sessions.map((session) => (
+                {(showArchived ? archivedSessions : sessions).map((session) => (
                   <Card
                     key={session.id}
                     className={`cursor-pointer transition-colors hover:bg-muted/50 ${
@@ -364,6 +415,9 @@ export default function Sessions() {
                           <Badge variant="secondary" className="ml-auto">
                             Completed
                           </Badge>
+                        )}
+                        {session.archived && (
+                          <Badge variant="outline" className="ml-auto">Archived</Badge>
                         )}
                       </div>
                     </CardContent>
@@ -481,6 +535,28 @@ export default function Sessions() {
                         </DialogContent>
                       </Dialog>
                       
+                      {!selectedSession.archived ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="rounded-full"
+                          onClick={async () => { await archiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
+                        >
+                          <Archive className="h-4 w-4 mr-2" />
+                          Archive
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="rounded-full"
+                          onClick={async () => { await unarchiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
+                        >
+                          <ArchiveRestore className="h-4 w-4 mr-2" />
+                          Unarchive
+                        </Button>
+                      )}
+                      
                       <Button 
                         variant="destructive" 
                         size="sm"
@@ -577,25 +653,92 @@ export default function Sessions() {
                       </Dialog>
                     </div>
 
+                    </div>
+
+                    {/* Task Filters */}
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex gap-2">
+                        <Button
+                          variant={taskFilter === 'all' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTaskFilter('all')}
+                        >
+                          All Tasks ({selectedSession.tasks?.length || 0})
+                        </Button>
+                        <Button
+                          variant={taskFilter === 'active' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTaskFilter('active')}
+                        >
+                          Active ({selectedSession.tasks?.filter(t => !t.completed && !t.archived).length || 0})
+                        </Button>
+                        <Button
+                          variant={taskFilter === 'completed' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTaskFilter('completed')}
+                        >
+                          Completed ({selectedSession.tasks?.filter(t => t.completed).length || 0})
+                        </Button>
+                        <Button
+                          variant={taskFilter === 'archived' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTaskFilter('archived')}
+                        >
+                          Archived ({selectedSession.tasks?.filter(t => t.archived).length || 0})
+                        </Button>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        {taskFilter !== 'all' && (
+                          <p className="text-xs text-muted-foreground">
+                            Task reordering is only available when viewing all tasks
+                          </p>
+                        )}
+                        {taskFilter === 'all' && selectedSession.tasks &&
+                         selectedSession.tasks.some(t => t.completed || t.archived) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleMoveCompletedToBottom}
+                            className="ml-auto"
+                          >
+                            <ArrowDown className="h-4 w-4 mr-2" />
+                            Move Completed/Archived to Bottom
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
                     <DragDropContext onDragEnd={handleDragEnd}>
                       <Droppable droppableId="tasks">
                         {(provided: DroppableProvided) => (
                           <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
-                            {selectedSession.tasks?.map((task, index) => (
-                              <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                            {getFilteredTasks(selectedSession.tasks)?.map((task, index) => (
+                              <Draggable
+                                key={task.id}
+                                draggableId={task.id.toString()}
+                                index={index}
+                                isDragDisabled={taskFilter !== 'all'}
+                              >
                                 {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                                   <Card
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`bg-card/60 backdrop-blur-sm ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"} hover:shadow-md transition-all`}
+                                    className={`bg-card/60 backdrop-blur-sm ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"} hover:shadow-md transition-all ${
+                                      task.completed ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" :
+                                      task.archived ? "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800" : ""
+                                    }`}
                                   >
                                     <CardContent className="p-4">
                                       <div className="flex items-center gap-3">
-                                        <div>
-                                          <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                        <div {...provided.dragHandleProps}>
+                                          <GripVertical
+                                            className={`h-5 w-5 ${
+                                              taskFilter === 'all'
+                                                ? 'text-muted-foreground cursor-grab'
+                                                : 'text-muted-foreground/30 cursor-not-allowed'
+                                            }`}
+                                          />
                                         </div>
-                                        
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2 mb-1">
                                             <h4 className="font-medium">{task.name}</h4>
@@ -660,14 +803,23 @@ export default function Sessions() {
                                               </div>
                                             </DialogContent>
                                           </Dialog>
-                                          
-                                          <Button 
-                                            variant="ghost" 
-                                            size="sm" 
+
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
                                             onClick={() => handleDeleteTask(task.id)}
                                           >
                                             <Trash2 className="h-4 w-4" />
                                           </Button>
+                                          {!task.archived ? (
+                                            <Button variant="ghost" size="sm" onClick={async () => { await archiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
+                                              <Archive className="h-4 w-4" />
+                                            </Button>
+                                          ) : (
+                                            <Button variant="ghost" size="sm" onClick={async () => { await unarchiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
+                                              <ArchiveRestore className="h-4 w-4" />
+                                            </Button>
+                                          )}
                                         </div>
                                       </div>
                                     </CardContent>
@@ -681,21 +833,31 @@ export default function Sessions() {
                       </Droppable>
                     </DragDropContext>
 
-                    {(!selectedSession.tasks || selectedSession.tasks.length === 0) && (
+                    {(getFilteredTasks(selectedSession.tasks)?.length === 0) && (
                       <div className="text-center text-muted-foreground py-8">
                         <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <div>No tasks found</div>
-                        <Button 
-                          variant="outline" 
-                          className="mt-4"
-                          onClick={() => setIsAddingTask(true)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add your first task
-                        </Button>
+                        <div>
+                          {taskFilter === 'all'
+                            ? "No tasks yet. Add some tasks to get started!"
+                            : taskFilter === 'active'
+                            ? "No active tasks found."
+                            : taskFilter === 'completed'
+                            ? "No completed tasks found."
+                            : "No archived tasks found."
+                          }
+                        </div>
+                        {taskFilter === 'all' && (
+                          <Button
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => setIsAddingTask(true)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add your first task
+                          </Button>
+                        )}
                       </div>
                     )}
-                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-64">

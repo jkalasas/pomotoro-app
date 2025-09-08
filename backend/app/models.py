@@ -35,9 +35,14 @@ class PomodoroSession(SQLModel, table=True):
     user_id: Optional[int] = SQLField(default=None, foreign_key="user.id", index=True)
     completed: bool = SQLField(default=False)
     completed_at: Optional[datetime] = None
+    archived: bool = SQLField(default=False, index=True)
+    archived_at: Optional[datetime] = None
     tasks: List["Task"] = Relationship(
         back_populates="session",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan",
+            "order_by": "Task.order"
+        },
     )
     user: Optional["User"] = Relationship(back_populates="sessions")
     active_session: Optional["ActivePomodoroSession"] = Relationship(back_populates="session")
@@ -73,6 +78,9 @@ class Task(SQLModel, table=True):
     due_date: Optional[datetime] = None  # Add due date for urgency calculations
     completed: bool = SQLField(default=False)
     completed_at: Optional[datetime] = None
+    archived: bool = SQLField(default=False, index=True)
+    archived_at: Optional[datetime] = None
+    order: int = SQLField(default=0, index=True)  # Add order field for task sorting
     categories: List[Category] = Relationship(
         back_populates="tasks", link_model=TaskCategoryLink
     )

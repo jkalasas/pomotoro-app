@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from datetime import datetime
+from sqlalchemy import func
 
 from ..db import SessionDep, get_session
 from ..models import PomodoroSession, Task, Category, ActivePomodoroSession, SessionFeedback
@@ -92,6 +93,8 @@ def create_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            archived=task.archived,
+            archived_at=task.archived_at,
         )
         for task in db_session.tasks
     ]
@@ -105,6 +108,8 @@ def create_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+    archived=db_session.archived,
+    archived_at=db_session.archived_at,
     )
 
 
@@ -112,17 +117,21 @@ def create_session(
 def read_sessions(
     db: SessionDep,
     current_user: ActiveUserDep,
+    include_archived: bool = False,
 ):
-    sessions = db.exec(
-        select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
-    ).all()
+    query = select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    if not include_archived:
+        query = query.where(PomodoroSession.archived == False)  # noqa: E712
+    sessions = db.exec(query).all()
     
     # Convert to SessionWithTasksPublic format to include tasks
     result = []
     for session in sessions:
-        # Get tasks for this session
+        # Get tasks for this session ordered by order field
         tasks = db.exec(
-            select(Task).where(Task.session_id == session.id)
+            select(Task)
+            .where(Task.session_id == session.id)
+            .order_by(Task.order)
         ).all()
         
         # Convert tasks to TaskPublic format
@@ -140,6 +149,8 @@ def read_sessions(
                 category=category_name,
                 completed=task.completed,
                 actual_completion_time=task.actual_completion_time,
+                archived=task.archived,
+                archived_at=task.archived_at,
             ))
         
         session_with_tasks = SessionWithTasksPublic(
@@ -151,10 +162,78 @@ def read_sessions(
             long_break_duration=session.long_break_duration,
             long_break_per_pomodoros=session.long_break_per_pomodoros,
             tasks=task_publics,
+            archived=session.archived,
+            archived_at=session.archived_at,
         )
         result.append(session_with_tasks)
     
     return result
+
+
+@router.post("/{session_id}/archive", response_model=SessionPublic)
+def archive_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
+    session = db.get(PomodoroSession, session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.archived:
+        return SessionPublic(
+            id=session.id,
+            name=session.name,
+            description=session.description,
+            focus_duration=session.focus_duration,
+            short_break_duration=session.short_break_duration,
+            long_break_duration=session.long_break_duration,
+            long_break_per_pomodoros=session.long_break_per_pomodoros,
+            archived=session.archived,
+            archived_at=session.archived_at,
+        )
+    session.archived = True
+    session.archived_at = datetime.utcnow()
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return SessionPublic(
+        id=session.id,
+        name=session.name,
+        description=session.description,
+        focus_duration=session.focus_duration,
+        short_break_duration=session.short_break_duration,
+        long_break_duration=session.long_break_duration,
+        long_break_per_pomodoros=session.long_break_per_pomodoros,
+        archived=session.archived,
+        archived_at=session.archived_at,
+    )
+
+
+@router.post("/{session_id}/unarchive", response_model=SessionPublic)
+def unarchive_session(
+    db: SessionDep,
+    session_id: int,
+    current_user: ActiveUserDep,
+):
+    session = db.get(PomodoroSession, session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.archived = False
+    session.archived_at = None
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return SessionPublic(
+        id=session.id,
+        name=session.name,
+        description=session.description,
+        focus_duration=session.focus_duration,
+        short_break_duration=session.short_break_duration,
+        long_break_duration=session.long_break_duration,
+        long_break_per_pomodoros=session.long_break_per_pomodoros,
+        archived=session.archived,
+        archived_at=session.archived_at,
+    )
 
 
 @router.post("/active", response_model=ActiveSessionPublic)
@@ -519,11 +598,20 @@ def read_session(
     db: SessionDep,
     session_id: int,
     current_user: ActiveUserDep,
+    include_archived: bool = False,
 ):
     db_session = db.get(PomodoroSession, session_id)
     if not db_session or db_session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Get tasks ordered by the order field
+    ordered_tasks = db.exec(
+        select(Task)
+        .where(Task.session_id == session_id)
+        .order_by(Task.order)
+    ).all()
+    
+    visible_tasks = [t for t in ordered_tasks if include_archived or not t.archived]
     tasks_public = [
         TaskPublic(
             id=task.id,
@@ -532,8 +620,10 @@ def read_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            archived=task.archived,
+            archived_at=task.archived_at,
         )
-        for task in db_session.tasks
+        for task in visible_tasks
     ]
 
     return SessionWithTasksPublic(
@@ -545,6 +635,8 @@ def read_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+    archived=db_session.archived,
+    archived_at=db_session.archived_at,
     )
 
 
@@ -621,6 +713,8 @@ def update_session(
         short_break_duration=db_session.short_break_duration,
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
+        archived=db_session.archived,
+        archived_at=db_session.archived_at,
     )
 
 
@@ -659,12 +753,19 @@ def add_task_to_session(
         db.commit()
         db.refresh(category)
     
+    # Get the highest order value for tasks in this session
+    max_order_result = db.exec(
+        select(func.max(Task.order)).where(Task.session_id == session_id)
+    ).first()
+    next_order = (max_order_result or 0) + 1
+    
     # Create the task
     db_task = Task(
         name=task_data.name,
         estimated_completion_time=task_data.estimated_completion_time,
         session_id=session_id,
         completed=False,
+        order=next_order,
     )
     # Add the category to the task through the many-to-many relationship
     db_task.categories = [category]
@@ -751,6 +852,58 @@ def delete_task(
     return {"message": "Task deleted successfully"}
 
 
+@router.post("/tasks/{task_id}/archive", response_model=TaskPublic)
+def archive_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task or (task.session and task.session.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.archived = True
+    task.archived_at = datetime.utcnow()
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return TaskPublic(
+        id=task.id,
+        name=task.name,
+        estimated_completion_time=task.estimated_completion_time,
+        category=task.categories[0].name if task.categories else "Uncategorized",
+        completed=task.completed,
+        actual_completion_time=task.actual_completion_time,
+        archived=task.archived,
+        archived_at=task.archived_at,
+    )
+
+
+@router.post("/tasks/{task_id}/unarchive", response_model=TaskPublic)
+def unarchive_task(
+    db: SessionDep,
+    task_id: int,
+    current_user: ActiveUserDep,
+):
+    task = db.get(Task, task_id)
+    if not task or (task.session and task.session.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.archived = False
+    task.archived_at = None
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return TaskPublic(
+        id=task.id,
+        name=task.name,
+        estimated_completion_time=task.estimated_completion_time,
+        category=task.categories[0].name if task.categories else "Uncategorized",
+        completed=task.completed,
+        actual_completion_time=task.actual_completion_time,
+        archived=task.archived,
+        archived_at=task.archived_at,
+    )
+
+
 @router.put("/{session_id}/tasks/reorder")
 def reorder_tasks(
     db: SessionDep,
@@ -772,9 +925,17 @@ def reorder_tasks(
         if task_id not in task_dict:
             raise HTTPException(status_code=400, detail=f"Task {task_id} not found in session")
     
-    # Update the order - assuming we add an order field to the Task model
-    # For now, we'll just return success as the order might be handled client-side
-    # In a real implementation, you'd add an `order` field to the Task model
+    # Verify all session tasks are included in the reorder
+    if len(reorder_data.task_ids) != len(tasks):
+        raise HTTPException(status_code=400, detail="All tasks must be included in reorder")
+    
+    # Update the order field for each task
+    for index, task_id in enumerate(reorder_data.task_ids):
+        task = task_dict[task_id]
+        task.order = index
+        db.add(task)
+    
+    db.commit()
     
     return {"message": "Tasks reordered successfully"}
 
@@ -795,6 +956,9 @@ def complete_task(
     
     task.completed = True
     task.completed_at = datetime.utcnow()
+    # Treat completed task as archived
+    task.archived = True
+    task.archived_at = datetime.utcnow()
     # For now, set actual_completion_time to estimated if not set
     if task.actual_completion_time is None:
         task.actual_completion_time = task.estimated_completion_time
@@ -850,6 +1014,9 @@ def uncomplete_task(
     task.completed = False
     task.completed_at = None
     task.actual_completion_time = None
+    # Unarchive when marking incomplete per new requirement
+    task.archived = False
+    task.archived_at = None
     
     db.add(task)
     
@@ -933,6 +1100,10 @@ def complete_session(
             task.completed = True
             task.completed_at = datetime.utcnow()
             incomplete_tasks.append(task.id)
+        # Ensure all tasks (newly or previously completed) are archived
+        task.archived = True
+        if not task.archived_at:
+            task.archived_at = datetime.utcnow()
     
     # Log which tasks were auto-completed
     if incomplete_tasks:

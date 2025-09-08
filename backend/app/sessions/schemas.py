@@ -40,6 +40,8 @@ class SessionPublic(BaseModel):
     short_break_duration: int
     long_break_duration: int
     long_break_per_pomodoros: int
+    archived: Optional[bool] = False
+    archived_at: Optional[datetime] = None
 
 
 class TaskPublic(BaseModel):
@@ -49,10 +51,14 @@ class TaskPublic(BaseModel):
     category: str
     completed: bool
     actual_completion_time: Optional[int] = None
+    archived: Optional[bool] = False
+    archived_at: Optional[datetime] = None
 
 
 class SessionWithTasksPublic(SessionPublic):
     tasks: List[TaskPublic]
+    archived: Optional[bool] = False
+    archived_at: Optional[datetime] = None
 
 
 class SessionUpdate(BaseModel):
