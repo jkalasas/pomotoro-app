@@ -5,4 +5,5 @@ export default [
   route("sessions", "routes/sessions.tsx"),
   route("overlay", "routes/overlay.tsx"),
   route("analytics", "routes/analytics.tsx"),
+  route("settings", "routes/settings.tsx"),
 ] satisfies RouteConfig;

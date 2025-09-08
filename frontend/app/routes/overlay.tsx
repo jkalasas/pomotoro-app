@@ -3,8 +3,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useSearchParams } from "react-router";
 import { Logo } from "~/components/ui/logo";
+import { useAppSettings } from "~/stores/settings";
 
 export default function Overlay() {
+  const appSettings = useAppSettings();
   const [searchParams] = useSearchParams();
   
   // Get time from URL parameters, fallback to 300 seconds (5 minutes)
@@ -119,8 +121,20 @@ export default function Overlay() {
         maxHeight: '100vh'
       }}
     >
-      {/* Top section - clean white/light background */}
-      <div className="flex-1 flex items-center justify-center w-full">
+      {/* Top section with small looping video and message */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full p-4 gap-6">
+        <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden shadow-lg border border-black/5 bg-black/60">
+          <video
+            key={appSettings.waitingVideo}
+            src={appSettings.waitingVideo.startsWith('/') ? appSettings.waitingVideo : `/videos/${appSettings.waitingVideo}`}
+            className="w-full h-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+          <div className="absolute inset-0 bg-black/20" />
+        </div>
         <div className="text-center">
           <h1 className="text-2xl md:text-3xl font-normal text-gray-700 tracking-wide">
             YOU DESERVE A WELL DEFINED REST

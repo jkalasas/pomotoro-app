@@ -41,6 +41,11 @@ const items: SidebarItem[] = [
     url: "/analytics",
     icon: ChartPie,
   },
+  {
+    label: "Settings",
+    url: "/settings",
+    icon: Settings,
+  },
 ];
 
 export default function AppSidebar() {

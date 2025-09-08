@@ -574,7 +574,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       let newPomodorosCompleted = pomodorosCompleted;
       let newTotalPomodorosCompleted = totalPomodorosCompleted;
 
-      if (phase === "focus") {
+  if (phase === "focus") {
         // Focus phase completed - increment pomodoro count and move to break
         newPomodorosCompleted = pomodorosCompleted + 1;
         newTotalPomodorosCompleted = totalPomodorosCompleted + 1;
@@ -598,6 +598,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         // Break phase completed - move back to focus
         nextPhase = "focus";
         nextDuration = session.focus_duration * 60;
+        // Play focus resume sound
+        try {
+          const { useAppSettings } = await import('./settings');
+          const { focusResumeSound } = useAppSettings.getState();
+          const src = focusResumeSound.startsWith('/') ? focusResumeSound : `/audio/${focusResumeSound}`;
+          const audio = new Audio(src);
+          audio.volume = 0.8;
+          audio.play().catch(() => {});
+        } catch { /* ignore sound errors */ }
       }
 
       // Update the backend with new phase and KEEP the timer running for a continuous experience
