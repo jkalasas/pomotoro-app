@@ -72,14 +72,34 @@ class AnalyticsService:
         analytics = db.exec(
             select(SessionAnalytics).where(SessionAnalytics.session_id == session_id)
         ).first()
-        
-        if analytics:
-            for key, value in kwargs.items():
-                if hasattr(analytics, key):
-                    setattr(analytics, key, value)
+
+        # If no analytics record exists yet, create one so events like task completion
+        # still contribute to daily stats even if the session wasn’t explicitly started
+        # via the active session endpoint.
+        if not analytics:
+            session = db.get(PomodoroSession, session_id)
+            if not session:
+                return None
+            analytics = SessionAnalytics(
+                user_id=session.user_id,
+                session_id=session_id,
+                session_started_at=datetime.utcnow(),
+                total_focus_time=0,
+                total_break_time=0,
+                pomodoros_completed=0,
+                tasks_completed=0,
+                interruptions_count=0,
+            )
             db.add(analytics)
             db.commit()
-        
+
+        # Apply provided updates to the analytics record
+        for key, value in kwargs.items():
+            if hasattr(analytics, key):
+                setattr(analytics, key, value)
+        db.add(analytics)
+        db.commit()
+
         return analytics
     
     @staticmethod

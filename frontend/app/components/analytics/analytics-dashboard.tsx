@@ -11,6 +11,7 @@ import { InsightsCard } from './insights-card';
 import { ActivityTimeline } from './activity-timeline';
 import { analyticsAPI, type AnalyticsDashboard } from '~/lib/analytics';
 import { useAuthStore } from '~/stores/auth';
+import { useAnalyticsStore } from '~/stores/analytics';
 import { toast } from 'sonner';
 
 interface AnalyticsDashboardProps {
@@ -19,6 +20,7 @@ interface AnalyticsDashboardProps {
 
 export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   const { user, token } = useAuthStore();
+  const analyticsStore = useAnalyticsStore();
   const [dashboardData, setDashboardData] = useState<AnalyticsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30');
@@ -33,6 +35,10 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
     try {
       setLoading(true);
+      // Ensure any queued analytics events are flushed before fetching
+      await analyticsStore.flushEvents().catch(() => {});
+  // Force a daily stats recomputation so the dashboard isn't empty
+  await analyticsAPI.updateDailyStats().catch(() => {});
       const data = await analyticsAPI.getDashboard(parseInt(timeRange));
       setDashboardData(data);
     } catch (error) {
@@ -58,8 +64,32 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   };
 
   useEffect(() => {
-    fetchDashboardData();
+  // Flush queued events when the time range or token changes so charts aren't empty
+  fetchDashboardData();
   }, [timeRange, token]);
+
+  // Refresh dashboard when tasks or sessions change elsewhere
+  useEffect(() => {
+    const handler = () => {
+      handleRefresh();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('task-completed', handler);
+      window.addEventListener('task-uncompleted', handler);
+      window.addEventListener('session-completed', handler);
+      window.addEventListener('session-reset', handler);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('task-completed', handler);
+        window.removeEventListener('task-uncompleted', handler);
+        window.removeEventListener('session-completed', handler);
+        window.removeEventListener('session-reset', handler);
+      }
+    };
+  }, []);
 
   // Show login prompt if not authenticated
   if (!token) {

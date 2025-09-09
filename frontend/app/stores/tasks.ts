@@ -197,46 +197,55 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       // Handle next task transition for pomodoro configuration updates
       await get().handleNextTaskTransition(taskId);
       
-      // Get task details for analytics logging
+      // Resolve the session that owns this task using the scheduler when available
+      let targetSessionId: number | null = null;
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const sched = useSchedulerStore.getState();
+        const schedTask = sched.currentSchedule?.find(t => t.id === taskId);
+        if (schedTask) targetSessionId = schedTask.session_id;
+      } catch {}
+
+      // Fallback to current session if scheduler couldn't resolve
       const currentSession = get().currentSession;
+      if (!targetSessionId && currentSession) targetSessionId = currentSession.id;
+
+      // Get task details for analytics logging (from currentSession if available)
       const task = currentSession?.tasks.find(t => t.id === taskId);
-      
-      if (task && currentSession) {
+
+      if (task && currentSession && currentSession.id === targetSessionId) {
         // Log task completion analytics
         useAnalyticsStore.getState().logTaskComplete(taskId, task.name, currentSession.id);
       }
       
-      // Refresh current session to get updated task status
-      if (currentSession) {
-        await get().refreshAllData();
-        
-        // Check if all tasks are completed after refreshing
-        const updatedSession = get().currentSession;
-        if (updatedSession) {
-          const allTasksCompleted = updatedSession.tasks.every(t => t.completed);
-          const completedTasksCount = updatedSession.tasks.filter(t => t.completed).length;
-          
-          if (allTasksCompleted && completedTasksCount > 0) {
-            // Trigger session completion feedback modal
+      // Independently verify completion on the ACTUAL session for this task (exclude archived)
+      try {
+        if (targetSessionId) {
+          const targetSession = await get().getSession(targetSessionId);
+          const activeTasks = (targetSession.tasks || []).filter(t => !t.archived);
+          const allActiveCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+          const completedActiveCount = activeTasks.filter(t => t.completed).length;
+          if (allActiveCompleted && completedActiveCount > 0) {
             const focusDuration = Math.floor(
-              updatedSession.tasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+              activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
-            
-            // Trigger session completion via custom event
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent('session-completion', {
                 detail: {
-                  sessionId: updatedSession.id,
-                  sessionName: updatedSession.name || updatedSession.description,
-                  totalTasks: updatedSession.tasks.length,
-                  completedTasks: completedTasksCount,
+                  sessionId: targetSession.id,
+                  sessionName: targetSession.name || targetSession.description,
+                  totalTasks: activeTasks.length,
+                  completedTasks: completedActiveCount,
                   focusDuration
                 }
               }));
             }
           }
         }
-      }
+      } catch {}
+
+      // Refresh data to keep lists in sync
+      await get().refreshAllData();
       
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));
@@ -304,9 +313,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       throw new Error("No active session to complete");
     }
 
-    const completedTasksCount = currentSession.tasks.filter(t => t.completed).length;
+    const activeTasks = (currentSession.tasks || []).filter(t => !t.archived);
+    const completedTasksCount = activeTasks.filter(t => t.completed).length;
     const focusDuration = Math.floor(
-      currentSession.tasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+      activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
     );
     
     // Trigger session completion via custom event
@@ -315,7 +325,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         detail: {
           sessionId: currentSession.id,
           sessionName: currentSession.name || currentSession.description,
-          totalTasks: currentSession.tasks.length,
+          totalTasks: activeTasks.length,
           completedTasks: completedTasksCount,
           focusDuration
         }
@@ -527,6 +537,31 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
         currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
       }));
+      // If archiving this task results in all non-archived tasks being completed, trigger session completion
+      try {
+        const current = get().currentSession;
+        if (current) {
+          const activeTasks = (current.tasks || []).filter(t => !t.archived);
+          const allActiveCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+          if (allActiveCompleted) {
+            const completedActiveCount = activeTasks.filter(t => t.completed).length;
+            const focusDuration = Math.floor(
+              activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+            );
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent('session-completion', {
+                detail: {
+                  sessionId: current.id,
+                  sessionName: current.name || current.description,
+                  totalTasks: activeTasks.length,
+                  completedTasks: completedActiveCount,
+                  focusDuration
+                }
+              }));
+            }
+          }
+        }
+      } catch {}
       // Remove archived task from current schedule view
       try {
         const { useSchedulerStore } = await import('./scheduler');

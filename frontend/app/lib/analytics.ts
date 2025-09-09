@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { useAuthStore } from '~/stores/auth';
 
 // Analytics API types
 export interface AnalyticsEvent {
@@ -72,19 +73,31 @@ class AnalyticsAPI {
   private baseUrl = `${API_BASE_URL}/analytics`;
 
   private getToken(): string | null {
-    // Try to get token from Zustand persist storage (same key as auth store)
+    // 1) Prefer in-memory token from the auth store (most reliable at runtime)
+    try {
+      const storeToken = useAuthStore.getState().token;
+      if (storeToken) return storeToken;
+    } catch {}
+
+    // 2) Fall back to persisted Zustand storage (rehydrated on app load)
     try {
       const authStorage = localStorage.getItem('auth-storage');
       if (authStorage) {
         const parsed = JSON.parse(authStorage);
-        return parsed?.state?.token || null;
+        // Zustand persist stores data under `state`
+        if (parsed?.state?.token) return parsed.state.token as string;
       }
     } catch (error) {
-      console.error('Failed to get token from auth storage:', error);
+      // Swallow errors; we'll try other fallbacks
+      console.debug('AnalyticsAPI: failed to parse auth-storage token');
     }
-    
-    // Fallback to direct localStorage access
-    return localStorage.getItem('access_token');
+
+    // 3) Last resort: a plain access_token key if one is used elsewhere
+    try {
+      return localStorage.getItem('access_token');
+    } catch {
+      return null;
+    }
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {

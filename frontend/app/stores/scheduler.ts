@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { apiClient } from "~/lib/api";
+import { toast } from "sonner";
 import type { ScheduledTask, ScheduleResponse, UserAnalytics } from "~/types/scheduler";
 
 interface SchedulerState {
@@ -209,40 +210,54 @@ export const useSchedulerStore = create<SchedulerState>()(
   },
 
   completeScheduledTask: async (taskId: number) => {
+    // Optimistic update
+    const prevSchedule = get().currentSchedule;
+    if (prevSchedule) {
+      const optimistic = prevSchedule.map(t => t.id === taskId ? { ...t, completed: true } : t);
+      set({ currentSchedule: optimistic });
+    }
+
     try {
-      await apiClient.completeTask(taskId);
-      
-      // Handle next task transition for pomodoro configuration updates
+      // Delegate to tasks store for unified behavior (analytics, events, feedback, data refresh)
       const { useTaskStore } = await import('./tasks');
-      await useTaskStore.getState().handleNextTaskTransition(taskId);
-      
-  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
-      if (currentSchedule) {
-        const updatedSchedule = currentSchedule.map(task =>
-          task.id === taskId ? { ...task, completed: true } : task
-        );
-        set({ currentSchedule: updatedSchedule });
+      await useTaskStore.getState().completeTask(taskId);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('task-completed'));
       }
+      toast.success('Task completed');
     } catch (error) {
+      // Rollback on failure
+      if (prevSchedule) set({ currentSchedule: prevSchedule });
       console.error("Failed to complete task:", error);
       set({ error: error instanceof Error ? error.message : "Failed to complete task" });
+      toast.error('Failed to complete task');
     }
   },
 
   uncompleteScheduledTask: async (taskId: number) => {
+    // Optimistic update
+    const prevSchedule = get().currentSchedule;
+    if (prevSchedule) {
+      const optimistic = prevSchedule.map(t => t.id === taskId ? { ...t, completed: false } : t);
+      set({ currentSchedule: optimistic });
+    }
+
     try {
-      await apiClient.uncompleteTask(taskId);
-      
-  const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
-      if (currentSchedule) {
-        const updatedSchedule = currentSchedule.map(task =>
-          task.id === taskId ? { ...task, completed: false } : task
-        );
-        set({ currentSchedule: updatedSchedule });
+      // Delegate to tasks store (handles analytics, potential session reset, and data refresh)
+      const { useTaskStore } = await import('./tasks');
+      await useTaskStore.getState().uncompleteTask(taskId);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('task-uncompleted'));
       }
+      toast.success('Task marked incomplete');
     } catch (error) {
+      // Rollback on failure
+      if (prevSchedule) set({ currentSchedule: prevSchedule });
       console.error("Failed to uncomplete task:", error);
       set({ error: error instanceof Error ? error.message : "Failed to uncomplete task" });
+      toast.error('Failed to mark task incomplete');
     }
   },
 
