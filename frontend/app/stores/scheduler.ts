@@ -62,6 +62,46 @@ export const useSchedulerStore = create<SchedulerState>()(
         selectedSessionIds: sessionIds,
         isLoading: false,
       });
+
+      // Update Pomodoro settings to reflect the first task's session of the new schedule
+      try {
+        const firstTask = visibleTasks.find(t => !t.completed);
+        if (firstTask) {
+          const { usePomodoroStore } = await import('./pomodoro');
+          const pomodoroStore = usePomodoroStore.getState();
+
+          const isRunning = pomodoroStore.isRunning;
+          const currentPhase = pomodoroStore.phase;
+          const remainingTime = pomodoroStore.time; // seconds
+
+          if (!isRunning) {
+            // Safest path: switch active session to the first task's session when timer is not running
+            await pomodoroStore.setSession(firstTask.session_id);
+            // Ensure the current task id is reflected on backend
+            await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: false });
+          } else {
+            // Timer running: don't switch session to avoid disruption; just sync settings and clamp if needed
+            await pomodoroStore.updateSettingsFromTask(firstTask.session_id);
+            const updatedSettings = usePomodoroStore.getState().settings;
+            const nextFocusSeconds = updatedSettings.focus_duration * 60;
+
+            if (currentPhase === 'focus') {
+              const clamped = remainingTime > nextFocusSeconds ? nextFocusSeconds : remainingTime;
+              await pomodoroStore.updateTimer({
+                current_task_id: firstTask.id,
+                time_remaining: clamped,
+                is_running: true,
+              });
+            } else {
+              // During breaks, keep remaining time; still set the current task id for UI consistency
+              await pomodoroStore.updateTimer({ current_task_id: firstTask.id });
+            }
+          }
+        }
+      } catch (syncErr) {
+        // Don't block schedule creation if timer sync fails
+        console.error('Failed to sync Pomodoro with new schedule:', syncErr);
+      }
       
       // Log successful schedule generation
       analyticsStore.logScheduleGeneration(
