@@ -39,7 +39,7 @@ export function InsightsCard({ insights }: InsightsCardProps) {
           Productivity Insights
         </CardTitle>
         <CardDescription>
-          AI-powered analysis of your productivity patterns
+          Analysis of your productivity patterns
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

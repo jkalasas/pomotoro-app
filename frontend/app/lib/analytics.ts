@@ -66,7 +66,7 @@ export interface AnalyticsDashboard {
   focus_time_trend: ChartDataPoint[];
   task_completion_trend: ChartDataPoint[];
   productivity_heatmap: ChartDataPoint[];
-  session_duration_distribution: SessionDurationData[];
+  session_duration_distribution?: SessionDurationData[];
 }
 
 class AnalyticsAPI {
