@@ -218,24 +218,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         useAnalyticsStore.getState().logTaskComplete(taskId, task.name, currentSession.id);
       }
       
-      // Independently verify completion on the ACTUAL session for this task (exclude archived)
+      // Independently verify completion on the ACTUAL session for this task (include archived tasks)
       try {
         if (targetSessionId) {
           const targetSession = await get().getSession(targetSessionId);
-          const activeTasks = (targetSession.tasks || []).filter(t => !t.archived);
-          const allActiveCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
-          const completedActiveCount = activeTasks.filter(t => t.completed).length;
-          if (allActiveCompleted && completedActiveCount > 0) {
+          const allTasks = targetSession.tasks || [];
+          const allTasksCompleted = allTasks.length > 0 && allTasks.every(t => t.completed);
+          const completedTasksCount = allTasks.filter(t => t.completed).length;
+          if (allTasksCompleted && completedTasksCount > 0) {
             const focusDuration = Math.floor(
-              activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+              allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent('session-completion', {
                 detail: {
                   sessionId: targetSession.id,
                   sessionName: targetSession.name || targetSession.description,
-                  totalTasks: activeTasks.length,
-                  completedTasks: completedActiveCount,
+                  totalTasks: allTasks.length,
+                  completedTasks: completedTasksCount,
                   focusDuration
                 }
               }));
@@ -313,10 +313,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       throw new Error("No active session to complete");
     }
 
-    const activeTasks = (currentSession.tasks || []).filter(t => !t.archived);
-    const completedTasksCount = activeTasks.filter(t => t.completed).length;
+    const allTasks = currentSession.tasks || [];
+    const completedTasksCount = allTasks.filter(t => t.completed).length;
     const focusDuration = Math.floor(
-      activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+      allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
     );
     
     // Trigger session completion via custom event
@@ -325,7 +325,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         detail: {
           sessionId: currentSession.id,
           sessionName: currentSession.name || currentSession.description,
-          totalTasks: activeTasks.length,
+          totalTasks: allTasks.length,
           completedTasks: completedTasksCount,
           focusDuration
         }
@@ -537,24 +537,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
         currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
       }));
-      // If archiving this task results in all non-archived tasks being completed, trigger session completion
+      // If archiving this task results in all tasks being completed, trigger session completion
       try {
         const current = get().currentSession;
         if (current) {
-          const activeTasks = (current.tasks || []).filter(t => !t.archived);
-          const allActiveCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
-          if (allActiveCompleted) {
-            const completedActiveCount = activeTasks.filter(t => t.completed).length;
+          const allTasks = current.tasks || [];
+          const allTasksCompleted = allTasks.length > 0 && allTasks.every(t => t.completed);
+          if (allTasksCompleted) {
+            const completedTasksCount = allTasks.filter(t => t.completed).length;
             const focusDuration = Math.floor(
-              activeTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
+              allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent('session-completion', {
                 detail: {
                   sessionId: current.id,
                   sessionName: current.name || current.description,
-                  totalTasks: activeTasks.length,
-                  completedTasks: completedActiveCount,
+                  totalTasks: allTasks.length,
+                  completedTasks: completedTasksCount,
                   focusDuration
                 }
               }));
