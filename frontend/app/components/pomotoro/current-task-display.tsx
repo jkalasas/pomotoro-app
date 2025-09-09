@@ -62,7 +62,7 @@ export function CurrentTaskDisplay() {
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-primary">Current Task</h3>
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <div className="font-medium">{currentTask.name}</div>
+                <div className="font-medium">{currentTask.name?.trim() || 'Untitled Task'}</div>
                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="size-3" />
@@ -90,7 +90,7 @@ export function CurrentTaskDisplay() {
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-muted-foreground">Up Next</h3>
               <div className="p-2 bg-muted/50 rounded border-l-2 border-muted-foreground/20">
-                <div className="text-sm">{nextTask.name}</div>
+                <div className="text-sm">{nextTask.name?.trim() || 'Untitled Task'}</div>
                 <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="size-3" />

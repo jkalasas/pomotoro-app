@@ -54,7 +54,10 @@ export const useSchedulerStore = create<SchedulerState>()(
     try {
       const response = await apiClient.generateSchedule(sessionIds) as ScheduleResponse;
       // Filter out archived tasks defensively (backend exclusion) 
-      const visibleTasks = response.scheduled_tasks.filter(t => !t.archived);
+      // and normalize empty names to a safe default
+      const visibleTasks = response.scheduled_tasks
+        .filter(t => !t.archived)
+        .map(t => ({ ...t, name: (t.name || '').trim() || 'Untitled Task' }));
       set({
         currentSchedule: visibleTasks,
         totalScheduleTime: response.total_schedule_time,
@@ -158,11 +161,12 @@ export const useSchedulerStore = create<SchedulerState>()(
       
       // Call the backend API to persist the reordered schedule
       const taskIds = reorderedTasks.map(task => task.id);
-      const response = await apiClient.reorderSchedule(taskIds) as ScheduleResponse;
+  const response = await apiClient.reorderSchedule(taskIds) as ScheduleResponse;
       
       // Preserve the completion status from before the reorder operation
       const correctedTasks = response.scheduled_tasks.map(task => ({
         ...task,
+        name: (task.name || '').trim() || 'Untitled Task',
         completed: completionStatusMap.get(task.id) || false
       }));
       

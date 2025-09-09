@@ -365,7 +365,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   addTaskToSession: async (sessionId: number, taskData) => {
     try {
-      const newTask = await apiClient.addTaskToSession(sessionId, taskData) as Task;
+      // Normalize empty names to avoid unnamed tasks leaking into schedule/UI
+      const normalized = {
+        ...taskData,
+        name: (taskData.name || "").trim() || "Untitled Task",
+      };
+      const newTask = await apiClient.addTaskToSession(sessionId, normalized) as Task;
       // Update the local state by adding the task to the session
       set((state) => ({
         sessions: state.sessions.map(session =>
@@ -385,7 +390,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   updateTask: async (taskId: number, taskData) => {
     try {
-      const updatedTask = await apiClient.updateTask(taskId, taskData) as Task;
+      // Normalize empty names to a safe default
+      const normalized = {
+        ...taskData,
+        ...(typeof taskData.name !== 'undefined' ? { name: (taskData.name || "").trim() || "Untitled Task" } : {}),
+      };
+      const updatedTask = await apiClient.updateTask(taskId, normalized) as Task;
       // Update the local state
       set((state) => ({
         sessions: state.sessions.map(session => ({
@@ -401,6 +411,29 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           ),
         } : null,
       }));
+
+      // Also sync any scheduled task instance so Home/schedule reflect edits immediately
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const schedState = useSchedulerStore.getState();
+        const currentSchedule = schedState.currentSchedule;
+        if (currentSchedule && currentSchedule.some(t => t.id === taskId)) {
+          const updatedSchedule = currentSchedule.map(t =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  name: updatedTask.name,
+                  estimated_completion_time: updatedTask.estimated_completion_time,
+                  category: updatedTask.category,
+                  archived: updatedTask.archived,
+                }
+              : t
+          );
+          useSchedulerStore.setState({ currentSchedule: updatedSchedule });
+        }
+      } catch (e) {
+        // Non-fatal: schedule sync failed
+      }
     } catch (error) {
       console.error("Failed to update task:", error);
       throw error;
@@ -421,6 +454,19 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           tasks: (state.currentSession.tasks || []).filter(task => task.id !== taskId),
         } : null,
       }));
+
+      // If the task is in the current schedule, remove it there too
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const schedState = useSchedulerStore.getState();
+        const currentSchedule = schedState.currentSchedule;
+        if (currentSchedule && currentSchedule.some(t => t.id === taskId)) {
+          const updatedSchedule = currentSchedule.filter(t => t.id !== taskId);
+          useSchedulerStore.setState({ currentSchedule: updatedSchedule });
+        }
+      } catch (e) {
+        // Non-fatal
+      }
     } catch (error) {
       console.error("Failed to delete task:", error);
       throw error;
@@ -481,6 +527,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
         currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
       }));
+      // Remove archived task from current schedule view
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const sched = useSchedulerStore.getState();
+        const cur = sched.currentSchedule;
+        if (cur && cur.some(t => t.id === taskId)) {
+          const updatedSchedule = cur.filter(t => t.id !== taskId);
+          useSchedulerStore.setState({ currentSchedule: updatedSchedule });
+          // If the archived task was active, switch Pomodoro to the next available task
+          try {
+            const { usePomodoroStore } = await import('./pomodoro');
+            const pomodoro = usePomodoroStore.getState();
+            if (pomodoro.currentTaskId === taskId) {
+              const next = useSchedulerStore.getState().getCurrentTask();
+              await pomodoro.updateTimer({ current_task_id: next ? next.id : undefined });
+            }
+          } catch {}
+        }
+      } catch {}
     } catch (e) { console.error('archive task failed', e); }
   },
   unarchiveTask: async (taskId: number) => {

@@ -253,7 +253,7 @@ export default function Home() {
           long_break_per_pomodoros: sessionInfo.pomodoroSetup.pomodorosBeforeLongBreak,
         },
         tasks: sessionInfo.tasks.map((t) => ({
-          name: t.name,
+          name: (t.name || "").trim() || "Untitled Task",
           category: t.category,
           estimated_completion_time: t.estimatedTime,
         })),
@@ -361,7 +361,7 @@ export default function Home() {
           <CardContent>
             <div className="flex flex-col items-center">
               <span className="font-bold text-center mb-1">Current Task</span>
-              <span className="font-normal text-center">{schedulerStore.getCurrentTask()?.name || "No active task"}</span>
+              <span className="font-normal text-center">{(() => { const t = schedulerStore.getCurrentTask(); return t ? (t.name?.trim() || "Untitled Task") : "No active task"; })()}</span>
             </div>
             <div className="mx-auto"><PomodoroTimer time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0} endTime={pomodoroStore.maxTime} /></div>
             <div className="-mt-4 mb-12 flex flex-col items-center">
@@ -426,7 +426,7 @@ export default function Home() {
                 visibleSchedule.slice(0, 5).map((task: any, index: number) => (
                   <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group">
                     <Checkbox checked={task.completed || false} onCheckedChange={() => { if (task.completed) { schedulerStore.uncompleteScheduledTask(task.id); } else { schedulerStore.completeScheduledTask(task.id); } }} className="rounded-md" />
-                    <span className={`flex-1 transition-all duration-200 ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-foreground"}`}>{task.name}</span>
+                    <span className={`flex-1 transition-all duration-200 ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-foreground"}`}>{task.name?.trim() || "Untitled Task"}</span>
                     <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">{index + 1}</div>
                   </div>
                 ))

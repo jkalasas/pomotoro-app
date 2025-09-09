@@ -7,6 +7,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { Plus, Edit, Trash2, GripVertical, Clock, Target, Archive, ArchiveRestore, ArrowDown } from "lucide-react";
+import { toast } from "sonner";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
 import { useAnalyticsStore } from "~/stores/analytics";
 import { DragDropContext, Droppable, Draggable, type DropResult, type DroppableProvided, type DraggableProvided, type DraggableStateSnapshot } from "@hello-pangea/dnd";
@@ -194,14 +195,19 @@ export default function Sessions() {
   };
 
   const handleDeleteTask = async (taskId: number) => {
+    // Archive instead of delete
     try {
-      await deleteTask(taskId);
+      await archiveTask(taskId);
       if (selectedSession) {
-        const updatedTasks = selectedSession.tasks?.filter(task => task.id !== taskId);
+        const updatedTasks = selectedSession.tasks?.map(task =>
+          task.id === taskId ? { ...task, archived: true } : task
+        );
         setSelectedSession({ ...selectedSession, tasks: updatedTasks });
       }
+      toast.success("Task archived");
     } catch (error) {
-      console.error("Failed to delete task:", error);
+      console.error("Failed to archive task:", error);
+      toast.error("Failed to archive task");
     }
   };
 

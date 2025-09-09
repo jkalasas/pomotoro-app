@@ -158,7 +158,10 @@ export function SessionEditorDialog({
   };
 
   const addTask = () => {
-    if (!sessionInfo || !taskForm.name.trim()) return;
+    if (!sessionInfo || !taskForm.name.trim()) {
+      toast.error("Task name can't be empty");
+      return;
+    }
 
     const newTask = {
       id: `temp-${Date.now()}`,
@@ -199,6 +202,10 @@ export function SessionEditorDialog({
 
   const saveTask = () => {
     if (!sessionInfo || !editingTaskId) return;
+    if (!taskForm.name.trim()) {
+      toast.error("Task name can't be empty");
+      return;
+    }
 
     const updatedTasks = sessionInfo.tasks.map((task) =>
       task.id === editingTaskId

@@ -49,7 +49,9 @@ export function ScheduledTasksList({
   const { sessions } = useTaskStore();
   const { isRunning } = usePomodoroStore();
 
-  if (!currentSchedule || currentSchedule.length === 0) {
+  const visible = (currentSchedule || []).filter(t => !t.archived);
+
+  if (!visible || visible.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-muted-foreground">
         <div className="text-center space-y-2">
@@ -73,6 +75,8 @@ export function ScheduledTasksList({
       return;
     }
 
+    // Ensure we use the unarchived list for visible ordering, but reorder the underlying schedule accordingly
+    if (!currentSchedule) return;
     const newSchedule = Array.from(currentSchedule);
     const [movedTask] = newSchedule.splice(sourceIndex, 1);
     newSchedule.splice(destinationIndex, 0, movedTask);
@@ -81,11 +85,11 @@ export function ScheduledTasksList({
     reorderScheduleWithTimerReset(newSchedule, isRunning);
   };
 
-  const completedTasks = currentSchedule.filter(
+  const completedTasks = visible.filter(
     (task) => task.completed
   ).length;
-  const totalTasks = currentSchedule.length;
-  const completedTime = currentSchedule
+  const totalTasks = visible.length;
+  const completedTime = visible
     .filter((task) => task.completed)
     .reduce((total, task) => total + task.estimated_completion_time, 0);
 
@@ -127,7 +131,7 @@ export function ScheduledTasksList({
               ref={provided.innerRef}
               className="space-y-1"
             >
-              {currentSchedule.map((task, index) => (
+              {visible.map((task, index) => (
                 <Draggable
                   key={task.id.toString()}
                   draggableId={task.id.toString()}
@@ -171,7 +175,7 @@ export function ScheduledTasksList({
                                   : ""
                               }`}
                             >
-                              {task.name}
+                              {task.name?.trim() || "Untitled Task"}
                             </span>
                           </div>
 
@@ -238,7 +242,7 @@ export function ScheduledTasksList({
         </Droppable>
       </DragDropContext>
 
-      {currentSchedule.length > 0 && (
+  {visible.length > 0 && (
         <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
           <strong>Tip:</strong> Drag and drop tasks to reorder them manually.
           The AI has optimized this schedule for urgency, momentum, and variety.
