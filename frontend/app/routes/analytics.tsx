@@ -5,7 +5,7 @@ import { useAnalyticsStore } from "~/stores/analytics";
 export function meta() {
   return [
     { title: "Analytics - Pomodoro Tracker" },
-    { name: "description", content: "View your productivity analytics and insights" },
+  { name: "description", content: "View your productivity analytics" },
   ];
 }
 

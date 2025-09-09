@@ -146,7 +146,6 @@ export default function Home() {
       // Defer analytics updates to prevent blocking UI
       setTimeout(() => {
         analyticsStore.updateDailyStats();
-        analyticsStore.fetchInsights();
       }, 100);
     };
 

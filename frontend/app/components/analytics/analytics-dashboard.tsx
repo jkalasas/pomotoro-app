@@ -5,9 +5,7 @@ import { Button } from '~/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { FocusTimeChart } from './focus-time-chart';
 import { TaskCompletionChart } from './task-completion-chart';
-import { SessionDurationChart } from './session-duration-chart';
 import { ProductivityOverview } from './productivity-overview';
-import { InsightsCard } from './insights-card';
 import { ActivityTimeline } from './activity-timeline';
 import { analyticsAPI, type AnalyticsDashboard } from '~/lib/analytics';
 import { useAuthStore } from '~/stores/auth';
@@ -183,7 +181,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="focus">Focus Time</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -191,10 +188,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <FocusTimeChart data={dashboardData.focus_time_trend} />
             <TaskCompletionChart data={dashboardData.task_completion_trend} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <SessionDurationChart data={dashboardData.session_duration_distribution} />
-            <InsightsCard insights={dashboardData.productivity_insights} />
           </div>
         </TabsContent>
 
@@ -223,7 +216,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                 </div>
               </CardContent>
             </Card>
-            <SessionDurationChart data={dashboardData.session_duration_distribution} />
           </div>
         </TabsContent>
 
@@ -256,34 +248,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="insights" className="space-y-4">
-          <InsightsCard insights={dashboardData.productivity_insights} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity History</CardTitle>
-              <CardDescription>
-                Your recent activity and patterns
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {dashboardData.daily_stats.slice(-14).map((stat, index) => (
-                  <div key={index} className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(stat.date).toLocaleDateString()}
-                    </span>
-                    <div className="text-right">
-                      <div className="font-medium">{(stat.total_focus_time / 3600).toFixed(1)}h focus</div>
-                      <div className="text-sm text-muted-foreground">
-                        {stat.tasks_completed} tasks, {stat.pomodoros_completed} pomodoros
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+  {/** Insights tab removed intentionally to disable AI-powered insights **/}
 
         <TabsContent value="activity" className="space-y-4">
           <ActivityTimeline events={dashboardData.recent_events} />
