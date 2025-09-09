@@ -2,11 +2,8 @@
 To address the task scheduling problem, a Genetic Algorithm (GA) is employed. The GA is a metaheuristic inspired by the process of natural selection, which iteratively evolves a population of potential solutions towards an optimal configuration. In this context, a "solution" is a specific sequence of tasks for a given Pomodoro session. The primary objective of the GA is to generate a schedule that maximizes a fitness function, which quantifies the quality of a schedule based on task urgency, user performance history, and perceived productivity.
 
 
-**Chromosomes**
-Each potential solution, or **chromosome**, in the GA population represents a unique task schedule. A chromosome is defined as an ordered vector of tasks for the session.
-
-Given a set of n tasks $T={t_1​,t_2​,...,t_n​}$ generated for a session, a chromosome C is a permutation of these tasks:
-$$C = [t_1, t_2, ..., t_n]$$
+**Chromosomes and Encoding**
+Each potential solution (chromosome) is a vector of real-valued priorities in [0,1] (random-keys), one per task. A deterministic decoder maps this vector to a valid schedule by repeatedly selecting, across all sessions, the next feasible task among the heads of each session’s task list based on its priority. This guarantees in-session order while allowing interleaving across sessions.
 
 **Fitness function**
 The core of the GA is the fitness function, $F(C)$, which evaluates the viability of each chromosome. The function is formulated as a weighted sum of three key components: an **Urgency Score**, a **Momentum Score**, and a **Variety Score**.
@@ -52,8 +49,10 @@ $$w_v = k_v * (\frac{F_{max} - \bar{F}_{feedback}}{F_{max} - F_{min}})$$
 
 Here, $k_m$​ and $k_v$​ are scaling constants, and $F_{max}$​ and $F_{min}$​ are the maximum and minimum possible feedback values, respectively.
 
-**3.5 Genetic Operators**
-The evolution of the population is driven by three primary genetic operators:
-1. **Selection**: A **Tournament Selection** mechanism is used. A small subset of chromosomes is randomly selected from the population, and the chromosome with the highest fitness value within that subset is chosen to be a parent for the next generation. This process is repeated to select two parents.
-2. **Crossover**: To create offspring from two parent chromosomes, **Order Crossover (OX1)** is applied. A random sub-sequence from one parent is copied to the child. The remaining tasks are then filled in from the second parent in the order they appear, without duplicating any tasks already present from the first parent. This ensures that the resulting offspring are valid permutations.
-3. **Mutation**: A **Swap Mutation** operator is used to introduce new genetic material and prevent premature convergence. Two distinct positions in a chromosome are randomly selected, and the tasks at these positions are swapped. This is applied with a low probability to each chromosome in the new generation.
+**3.5 Genetic Operators (PyGAD)**
+The evolution of the population uses PyGAD operators over the priority vectors:
+1. **Selection**: Tournament selection (K=4 by default).
+2. **Crossover**: Uniform crossover over the random-keys (priority floats).
+3. **Mutation**: Random mutation over the random-keys with a small probability (e.g., 0.15).
+
+The decoder enforces feasibility (in-session order) after each genetic operation.

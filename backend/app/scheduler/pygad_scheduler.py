@@ -23,7 +23,7 @@ from ..users.models import User
 from ..services.analytics import UserAnalyticsService
 
 
-class PygadGeneticScheduler:
+class GeneticScheduler:
     """
     Schedules tasks using a GA with random-keys encoding while enforcing
     the order of tasks inside each session.

@@ -1,6 +1,6 @@
-# Genetic Algorithm Task Scheduler Implementation
+# Genetic Algorithm Task Scheduler (PyGAD-based)
 
-This implementation follows the specifications in `IMPLEMENTATION.md` and provides a complete genetic algorithm solution for optimizing task schedules in the Pomodoro application.
+This document describes the current scheduler, implemented with PyGAD and a random-keys encoding that preserves the natural order of tasks inside each session while allowing interleaving across sessions.
 
 ## Overview
 
@@ -16,13 +16,19 @@ The genetic algorithm optimizes task schedules by maximizing a fitness function 
 - **Variety weight** adjusts based on user's focus level feedback
 - **Urgency weight** remains constant as deadlines are always critical
 
-### Genetic Algorithm Components
-- **Population size**: 50 chromosomes
-- **Generations**: 100 iterations
-- **Selection**: Tournament selection with size 5
-- **Crossover**: Order Crossover (OX1) with 80% probability
-- **Mutation**: Swap mutation with 10% probability
-- **Elitism**: Top 5 chromosomes preserved each generation
+### Encoding and Feasibility (Random-Keys + Decoder)
+- Each gene is a float priority in [0, 1] corresponding to a task.
+- A deterministic decoder performs a K-way merge across sessions: at each step, it picks the head task of any session with the highest priority. This enforces in-session order (no invalid permutations) while permitting interleaving across sessions.
+- Ties are broken by earlier due date, then shorter estimated time, then lower task id.
+
+### Genetic Algorithm Configuration (PyGAD)
+- **Population size**: 80 solutions
+- **Generations**: 120 iterations
+- **Selection**: Tournament selection (K = 4)
+- **Crossover**: Uniform crossover on priority vectors
+- **Mutation**: Random mutation with probability 0.15
+- **Elitism**: Keep 4 parents
+- **Gene space**: Uniform [0.0, 1.0] per gene
 
 ### User Analytics Integration
 - Tracks task completion rates over time
@@ -32,7 +38,7 @@ The genetic algorithm optimizes task schedules by maximizing a fitness function 
 
 ## API Endpoints
 
-### Schedule Generation
+### Schedule Generation (default uses PyGAD)
 ```
 POST /scheduler/generate-schedule
 {
@@ -92,21 +98,19 @@ w_v = k_v × (F_max - F̄_feedback) / (F_max - F_min)
 
 ## Implementation Files
 
-- `app/scheduler/genetic_algorithm.py` - Core GA implementation
-- `app/scheduler/router.py` - API endpoints
-- `app/scheduler/schemas.py` - Request/response models
-- `app/services/analytics.py` - User performance analytics
-- `app/models.py` - Updated database models
-- `migrate_db.py` - Database migration script
+- `app/scheduler/pygad_scheduler.py` — Core GA implementation (class `GeneticScheduler`), random-keys encoding + decoder
+- `app/scheduler/router.py` — API endpoints (default `/scheduler/generate-schedule` uses `GeneticScheduler`)
+- `app/scheduler/schemas.py` — Request/response models
+- `app/services/analytics.py` — User performance analytics powering adaptive weights
+- `app/models.py` — Database models (e.g., `Task.due_date`, `Task.order`)
 
 ## Testing
 
-The implementation has been thoroughly tested:
-- Unit tests for all GA components
-- Fitness function validation
-- Genetic operator verification
+Key validation points to consider:
+- Unit tests for decoder correctness (session-order preservation)
+- Fitness function validation (urgency, momentum, variety)
+- PyGAD integration (selection, crossover, mutation behaviors)
 - API endpoint functionality
-- Database migration success
 
 ## Usage Example
 

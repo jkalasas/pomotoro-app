@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -25,11 +25,3 @@ class ScheduleResponse(BaseModel):
 
 class ScheduleReorderRequest(BaseModel):
     task_ids: List[int]
-
-
-class UserAnalyticsResponse(BaseModel):
-    completion_rate: float
-    average_focus_level: float
-    estimated_vs_actual_ratio: float
-    category_performance: Dict[str, float]
-    time_of_day_performance: Dict[str, float]
