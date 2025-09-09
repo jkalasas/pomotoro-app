@@ -7,6 +7,7 @@ from ..db import SessionDep
 from ..models import PomodoroSession, Task
 from .schemas import ScheduleRequest, ScheduleResponse, ScheduledTaskResponse, UserAnalyticsResponse, ScheduleReorderRequest
 from .genetic_algorithm import GeneticAlgorithmScheduler
+from .pygad_scheduler import PygadGeneticScheduler
 from ..services.analytics import UserAnalyticsService
 
 router = APIRouter(prefix="/scheduler", tags=["Scheduler"])
@@ -73,6 +74,37 @@ def schedule_tasks_with_ga(session_ids: List[int], db, user: ActiveUserDep) -> S
     )
 
 
+def schedule_tasks_with_pygad(session_ids: List[int], db, user: ActiveUserDep) -> ScheduleResponse:
+    """Schedule tasks using the pygad-based GA that preserves in-session order."""
+    statement = select(Task).where(
+        Task.session_id.in_(session_ids),
+        Task.completed == False,
+        Task.archived == False,
+    )
+    all_tasks = db.exec(statement).all()
+
+    if not all_tasks:
+        raise HTTPException(status_code=404, detail="No uncompleted tasks found for the provided session IDs.")
+
+    pygad_sched = PygadGeneticScheduler()
+    optimized, fitness = pygad_sched.schedule_tasks(all_tasks, user, db)
+
+    response_tasks = [
+        ScheduledTaskResponse(
+            id=t.id,
+            name=t.name,
+            estimated_completion_time=t.estimated_completion_time,
+            session_id=t.session_id,
+            category=(t.categories[0].name if t.categories else "Uncategorized"),
+            due_date=t.due_date.isoformat() if t.due_date else None,
+            completed=t.completed,
+        )
+        for t in optimized
+    ]
+    total_time = sum(t.estimated_completion_time for t in optimized)
+    return ScheduleResponse(scheduled_tasks=response_tasks, total_schedule_time=total_time, fitness_score=fitness)
+
+
 @router.post("/generate-schedule", response_model=ScheduleResponse)
 def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUserDep):
     """
@@ -95,6 +127,28 @@ def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUser
         raise HTTPException(status_code=400, detail="Session IDs list cannot be empty.")
     
     return schedule_tasks_with_ga(request.session_ids, db, user)
+
+
+@router.post("/generate-schedule-pygad", response_model=ScheduleResponse)
+def generate_schedule_pygad(request: ScheduleRequest, db: SessionDep, user: ActiveUserDep):
+    """Alternative endpoint using pygad-based GA that respects in-session order."""
+    # Verify user owns all requested sessions
+    query = select(PomodoroSession).where(
+        PomodoroSession.id.in_(request.session_ids),
+        PomodoroSession.user_id != user.id,
+    )
+
+    unauthorized_sessions = db.exec(query).first()
+    if unauthorized_sessions:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot schedule tasks from sessions not owned by the user.",
+        )
+
+    if not request.session_ids:
+        raise HTTPException(status_code=400, detail="Session IDs list cannot be empty.")
+
+    return schedule_tasks_with_pygad(request.session_ids, db, user)
 
 
 @router.get("/user-insights", response_model=UserAnalyticsResponse)
