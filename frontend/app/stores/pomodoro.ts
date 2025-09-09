@@ -262,6 +262,32 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     }
   }
 
+  // Notification helper function
+  const sendFocusNotification = async () => {
+    if (typeof window === "undefined" || !("__TAURI__" in window)) {
+      return; // Not in Tauri environment
+    }
+
+    try {
+      const { isPermissionGranted, requestPermission, sendNotification } = await import("@tauri-apps/plugin-notification");
+      
+      let permissionGranted = await isPermissionGranted();
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === 'granted';
+      }
+      
+      if (permissionGranted) {
+        sendNotification({
+          title: 'Focus Time Started',
+          body: 'Your break is over. Time to get back to work!',
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to send focus notification:", error);
+    }
+  };
+
   return {
   time: 25 * 60, // Initialize with default 25 minutes
   maxTime: 25 * 60, // Initialize with default 25 minutes
@@ -721,6 +747,9 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           audio.volume = 0.8;
           audio.play().catch(() => {});
         } catch { /* ignore sound errors */ }
+        
+        // Send focus notification
+        sendFocusNotification();
       }
 
   // Update the backend with new phase and KEEP the timer running; suppress ticker sync briefly
