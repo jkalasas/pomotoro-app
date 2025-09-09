@@ -252,14 +252,9 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       <div className="w-full flex justify-between items-center backdrop-blur-md bg-card/70 rounded-xl p-4 border border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              Insights
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+            Insights
+          </h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/30 px-4 py-2.5 rounded-2xl backdrop-blur-sm border border-border/30">
@@ -283,11 +278,21 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-border/40 bg-card/90 backdrop-blur-md">
-              <SelectItem value="7" className="rounded-xl">7 days</SelectItem>
-              <SelectItem value="14" className="rounded-xl">14 days</SelectItem>
-              <SelectItem value="30" className="rounded-xl">30 days</SelectItem>
-              <SelectItem value="60" className="rounded-xl">60 days</SelectItem>
-              <SelectItem value="90" className="rounded-xl">90 days</SelectItem>
+              <SelectItem value="7" className="rounded-xl">
+                7 days
+              </SelectItem>
+              <SelectItem value="14" className="rounded-xl">
+                14 days
+              </SelectItem>
+              <SelectItem value="30" className="rounded-xl">
+                30 days
+              </SelectItem>
+              <SelectItem value="60" className="rounded-xl">
+                60 days
+              </SelectItem>
+              <SelectItem value="90" className="rounded-xl">
+                90 days
+              </SelectItem>
             </SelectContent>
           </Select>
 
@@ -314,23 +319,31 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           <Tabs defaultValue="overview" className="space-y-8">
             <div className="flex justify-start items-center mb-8">
               <TabsList className="rounded-2xl bg-muted/30 backdrop-blur-sm border border-border/30 p-1.5">
-                <TabsTrigger value="overview" className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300">
+                <TabsTrigger
+                  value="overview"
+                  className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300"
+                >
                   <TrendingUp className="h-4 w-4 mr-2" />
                   Overview
                 </TabsTrigger>
-                <TabsTrigger value="focus" className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300">
+                <TabsTrigger
+                  value="focus"
+                  className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300"
+                >
                   <Clock className="h-4 w-4 mr-2" />
                   Focus
                 </TabsTrigger>
-                <TabsTrigger value="tasks" className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300">
+                <TabsTrigger
+                  value="tasks"
+                  className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300"
+                >
                   <Calendar className="h-4 w-4 mr-2" />
                   Tasks
                 </TabsTrigger>
-                <TabsTrigger value="insights" className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Insights
-                </TabsTrigger>
-                <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300">
+                <TabsTrigger
+                  value="activity"
+                  className="rounded-xl data-[state=active]:bg-card/70 data-[state=active]:shadow-lg transition-all duration-300"
+                >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Activity
                 </TabsTrigger>
@@ -343,12 +356,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                 <TaskCompletionChart
                   data={dashboardData.task_completion_trend}
                 />
-              </div>
-              <div className="grid gap-8 md:grid-cols-2">
-                <SessionDurationChart
-                  data={dashboardData.session_duration_distribution}
-                />
-                <InsightsCard insights={dashboardData.productivity_insights} />
               </div>
             </TabsContent>
 
@@ -392,9 +399,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                     </div>
                   </CardContent>
                 </Card>
-                <SessionDurationChart
-                  data={dashboardData.session_duration_distribution}
-                />
               </div>
             </TabsContent>
 
@@ -436,47 +440,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                 </CardContent>
               </Card>
             </TabsContent>
-
-            <TabsContent value="insights" className="space-y-8">
-              <InsightsCard insights={dashboardData.productivity_insights} />
-              <Card className="backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-xl shadow-primary/5 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 rounded-2xl overflow-hidden">
-                <CardHeader className="border-b border-border/30">
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                    </div>
-                    Activity History
-                  </CardTitle>
-                  <CardDescription>
-                    Your recent activity and productivity patterns
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    {dashboardData.daily_stats.slice(-14).map((stat, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-muted/20 to-muted/10 hover:from-muted/30 hover:to-muted/20 transition-all duration-300 group border border-border/20 hover:border-border/40 hover:shadow-lg"
-                      >
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {new Date(stat.date).toLocaleDateString()}
-                        </span>
-                        <div className="text-right">
-                          <div className="font-bold text-foreground group-hover:text-primary transition-colors">
-                            {(stat.total_focus_time / 3600).toFixed(1)}h focus
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {stat.tasks_completed} tasks •{" "}
-                            {stat.pomodoros_completed} pomodoros
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
             <TabsContent value="activity" className="space-y-8">
               <ActivityTimeline events={dashboardData.recent_events} />
             </TabsContent>
