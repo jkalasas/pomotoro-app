@@ -361,45 +361,41 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
             <TabsContent value="focus" className="space-y-8">
               <FocusTimeChart data={dashboardData.focus_time_trend} />
-              <div className="grid gap-8 md:grid-cols-2">
-                <Card className="backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-xl shadow-primary/5 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 rounded-2xl overflow-hidden">
-                  <CardHeader className=" border-b border-border/30">
-                    <CardTitle className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                        <Clock className="h-4 w-4 text-primary" />
-                      </div>
-                      Focus Time Statistics
-                    </CardTitle>
-                    <CardDescription>
-                      Detailed breakdown of your focus time over the past week
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-3">
-                      {dashboardData.daily_stats
-                        .slice(-7)
-                        .map((stat, index) => (
-                          <div
-                            key={index}
-                            className="flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-muted/20 to-muted/10 hover:from-muted/30 hover:to-muted/20 transition-all duration-300 group border border-border/20 hover:border-border/40 hover:shadow-lg"
-                          >
-                            <span className="text-sm text-muted-foreground font-medium">
-                              {new Date(stat.date).toLocaleDateString()}
-                            </span>
-                            <div className="text-right">
-                              <div className="font-bold text-foreground group-hover:text-primary transition-colors">
-                                {(stat.total_focus_time / 3600).toFixed(1)}h
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                focus time
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+              <Card className="backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-xl shadow-primary/5 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 rounded-2xl overflow-hidden">
+                <CardHeader className=" border-b border-border/30">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    Focus Time Statistics
+                  </CardTitle>
+                  <CardDescription>
+                    Detailed breakdown of your focus time over the past week
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    {dashboardData.daily_stats.slice(-7).map((stat, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-muted/20 to-muted/10 hover:from-muted/30 hover:to-muted/20 transition-all duration-300 group border border-border/20 hover:border-border/40 hover:shadow-lg"
+                      >
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {new Date(stat.date).toLocaleDateString()}
+                        </span>
+                        <div className="text-right">
+                          <div className="font-bold text-foreground group-hover:text-primary transition-colors">
+                            {(stat.total_focus_time / 3600).toFixed(1)}h
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            focus time
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="tasks" className="space-y-8">
@@ -440,6 +436,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                 </CardContent>
               </Card>
             </TabsContent>
+
             <TabsContent value="activity" className="space-y-8">
               <ActivityTimeline events={dashboardData.recent_events} />
             </TabsContent>
