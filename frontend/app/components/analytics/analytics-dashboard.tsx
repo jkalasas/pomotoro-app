@@ -50,7 +50,9 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      await analyticsAPI.updateDailyStats();
+      // Recompute stats for today to reflect latest completions
+      const today = new Date().toISOString().slice(0, 10);
+      await analyticsAPI.updateDailyStats(today);
       await fetchDashboardData();
       toast.success('Analytics data refreshed');
     } catch (error) {
@@ -68,8 +70,11 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
   // Refresh dashboard when tasks or sessions change elsewhere
   useEffect(() => {
-    const handler = () => {
-      handleRefresh();
+    const handler = async () => {
+      // Make sure we recompute today's stats promptly when a task completes
+      const today = new Date().toISOString().slice(0, 10);
+      await analyticsAPI.updateDailyStats(today).catch(() => {});
+      await fetchDashboardData();
     };
 
     if (typeof window !== 'undefined') {

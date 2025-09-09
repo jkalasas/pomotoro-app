@@ -145,27 +145,27 @@ export default function Home() {
       tasksStore.refreshAllData();
       // Defer analytics updates to prevent blocking UI
       setTimeout(() => {
-        analyticsStore.updateDailyStats();
+        analyticsStore.updateTodayStats();
       }, 100);
     };
 
     const handleSessionReset = () => {
-      tasksStore.refreshAllData();
-      // Defer analytics update
-      setTimeout(() => analyticsStore.updateDailyStats(), 100);
+  tasksStore.refreshAllData();
+  // Defer analytics update
+  setTimeout(() => analyticsStore.updateTodayStats(), 100);
     };
 
     const handleTaskCompleted = () => {
       // Session/task data refresh is already triggered by the stores.
       // Only update analytics here to avoid duplicate network calls.
-      setTimeout(() => analyticsStore.updateDailyStats(), 100);
+      setTimeout(() => analyticsStore.updateTodayStats(), 50);
     };
 
     if (typeof window !== "undefined") {
       window.addEventListener("session-completed", handleSessionCompleted);
       window.addEventListener("session-reset", handleSessionReset);
       window.addEventListener("task-completed", handleTaskCompleted);
-      window.addEventListener("task-uncompleted", handleTaskCompleted);
+  window.addEventListener("task-uncompleted", handleTaskCompleted);
     }
 
     return () => {
@@ -173,7 +173,7 @@ export default function Home() {
         window.removeEventListener("session-completed", handleSessionCompleted);
         window.removeEventListener("session-reset", handleSessionReset);
         window.removeEventListener("task-completed", handleTaskCompleted);
-        window.removeEventListener("task-uncompleted", handleTaskCompleted);
+  window.removeEventListener("task-uncompleted", handleTaskCompleted);
       }
     };
   }, [tasksStore]);
@@ -530,7 +530,7 @@ export default function Home() {
               toast.success("Session feedback submitted successfully!");
               // Refresh analytics after successful submission
               analyticsStore.fetchEvents();
-              analyticsStore.updateDailyStats();
+              analyticsStore.updateTodayStats();
             } catch (error) {
               toast.error("Failed to submit feedback. Please try again.");
             }

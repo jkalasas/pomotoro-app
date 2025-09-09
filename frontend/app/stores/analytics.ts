@@ -50,7 +50,8 @@ interface AnalyticsState {
   fetchEvents: (eventType?: string, days?: number) => Promise<void>;
   fetchDailyStats: (days?: number) => Promise<void>;
   fetchInsights: (days?: number) => Promise<void>;
-  updateDailyStats: () => Promise<void>;
+  updateDailyStats: (targetDate?: string) => Promise<void>;
+  updateTodayStats: () => Promise<void>;
   
   // Convenience methods for common events - now synchronous for performance
   logSessionStart: (sessionId: number, sessionName: string) => void;
@@ -171,13 +172,23 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
       }
     },
 
-    updateDailyStats: async () => {
+    updateDailyStats: async (targetDate?: string) => {
       try {
-        await analyticsAPI.updateDailyStats();
+        await analyticsAPI.updateDailyStats(targetDate);
         // Refresh daily stats after update
         get().fetchDailyStats();
       } catch (error) {
         console.error('Failed to update daily stats:', error);
+      }
+    },
+
+    updateTodayStats: async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        await analyticsAPI.updateDailyStats(today);
+        await get().fetchDailyStats();
+      } catch (error) {
+        // Non-fatal
       }
     },
 

@@ -151,7 +151,7 @@ class AnalyticsService:
         if not daily_stats:
             daily_stats = DailyStats(user_id=user_id, date=target_date)
         
-        # Calculate daily metrics from session analytics
+    # Calculate daily metrics from session analytics
         day_start = datetime.combine(target_date, datetime.min.time())
         day_end = datetime.combine(target_date, datetime.max.time())
         
@@ -177,11 +177,28 @@ class AnalyticsService:
             )
         ).all()
         
+        # Compute tasks completed TODAY by looking at task completion timestamps
+        # This ensures tasks completed in sessions started on previous days are counted correctly.
+        from ..models import Task, PomodoroSession as _PomodoroSession
+        completed_tasks_today = db.exec(
+            select(Task)
+            .join(_PomodoroSession)
+            .where(
+                and_(
+                    _PomodoroSession.user_id == user_id,
+                    Task.completed == True,  # noqa: E712
+                    Task.completed_at >= day_start,
+                    Task.completed_at <= day_end,
+                    Task.is_deleted == False  # noqa: E712
+                )
+            )
+        ).all()
+
         # Aggregate metrics
         daily_stats.total_focus_time = sum(sa.total_focus_time for sa in session_analytics)
         daily_stats.total_break_time = sum(sa.total_break_time for sa in session_analytics)
         daily_stats.sessions_completed = len(session_feedbacks)  # Use feedback count for completed sessions
-        daily_stats.tasks_completed = sum(sa.tasks_completed for sa in session_analytics)
+        daily_stats.tasks_completed = len(completed_tasks_today)
         daily_stats.pomodoros_completed = sum(sa.pomodoros_completed for sa in session_analytics)
         daily_stats.interruptions_count = sum(sa.interruptions_count for sa in session_analytics)
         
@@ -341,14 +358,38 @@ class AnalyticsService:
         ]
         
         # Task completion trend
-        task_completion_trend = [
-            {
-                "date": ds.date.isoformat(),
-                "completed": ds.tasks_completed,
-                "sessions": ds.sessions_completed
-            }
-            for ds in daily_stats
-        ]
+        # To ensure accuracy when sessions span days, compute completed count per day from Task.completed_at
+        from ..models import Task as _Task, PomodoroSession as _PomodoroSession
+        task_completion_trend = []
+        current_day = start_date
+        while current_day <= end_date:
+            day_start = datetime.combine(current_day, datetime.min.time())
+            day_end = datetime.combine(current_day, datetime.max.time())
+            completed_count = db.exec(
+                select(_Task)
+                .join(_PomodoroSession)
+                .where(
+                    and_(
+                        _PomodoroSession.user_id == user_id,
+                        _Task.completed == True,  # noqa: E712
+                        _Task.completed_at >= day_start,
+                        _Task.completed_at <= day_end,
+                        _Task.is_deleted == False  # noqa: E712
+                    )
+                )
+            ).all()
+
+            # sessions_completed from daily_stats for this date if present
+            ds_for_day = next((ds for ds in daily_stats if ds.date == current_day), None)
+            sessions_count = ds_for_day.sessions_completed if ds_for_day else 0
+
+            task_completion_trend.append({
+                "date": current_day.isoformat(),
+                "completed": len(completed_count),
+                "sessions": sessions_count
+            })
+
+            current_day += timedelta(days=1)
         
         # Productivity heatmap (simplified - could be enhanced)
         productivity_heatmap = [
