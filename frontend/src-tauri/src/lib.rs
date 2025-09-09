@@ -1,7 +1,7 @@
-use tauri::{AppHandle, Manager};
-use tauri::WindowEvent;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
+use tauri::WindowEvent;
+use tauri::{AppHandle, Manager};
 
 fn handle_menu_event(app: &AppHandle, id: &str) {
     match id {
@@ -42,10 +42,12 @@ pub fn run() {
                 .build()?;
 
             // Create tray icon and wire up menu events
-        TrayIconBuilder::new()
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Pomotoro")
                 .menu(&menu)
                 .on_menu_event(|app, event| {
-            handle_menu_event(app, event.id.as_ref());
+                    handle_menu_event(app, event.id.as_ref());
                 })
                 .build(app)?;
 
