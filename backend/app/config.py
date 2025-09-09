@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    # When true, access tokens will be created without an `exp` claim
+    # Useful for local development or special environments. Do NOT enable in production.
+    access_token_no_expiration: bool = False
 
     gemini_api_key: str
     gemini_model: str = "gemini-2.0-flash-lite"

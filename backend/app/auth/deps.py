@@ -29,15 +29,19 @@ def authenticate_user(session: Session, email: str, password: str) -> Optional[U
     return user
 
 
-def create_token(data: dict, expires_delta: timedelta):
+def create_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expires_delta = expires_delta
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
+    # Only set exp if an expiration is provided; otherwise, token will not expire.
+    if expires_delta is not None:
+        expire = datetime.now(timezone.utc) + expires_delta
+        to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    # If no-expiration flag is set and no explicit delta is provided, omit exp.
+    if expires_delta is None and settings.access_token_no_expiration:
+        return create_token(data, None)
     return create_token(
         data, expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     )
