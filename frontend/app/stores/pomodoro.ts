@@ -943,6 +943,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   triggerSessionCompletion: (sessionId, sessionName, totalTasks, completedTasks, focusDuration) => {
+    // Show feedback UI and capture completion details
     set({
       showFeedbackModal: true,
       pendingSessionCompletion: {
@@ -953,6 +954,21 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         focusDuration,
       },
     });
+
+    // Immediately stop the timer and close any rest overlay to avoid lingering overlay
+    try {
+      // Stop local timer state first to ensure background ticker doesn't recreate overlay
+      set({ isRunning: false });
+      // Best-effort backend sync to pause active session
+      apiClient.updateActiveSession({ is_running: false }).catch(() => { /* ignore */ });
+
+      // If rest overlay is visible, close it now
+      const state = get();
+      if (state.showRestOverlay) {
+        set({ showRestOverlay: false });
+        try { useWindowStore.getState().closeOverlayWindow(); } catch { /* ignore */ }
+      }
+    } catch { /* non-fatal */ }
   },
 
   setShowFeedbackModal: (show) => {
