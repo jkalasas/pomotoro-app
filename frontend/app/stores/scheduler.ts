@@ -78,13 +78,13 @@ export const useSchedulerStore = create<SchedulerState>()(
           const currentPhase = pomodoroStore.phase;
           const remainingTime = pomodoroStore.time; // seconds
 
+          // Don't automatically switch the backend session - just update the current task
+          // and let the pomodoro store handle the configuration based on the current task
           if (!isRunning) {
-            // Safest path: switch active session to the first task's session when timer is not running
-            await pomodoroStore.setSession(firstTask.session_id);
-            // Ensure the current task id is reflected on backend
+            // When timer is not running, we can safely update the current task
             await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: false });
           } else {
-            // Timer running: don't switch session to avoid disruption; just sync settings and clamp if needed
+            // Timer running: update task and sync settings, clamp time if needed
             await pomodoroStore.updateSettingsFromTask(firstTask.session_id);
             const updatedSettings = usePomodoroStore.getState().settings;
             const nextFocusSeconds = updatedSettings.focus_duration * 60;
@@ -101,6 +101,9 @@ export const useSchedulerStore = create<SchedulerState>()(
               await pomodoroStore.updateTimer({ current_task_id: firstTask.id });
             }
           }
+          
+          // Always sync config with current task after schedule generation
+          await pomodoroStore.syncConfigWithCurrentTask();
         }
       } catch (syncErr) {
         // Don't block schedule creation if timer sync fails
@@ -221,6 +224,14 @@ export const useSchedulerStore = create<SchedulerState>()(
       // Delegate to tasks store for unified behavior (analytics, events, feedback, data refresh)
       const { useTaskStore } = await import('./tasks');
       await useTaskStore.getState().completeTask(taskId);
+
+      // Sync pomodoro config with the new current task after completion
+      try {
+        const { usePomodoroStore } = await import('./pomodoro');
+        await usePomodoroStore.getState().syncConfigWithCurrentTask();
+      } catch (syncError) {
+        // Don't block task completion if sync fails
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));

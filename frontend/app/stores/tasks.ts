@@ -656,30 +656,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           is_running: true,
           time_remaining: newTimeRemaining,
         });
+        
+        // Sync configuration after updating the timer
+        await pomodoroStore.syncConfigWithCurrentTask();
       } else {
         // Timer is not running or not in focus phase, handle normally
         
-        // If the next task is from a different session, update pomodoro configuration
-        if (currentSessionId !== nextSessionId) {
-          await pomodoroStore.updateSettingsFromTask(nextSessionId);
-          
-          // Get the updated settings after updateSettingsFromTask
-          const updatedSettings = usePomodoroStore.getState().settings;
-          const newFocusDuration = updatedSettings.focus_duration * 60; // Convert to seconds
-          
-          // For non-running timer, use new focus duration
-          await pomodoroStore.updateTimer({
-            time_remaining: newFocusDuration,
-            current_task_id: nextTask.id,
-            is_running: false,
-          });
-        } else {
-          // Same session, just update the current task
-          await pomodoroStore.updateTimer({
-            current_task_id: nextTask.id,
-            is_running: false,
-          });
-        }
+        // Update the current task first
+        await pomodoroStore.updateTimer({
+          current_task_id: nextTask.id,
+          is_running: false,
+        });
+        
+        // Then sync configuration which will handle session differences
+        await pomodoroStore.syncConfigWithCurrentTask();
       }
     } catch (error) {
       // Failed to handle next task transition

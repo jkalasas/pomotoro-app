@@ -128,7 +128,10 @@ export default function Home() {
   useEffect(() => {
     if (authStore.user) {
       tasksStore.loadSessions();
-      pomodoroStore.loadActiveSession();
+      pomodoroStore.loadActiveSession().then(() => {
+        // Sync pomodoro config with current task after loading active session
+        pomodoroStore.syncConfigWithCurrentTask();
+      });
     }
   }, [authStore.user]);
 

@@ -45,6 +45,7 @@ export interface PomodoroState {
     long_break_per_pomodoros: number;
   }) => void;
   updateSettingsFromTask: (taskSessionId: number) => Promise<void>;
+  syncConfigWithCurrentTask: () => Promise<void>;
   setSession: (sessionId: number) => Promise<void>;
   loadActiveSession: () => Promise<void>;
   handlePhaseCompletion: () => Promise<void>;
@@ -421,6 +422,48 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     }
   },
 
+  syncConfigWithCurrentTask: async () => {
+    try {
+      const { useSchedulerStore } = await import('./scheduler');
+      const schedulerState = useSchedulerStore.getState();
+      const currentTask = schedulerState.getCurrentTask();
+      
+      if (currentTask) {
+        const currentState = get();
+        
+        // Update settings from the current task's session
+        await get().updateSettingsFromTask(currentTask.session_id);
+        
+        // Get the updated settings
+        const updatedState = get();
+        
+        // If we're in focus phase, make sure max time matches the new focus duration
+        if (currentState.phase === "focus") {
+          const newFocusDuration = updatedState.settings.focus_duration * 60;
+          
+          // Always update max time to match the current task's session focus duration
+          if (currentState.maxTime !== newFocusDuration) {
+            set({ maxTime: newFocusDuration });
+            
+            // If current time is greater than new max time, clamp it
+            if (currentState.time > newFocusDuration) {
+              await get().updateTimer({ time_remaining: newFocusDuration });
+            } else {
+              // Even if we don't need to clamp time, we should update the backend
+              // to ensure it knows about the current task
+              await get().updateTimer({ current_task_id: currentTask.id });
+            }
+          }
+        } else {
+          // For break phases, just ensure the current task is set
+          await get().updateTimer({ current_task_id: currentTask.id });
+        }
+      }
+    } catch (error) {
+      // Failed to sync config with current task
+    }
+  },
+
   setSession: async (sessionId: number) => {
     set({ isLoading: true });
     try {
@@ -479,11 +522,37 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         set({ isRunning: false });
       }
       
-      // Update settings if session changed or if this is the first load
-      const sessionChanged = currentState.sessionId !== activeSession.session_id;
-      if (sessionChanged || currentState.sessionId === null) {
+      // Determine which session's config to use based on current task
+      let configSessionId = activeSession.session_id;
+      let useCurrentTaskSession = false;
+      
+      // If there's a current task, check if it belongs to a different session
+      if (activeSession.current_task_id) {
         try {
-          await get().updateSettingsFromTask(activeSession.session_id);
+          const { useSchedulerStore } = await import('./scheduler');
+          const schedulerState = useSchedulerStore.getState();
+          const currentSchedule = schedulerState.currentSchedule;
+          
+          if (currentSchedule) {
+            const currentTask = currentSchedule.find(task => task.id === activeSession.current_task_id);
+            if (currentTask) {
+              // Always use the current task's session for configuration
+              configSessionId = currentTask.session_id;
+              useCurrentTaskSession = currentTask.session_id !== activeSession.session_id;
+            }
+          }
+        } catch (error) {
+          // Failed to check scheduler, use default session
+        }
+      }
+      
+      // Update settings - always use the current task's session config if available
+      const sessionChanged = currentState.sessionId !== activeSession.session_id;
+      const configChanged = useCurrentTaskSession || sessionChanged || currentState.sessionId === null;
+      
+      if (configChanged) {
+        try {
+          await get().updateSettingsFromTask(configSessionId);
         } catch (error) {
           // Failed to update settings from session
         }
@@ -500,10 +569,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const phaseChanged = currentState.phase !== activeSession.phase;
       const isAtBeginning = !currentState.maxTime || currentState.time === currentState.maxTime || currentState.maxTime === 0;
       
-      if (phaseChanged || sessionChanged || isAtBeginning) {
+      if (phaseChanged || sessionChanged || configChanged || isAtBeginning) {
         // Get session details to determine correct maxTime for the current phase
+        // Use the config session ID to ensure we get the right timing values
         try {
-          const session = await apiClient.getSession(activeSession.session_id) as {
+          const session = await apiClient.getSession(configSessionId) as {
             focus_duration: number;
             short_break_duration: number;
             long_break_duration: number;
