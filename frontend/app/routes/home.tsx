@@ -442,10 +442,26 @@ export default function Home() {
               {schedulerStore.getCurrentTask() && (
                 <>
                   <div className="flex gap-3">
-                    <Button className="flex flex-1 items-center gap-3" variant="default" onClick={() => { if (pomodoroStore.isRunning) { pomodoroStore.pauseTimer(); } else { pomodoroStore.startTimer(); } }} disabled={pomodoroStore.isLoading}>
+                    <Button className="flex flex-1 items-center gap-3" variant="default" onClick={async () => { 
+                      try {
+                        if (pomodoroStore.isRunning) { 
+                          await pomodoroStore.pauseTimer(); 
+                        } else { 
+                          await pomodoroStore.startTimer(); 
+                        }
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : "Failed to start timer");
+                      }
+                    }} disabled={pomodoroStore.isLoading}>
                       {pomodoroStore.isRunning ? (<><Pause /><span>Pause Task</span></>) : (<><Play /><span>Start Task</span></>)}
                     </Button>
-                    <Button className="flex items-center gap-3" variant="outline" onClick={() => { pomodoroStore.resetTimer(); }} disabled={pomodoroStore.isLoading}><RotateCcw /></Button>
+                    <Button className="flex items-center gap-3" variant="outline" onClick={async () => { 
+                      try {
+                        await pomodoroStore.resetTimer(); 
+                      } catch (error) {
+                        toast.error("Failed to reset timer");
+                      }
+                    }} disabled={pomodoroStore.isLoading}><RotateCcw /></Button>
                   </div>
                 </>
               )}

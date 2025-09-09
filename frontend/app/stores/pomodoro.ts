@@ -294,6 +294,26 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         set({ time: focusDuration, maxTime: focusDuration });
       }
       
+      // Check if we have an active session, if not try to set one from current task
+      if (!sessionId) {
+        try {
+          // Try to get current task from scheduler
+          const { useSchedulerStore } = await import('./scheduler');
+          const schedulerState = useSchedulerStore.getState();
+          const currentTask = schedulerState.getCurrentTask();
+          
+          if (currentTask) {
+            // Start active session for this task's session
+            await get().setSession(currentTask.session_id);
+          } else {
+            // No current task available, cannot start timer
+            throw new Error("No active task available. Please generate a schedule first.");
+          }
+        } catch (error) {
+          throw error;
+        }
+      }
+      
       // Update backend first
       await apiClient.updateActiveSession({ is_running: true });
       
@@ -301,11 +321,14 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       set({ isRunning: true });
       
       // Log analytics event
-      if (sessionId) {
-        useAnalyticsStore.getState().logTimerStart(sessionId, get().phase);
+      const currentSessionId = get().sessionId;
+      if (currentSessionId) {
+        useAnalyticsStore.getState().logTimerStart(currentSessionId, get().phase);
       }
     } catch (error) {
       // Failed to start timer
+      console.error("Failed to start timer:", error);
+      throw error; // Re-throw to let UI handle the error
     } finally {
       set({ isLoading: false });
     }
@@ -315,6 +338,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       const { time, sessionId } = get();
+      
+      // Check if we have an active session
+      if (!sessionId) {
+        throw new Error("No active session found");
+      }
       
       // Update backend first with current time and paused state
       await apiClient.updateActiveSession({ 
@@ -331,6 +359,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
     } catch (error) {
       // Failed to pause timer
+      console.error("Failed to pause timer:", error);
     } finally {
       set({ isLoading: false });
     }
@@ -341,6 +370,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     try {
       // Get current settings
       const { settings, sessionId, phase, time } = get();
+      
+      // Check if we have an active session
+      if (!sessionId) {
+        throw new Error("No active session found");
+      }
+      
       const resetTime = settings.focus_duration * 60; // Convert to seconds
       
       // Update backend first
@@ -364,6 +399,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
     } catch (error) {
       // Failed to reset timer
+      console.error("Failed to reset timer:", error);
     } finally {
       set({ isLoading: false });
     }
