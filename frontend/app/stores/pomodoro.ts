@@ -66,6 +66,8 @@ export interface PomodoroState {
 
 export const usePomodoroStore = create<PomodoroState>((set, get) => {
   let _bgInterval: NodeJS.Timeout | null = null;
+  // Suppress background sync for a brief window after intentional updates to avoid races
+  let _suppressSyncUntilMs = 0;
   
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
@@ -134,9 +136,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
             const newTime = state.time - 1;
             set({ time: newTime });
 
-            // Sync with backend every 10 seconds but only when not at critical moments
-            // to prevent overwriting the local countdown during task completion
-            if (newTime > 0 && newTime % 10 === 0 && newTime > 5) {
+            // Sync with backend every 10 seconds but skip during suppression window
+            if (newTime > 0 && newTime % 10 === 0 && newTime > 5 && Date.now() >= _suppressSyncUntilMs) {
               apiClient.updateActiveSession({ time_remaining: newTime }).catch(() => {
                 // Backend sync failed - continue with local timer
               });
@@ -429,34 +430,41 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const currentTask = schedulerState.getCurrentTask();
       
       if (currentTask) {
-        const currentState = get();
-        
-        // Update settings from the current task's session
+        const prev = get();
+
+        // Remember previous focus max to evaluate reset conditions
+        const prevFocusSeconds = prev.settings.focus_duration * 60;
+        const prevRemaining = prev.time;
+        const wasRunning = prev.isRunning;
+        const prevPhase = prev.phase;
+
+        // Update settings from the current task's session (adopt latest task config)
         await get().updateSettingsFromTask(currentTask.session_id);
-        
-        // Get the updated settings
-        const updatedState = get();
-        
-        // If we're in focus phase, make sure max time matches the new focus duration
-        if (currentState.phase === "focus") {
-          const newFocusDuration = updatedState.settings.focus_duration * 60;
-          
-          // Always update max time to match the current task's session focus duration
-          if (currentState.maxTime !== newFocusDuration) {
-            set({ maxTime: newFocusDuration });
-            
-            // If current time is greater than new max time, clamp it
-            if (currentState.time > newFocusDuration) {
-              await get().updateTimer({ time_remaining: newFocusDuration });
-            } else {
-              // Even if we don't need to clamp time, we should update the backend
-              // to ensure it knows about the current task
-              await get().updateTimer({ current_task_id: currentTask.id });
-            }
-          }
+
+        const after = get();
+        const newFocusSeconds = after.settings.focus_duration * 60;
+
+        if (prevPhase === "focus") {
+          // Reset if remaining equals previous session max or exceeds new session max
+          const mustReset = prevRemaining === prevFocusSeconds || prevRemaining > newFocusSeconds;
+          const newRemaining = mustReset ? newFocusSeconds : Math.min(prevRemaining, newFocusSeconds);
+
+          // Immediately reflect new config locally for snappy UI
+          set({ maxTime: newFocusSeconds, time: newRemaining, currentTaskId: currentTask.id });
+
+          await get().updateTimer({
+            current_task_id: currentTask.id,
+            phase: mustReset ? 'focus' : undefined,
+            time_remaining: newRemaining,
+            is_running: wasRunning,
+          });
         } else {
-          // For break phases, just ensure the current task is set
-          await get().updateTimer({ current_task_id: currentTask.id });
+          // During breaks, keep timer running state and just switch the task for UI/association
+          set({ currentTaskId: currentTask.id });
+          await get().updateTimer({
+            current_task_id: currentTask.id,
+            is_running: wasRunning,
+          });
         }
       }
     } catch (error) {
@@ -623,7 +631,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   handlePhaseCompletion: async () => {
-    const { phase, pomodorosCompleted, sessionId, totalPomodorosCompleted } = get();
+    const { phase, pomodorosCompleted, sessionId, totalPomodorosCompleted, settings } = get();
     
     if (!sessionId) {
       console.error('No active session found for phase completion');
@@ -631,13 +639,13 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     }
 
     try {
-      // Get session configuration to determine durations and break intervals
-      const session = await apiClient.getSession(sessionId) as {
-        focus_duration: number;
-        short_break_duration: number;
-        long_break_duration: number;
-        long_break_per_pomodoros: number;
-      };
+      // Use current settings already synced with the current task's session
+      const session = {
+        focus_duration: settings.focus_duration,
+        short_break_duration: settings.short_break_duration,
+        long_break_duration: settings.long_break_duration,
+        long_break_per_pomodoros: settings.long_break_per_pomodoros,
+      } as const;
 
       let nextPhase: string;
       let nextDuration: number;
@@ -679,8 +687,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         } catch { /* ignore sound errors */ }
       }
 
-      // Update the backend with new phase and KEEP the timer running for a continuous experience
-      await apiClient.updateActiveSession({
+  // Update the backend with new phase and KEEP the timer running; suppress ticker sync briefly
+  const suppressMs = 1500;
+  _suppressSyncUntilMs = Date.now() + suppressMs;
+  await apiClient.updateActiveSession({
         phase: nextPhase,
         time_remaining: nextDuration,
         is_running: true, // Auto-continue into next phase
@@ -729,6 +739,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       const prevState = get();
+  // Avoid background ticker overwriting this direct update for a brief moment
+  _suppressSyncUntilMs = Date.now() + 1500;
       await apiClient.updateActiveSession(updates);
       await get().loadActiveSession();
       
@@ -783,7 +795,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   skipRest: async () => {
-    const { sessionId, phase, isRunning } = get();
+    const { sessionId, phase, isRunning, settings } = get();
     
     if (!sessionId) {
       console.error('No active session found for skip rest');
@@ -802,12 +814,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         try { await useWindowStore.getState().closeOverlayWindow(); } catch { /* ignore */ }
       }
       
-      // Fetch session to get correct focus duration
-      const session = await apiClient.getSession(sessionId) as { focus_duration: number };
-      const focusDuration = session.focus_duration * 60; // seconds
+  // Use current settings for focus duration
+  const focusDuration = settings.focus_duration * 60; // seconds
       
-      // Fast-forward to focus phase AND keep timer running (continuous flow)
-      await apiClient.updateActiveSession({
+  // Fast-forward to focus phase AND keep timer running (continuous flow). Suppress ticker briefly
+  _suppressSyncUntilMs = Date.now() + 1500;
+  await apiClient.updateActiveSession({
         phase: 'focus',
         is_running: true, // continue running instead of pausing
         time_remaining: focusDuration,

@@ -77,6 +77,7 @@ export const useSchedulerStore = create<SchedulerState>()(
           const isRunning = pomodoroStore.isRunning;
           const currentPhase = pomodoroStore.phase;
           const remainingTime = pomodoroStore.time; // seconds
+          const prevFocusSeconds = pomodoroStore.settings.focus_duration * 60;
 
           // Don't automatically switch the backend session - just update the current task
           // and let the pomodoro store handle the configuration based on the current task
@@ -84,21 +85,25 @@ export const useSchedulerStore = create<SchedulerState>()(
             // When timer is not running, we can safely update the current task
             await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: false });
           } else {
-            // Timer running: update task and sync settings, clamp time if needed
+            // Timer running: update task and sync settings, apply reset rules and keep running
             await pomodoroStore.updateSettingsFromTask(firstTask.session_id);
-            const updatedSettings = usePomodoroStore.getState().settings;
-            const nextFocusSeconds = updatedSettings.focus_duration * 60;
+            const nextFocusSeconds = usePomodoroStore.getState().settings.focus_duration * 60;
 
             if (currentPhase === 'focus') {
-              const clamped = remainingTime > nextFocusSeconds ? nextFocusSeconds : remainingTime;
+              const mustReset = remainingTime === prevFocusSeconds || remainingTime > nextFocusSeconds;
+              const newRemaining = mustReset ? nextFocusSeconds : Math.min(remainingTime, nextFocusSeconds);
+              // Instantly reflect locally
+              usePomodoroStore.setState({ maxTime: nextFocusSeconds, time: newRemaining, currentTaskId: firstTask.id });
               await pomodoroStore.updateTimer({
                 current_task_id: firstTask.id,
-                time_remaining: clamped,
+                phase: 'focus',
+                time_remaining: newRemaining,
                 is_running: true,
               });
             } else {
               // During breaks, keep remaining time; still set the current task id for UI consistency
-              await pomodoroStore.updateTimer({ current_task_id: firstTask.id });
+              usePomodoroStore.setState({ currentTaskId: firstTask.id });
+              await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: true });
             }
           }
           
@@ -155,6 +160,10 @@ export const useSchedulerStore = create<SchedulerState>()(
       
       // Get the currently active task from the timer (not just first uncompleted)
       const currentTaskId = pomodoroStore.currentTaskId;
+  const wasRunning = pomodoroStore.isRunning;
+  const prevPhase = pomodoroStore.phase;
+  const prevRemaining = pomodoroStore.time; // seconds
+  const prevFocusSeconds = pomodoroStore.settings.focus_duration * 60;
       const newFirstTask = reorderedTasks.find(task => !task.completed);
       
       // Create a map to preserve completion status
@@ -181,28 +190,55 @@ export const useSchedulerStore = create<SchedulerState>()(
         fitnessScore: response.fitness_score
       });
       
-      // Only reset timer if:
-      // 1. Timer was running on a specific task, AND
-      // 2. The active task changes (different first uncompleted), AND
-      // 3. The focus duration of the new task's session is LESS than the remaining time
-      let shouldResetTimer = false;
-      if (wasTimerRunning && currentTaskId !== null && newFirstTask && currentTaskId !== newFirstTask.id) {
+      // Decide how to update timer/config based on new first task and rules
+      if (newFirstTask) {
         try {
-          // Fetch session to determine its focus duration
-            const session = await apiClient.getSession(newFirstTask.session_id) as { focus_duration: number };
-            const remainingTime = pomodoroStore.time; // seconds
-            if (session.focus_duration * 60 < remainingTime) {
-              shouldResetTimer = true;
-            }
-        } catch (e) {
-          // If we fail to fetch session data, be conservative: do NOT reset
-          shouldResetTimer = false;
-        }
-      }
+          // Always adopt the session config of the new first (latest/next) task
+          await pomodoroStore.updateSettingsFromTask(newFirstTask.session_id);
 
-      if (shouldResetTimer) {
-        await pomodoroStore.resetTimer();
-        await pomodoroStore.startTimer();
+          // Compute new focus seconds for comparisons
+          const newFocusSeconds = usePomodoroStore.getState().settings.focus_duration * 60;
+
+          // If we're in focus phase and switching active task, decide if we must reset
+          const switchingTask = currentTaskId !== null && currentTaskId !== newFirstTask.id;
+          const mustResetFocus = prevPhase === 'focus' && switchingTask && (
+            prevRemaining === prevFocusSeconds || // equal to previous session max
+            prevRemaining > newFocusSeconds       // greater than new session max
+          );
+
+          if (prevPhase === 'focus') {
+            // Keep timer running during switch if it was running
+            if (mustResetFocus) {
+              // Reflect new config instantly
+              usePomodoroStore.setState({ maxTime: newFocusSeconds, time: newFocusSeconds, currentTaskId: newFirstTask.id });
+              await pomodoroStore.updateTimer({
+                current_task_id: newFirstTask.id,
+                phase: 'focus',
+                time_remaining: newFocusSeconds,
+                is_running: wasRunning || wasTimerRunning,
+              });
+            } else {
+              // If remaining time exceeds new max but we didn't detect switch (edge), clamp
+              const clamped = Math.min(prevRemaining, newFocusSeconds);
+              usePomodoroStore.setState({ maxTime: newFocusSeconds, time: clamped, currentTaskId: newFirstTask.id });
+              await pomodoroStore.updateTimer({
+                current_task_id: newFirstTask.id,
+                time_remaining: clamped,
+                is_running: wasRunning || wasTimerRunning,
+              });
+            }
+          } else {
+            // During breaks, just update the current task id and keep running state
+            usePomodoroStore.setState({ currentTaskId: newFirstTask.id });
+            await pomodoroStore.updateTimer({
+              current_task_id: newFirstTask.id,
+              is_running: wasRunning || wasTimerRunning,
+            });
+          }
+        } catch (e) {
+          // Best-effort: at least point timer to the new current task
+          await pomodoroStore.updateTimer({ current_task_id: newFirstTask.id, is_running: wasRunning || wasTimerRunning });
+        }
       }
     } catch (error) {
       console.error("Failed to reorder schedule:", error);
