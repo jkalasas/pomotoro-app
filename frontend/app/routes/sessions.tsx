@@ -98,6 +98,12 @@ export default function Sessions() {
 
   const handleSaveSession = async () => {
     if (!selectedSession) return;
+    // Basic validation: prevent saving empty/zero durations
+    const { focus_duration, short_break_duration, long_break_duration, long_break_per_pomodoros } = sessionForm;
+    if (!focus_duration || !short_break_duration || !long_break_duration || !long_break_per_pomodoros) {
+      toast.error("Please fill all session duration fields with values greater than 0");
+      return;
+    }
     
     try {
       await updateSession(selectedSession.id, sessionForm);
@@ -121,6 +127,16 @@ export default function Sessions() {
   
   const handleCreateSession = async () => {
     try {
+      // Validation for create session
+      const { focus_duration, short_break_duration, long_break_duration, long_break_per_pomodoros } = sessionForm;
+      if (!sessionForm.name.trim()) {
+        toast.error("Session name can't be empty");
+        return;
+      }
+      if (!focus_duration || !short_break_duration || !long_break_duration || !long_break_per_pomodoros) {
+        toast.error("Please fill all session duration fields with values greater than 0");
+        return;
+      }
       const sessionData = {
         name: sessionForm.name,
         description: sessionForm.description,
@@ -154,6 +170,10 @@ export default function Sessions() {
     if (!selectedSession) return;
     
     try {
+      if (!taskForm.estimated_completion_time || taskForm.estimated_completion_time <= 0) {
+        toast.error("Estimated duration must be greater than 0");
+        return;
+      }
       await addTaskToSession(selectedSession.id, taskForm);
       // Refresh the selected session
       const updatedSession = await getSession(selectedSession.id);
@@ -179,6 +199,10 @@ export default function Sessions() {
     if (!editingTask) return;
     
     try {
+      if (!taskForm.estimated_completion_time || taskForm.estimated_completion_time <= 0) {
+        toast.error("Estimated duration must be greater than 0");
+        return;
+      }
       await updateTask(editingTask.id, taskForm);
       // Update the selected session
       if (selectedSession) {
@@ -333,7 +357,10 @@ export default function Sessions() {
                       id="newFocus"
                       type="number"
                       value={sessionForm.focus_duration}
-                      onChange={(e) => setSessionForm({ ...sessionForm, focus_duration: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setSessionForm({ ...sessionForm, focus_duration: Number.isNaN(v) ? 0 : v });
+                      }}
                     />
                   </div>
                   <div>
@@ -342,7 +369,10 @@ export default function Sessions() {
                       id="newShort"
                       type="number"
                       value={sessionForm.short_break_duration}
-                      onChange={(e) => setSessionForm({ ...sessionForm, short_break_duration: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setSessionForm({ ...sessionForm, short_break_duration: Number.isNaN(v) ? 0 : v });
+                      }}
                     />
                   </div>
                 </div>
@@ -353,7 +383,10 @@ export default function Sessions() {
                       id="newLong"
                       type="number"
                       value={sessionForm.long_break_duration}
-                      onChange={(e) => setSessionForm({ ...sessionForm, long_break_duration: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setSessionForm({ ...sessionForm, long_break_duration: Number.isNaN(v) ? 0 : v });
+                      }}
                     />
                   </div>
                   <div>
@@ -362,7 +395,10 @@ export default function Sessions() {
                       id="newCycles"
                       type="number"
                       value={sessionForm.long_break_per_pomodoros}
-                      onChange={(e) => setSessionForm({ ...sessionForm, long_break_per_pomodoros: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setSessionForm({ ...sessionForm, long_break_per_pomodoros: Number.isNaN(v) ? 0 : v });
+                      }}
                     />
                   </div>
                 </div>
@@ -496,7 +532,10 @@ export default function Sessions() {
                                   id="focus"
                                   type="number"
                                   value={sessionForm.focus_duration}
-                                  onChange={(e) => setSessionForm({ ...sessionForm, focus_duration: parseInt(e.target.value) })}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setSessionForm({ ...sessionForm, focus_duration: Number.isNaN(v) ? 0 : v });
+                                  }}
                                 />
                               </div>
                               <div>
@@ -505,7 +544,10 @@ export default function Sessions() {
                                   id="short"
                                   type="number"
                                   value={sessionForm.short_break_duration}
-                                  onChange={(e) => setSessionForm({ ...sessionForm, short_break_duration: parseInt(e.target.value) })}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setSessionForm({ ...sessionForm, short_break_duration: Number.isNaN(v) ? 0 : v });
+                                  }}
                                 />
                               </div>
                             </div>
@@ -516,7 +558,10 @@ export default function Sessions() {
                                   id="long"
                                   type="number"
                                   value={sessionForm.long_break_duration}
-                                  onChange={(e) => setSessionForm({ ...sessionForm, long_break_duration: parseInt(e.target.value) })}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setSessionForm({ ...sessionForm, long_break_duration: Number.isNaN(v) ? 0 : v });
+                                  }}
                                 />
                               </div>
                               <div>
@@ -525,7 +570,10 @@ export default function Sessions() {
                                   id="cycles"
                                   type="number"
                                   value={sessionForm.long_break_per_pomodoros}
-                                  onChange={(e) => setSessionForm({ ...sessionForm, long_break_per_pomodoros: parseInt(e.target.value) })}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setSessionForm({ ...sessionForm, long_break_per_pomodoros: Number.isNaN(v) ? 0 : v });
+                                  }}
                                 />
                               </div>
                             </div>
@@ -642,8 +690,11 @@ export default function Sessions() {
                               <Input
                                 id="duration"
                                 type="number"
-                                value={taskForm.estimated_completion_time}
-                                onChange={(e) => setTaskForm({ ...taskForm, estimated_completion_time: parseInt(e.target.value) })}
+                                value={taskForm.estimated_completion_time === 0 ? "" : taskForm.estimated_completion_time}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10);
+                                  setTaskForm({ ...taskForm, estimated_completion_time: Number.isNaN(v) ? 0 : v });
+                                }}
                               />
                             </div>
                             <div className="flex gap-2 pt-4">
@@ -794,8 +845,11 @@ export default function Sessions() {
                                                   <Input
                                                     id="editDuration"
                                                     type="number"
-                                                    value={taskForm.estimated_completion_time}
-                                                    onChange={(e) => setTaskForm({ ...taskForm, estimated_completion_time: parseInt(e.target.value) })}
+                                                    value={taskForm.estimated_completion_time === 0 ? "" : taskForm.estimated_completion_time}
+                                                    onChange={(e) => {
+                                                      const v = parseInt(e.target.value, 10);
+                                                      setTaskForm({ ...taskForm, estimated_completion_time: Number.isNaN(v) ? 0 : v });
+                                                    }}
                                                   />
                                                 </div>
                                                 <div className="flex gap-2 pt-4">

@@ -149,6 +149,11 @@ export function SessionEditorDialog({
 
   const savePomodoroConfig = () => {
     if (!sessionInfo) return;
+    const { duration, shortBreakTime, longBreakTime, pomodorosBeforeLongBreak } = pomodoroForm;
+    if (!duration || !shortBreakTime || !longBreakTime || !pomodorosBeforeLongBreak) {
+      toast.error("Please fill all Pomodoro settings with values greater than 0");
+      return;
+    }
     onSessionChange({
       ...sessionInfo,
       pomodoroSetup: pomodoroForm,
@@ -160,6 +165,10 @@ export function SessionEditorDialog({
   const addTask = () => {
     if (!sessionInfo || !taskForm.name.trim()) {
       toast.error("Task name can't be empty");
+      return;
+    }
+    if (!taskForm.estimatedTime || taskForm.estimatedTime <= 0) {
+      toast.error("Estimated time must be greater than 0");
       return;
     }
 
@@ -204,6 +213,10 @@ export function SessionEditorDialog({
     if (!sessionInfo || !editingTaskId) return;
     if (!taskForm.name.trim()) {
       toast.error("Task name can't be empty");
+      return;
+    }
+    if (!taskForm.estimatedTime || taskForm.estimatedTime <= 0) {
+      toast.error("Estimated time must be greater than 0");
       return;
     }
 
@@ -510,13 +523,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       type="number"
                       min="1"
                       max="120"
-                      value={pomodoroForm.duration}
-                      onChange={(e) =>
+                      value={pomodoroForm.duration === 0 ? "" : pomodoroForm.duration}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
                         setPomodoroForm({
                           ...pomodoroForm,
-                          duration: parseInt(e.target.value) || 25,
-                        })
-                      }
+                          duration: Number.isNaN(v) ? 0 : v,
+                        });
+                      }}
                       className="rounded-lg"
                     />
                   </div>
@@ -527,13 +541,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       type="number"
                       min="1"
                       max="30"
-                      value={pomodoroForm.shortBreakTime}
-                      onChange={(e) =>
+                      value={pomodoroForm.shortBreakTime === 0 ? "" : pomodoroForm.shortBreakTime}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
                         setPomodoroForm({
                           ...pomodoroForm,
-                          shortBreakTime: parseInt(e.target.value) || 5,
-                        })
-                      }
+                          shortBreakTime: Number.isNaN(v) ? 0 : v,
+                        });
+                      }}
                       className="rounded-lg"
                     />
                   </div>
@@ -544,13 +559,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       type="number"
                       min="1"
                       max="60"
-                      value={pomodoroForm.longBreakTime}
-                      onChange={(e) =>
+                      value={pomodoroForm.longBreakTime === 0 ? "" : pomodoroForm.longBreakTime}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
                         setPomodoroForm({
                           ...pomodoroForm,
-                          longBreakTime: parseInt(e.target.value) || 15,
-                        })
-                      }
+                          longBreakTime: Number.isNaN(v) ? 0 : v,
+                        });
+                      }}
                       className="rounded-lg"
                     />
                   </div>
@@ -563,13 +579,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                       type="number"
                       min="1"
                       max="10"
-                      value={pomodoroForm.pomodorosBeforeLongBreak}
-                      onChange={(e) =>
+                      value={pomodoroForm.pomodorosBeforeLongBreak === 0 ? "" : pomodoroForm.pomodorosBeforeLongBreak}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
                         setPomodoroForm({
                           ...pomodoroForm,
-                          pomodorosBeforeLongBreak: parseInt(e.target.value) || 4,
-                        })
-                      }
+                          pomodorosBeforeLongBreak: Number.isNaN(v) ? 0 : v,
+                        });
+                      }}
                       className="rounded-lg"
                     />
                   </div>
@@ -696,13 +713,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                         type="number"
                                         min="1"
                                         max="240"
-                                        value={taskForm.estimatedTime}
-                                        onChange={(e) =>
+                                        value={taskForm.estimatedTime === 0 ? "" : taskForm.estimatedTime}
+                                        onChange={(e) => {
+                                          const v = parseInt(e.target.value, 10);
                                           setTaskForm({
                                             ...taskForm,
-                                            estimatedTime: parseInt(e.target.value) || 25,
-                                          })
-                                        }
+                                            estimatedTime: Number.isNaN(v) ? 0 : v,
+                                          });
+                                        }}
                                         className="rounded-lg"
                                       />
                                     </div>
@@ -822,13 +840,14 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
                                 type="number"
                                 min="5"
                                 max="480"
-                                value={taskForm.estimatedTime}
-                                onChange={(e) =>
+                                value={taskForm.estimatedTime === 0 ? "" : taskForm.estimatedTime}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10);
                                   setTaskForm({
                                     ...taskForm,
-                                    estimatedTime: parseInt(e.target.value) || 25,
-                                  })
-                                }
+                                    estimatedTime: Number.isNaN(v) ? 0 : v,
+                                  });
+                                }}
                                 className="rounded-lg"
                               />
                             </div>

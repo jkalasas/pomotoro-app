@@ -278,6 +278,11 @@ export default function Home() {
   };
 
   const saveSessionSettings = () => {
+    const { focus_duration, short_break_duration, long_break_duration, long_break_per_pomodoros } = sessionSettings;
+    if (!focus_duration || !short_break_duration || !long_break_duration || !long_break_per_pomodoros) {
+      toast.error("Please fill all session settings with values greater than 0");
+      return;
+    }
     pomodoroStore.updateSettings(sessionSettings);
     setIsSessionSettingsOpen(false);
     toast.success("Session settings saved");
@@ -330,22 +335,74 @@ export default function Home() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
-              <Input id="focus-duration" type="number" min="1" max="120" value={sessionSettings.focus_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, focus_duration: parseInt(e.target.value) || 25 })} />
+              <Input
+                id="focus-duration"
+                type="number"
+                min="1"
+                max="120"
+                value={sessionSettings.focus_duration === 0 ? "" : sessionSettings.focus_duration}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setSessionSettings({
+                    ...sessionSettings,
+                    focus_duration: Number.isNaN(v) ? 0 : v,
+                  });
+                }}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="short-break">Short Break Duration (minutes)</Label>
-              <Input id="short-break" type="number" min="1" max="30" value={sessionSettings.short_break_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, short_break_duration: parseInt(e.target.value) || 5 })} />
+              <Input
+                id="short-break"
+                type="number"
+                min="1"
+                max="30"
+                value={sessionSettings.short_break_duration === 0 ? "" : sessionSettings.short_break_duration}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setSessionSettings({
+                    ...sessionSettings,
+                    short_break_duration: Number.isNaN(v) ? 0 : v,
+                  });
+                }}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
-              <Input id="long-break" type="number" min="1" max="60" value={sessionSettings.long_break_duration} onChange={(e) => setSessionSettings({ ...sessionSettings, long_break_duration: parseInt(e.target.value) || 15 })} />
+              <Input
+                id="long-break"
+                type="number"
+                min="1"
+                max="60"
+                value={sessionSettings.long_break_duration === 0 ? "" : sessionSettings.long_break_duration}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_duration: Number.isNaN(v) ? 0 : v,
+                  });
+                }}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="long-break-frequency">Long Break After (pomodoros)</Label>
-              <Input id="long-break-frequency" type="number" min="1" max="10" value={sessionSettings.long_break_per_pomodoros} onChange={(e) => setSessionSettings({ ...sessionSettings, long_break_per_pomodoros: parseInt(e.target.value) || 4 })} />
+              <Input
+                id="long-break-frequency"
+                type="number"
+                min="1"
+                max="10"
+                value={sessionSettings.long_break_per_pomodoros === 0 ? "" : sessionSettings.long_break_per_pomodoros}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setSessionSettings({
+                    ...sessionSettings,
+                    long_break_per_pomodoros: Number.isNaN(v) ? 0 : v,
+                  });
+                }}
+              />
             </div>
           </div>
 
