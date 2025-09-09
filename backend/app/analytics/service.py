@@ -115,13 +115,14 @@ class AnalyticsService:
             # Calculate completion rate
             session = db.get(PomodoroSession, session_id)
             if session and session.tasks:
-                completed_tasks = sum(1 for task in session.tasks if task.completed)
-                analytics.completion_rate = completed_tasks / len(session.tasks)
+                active_tasks = [t for t in session.tasks if not getattr(t, "is_deleted", False)]
+                completed_tasks = sum(1 for task in active_tasks if task.completed)
+                analytics.completion_rate = (completed_tasks / len(active_tasks)) if active_tasks else None
                 analytics.tasks_completed = completed_tasks
                 
                 # Calculate estimated vs actual ratio
-                total_estimated = sum(task.estimated_completion_time for task in session.tasks if task.completed)
-                total_actual = sum(task.actual_completion_time for task in session.tasks if task.completed and task.actual_completion_time)
+                total_estimated = sum(task.estimated_completion_time for task in active_tasks if task.completed)
+                total_actual = sum(task.actual_completion_time for task in active_tasks if task.completed and task.actual_completion_time)
                 
                 if total_estimated > 0 and total_actual > 0:
                     analytics.estimated_vs_actual_ratio = total_actual / total_estimated

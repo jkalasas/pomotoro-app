@@ -119,7 +119,10 @@ def read_sessions(
     current_user: ActiveUserDep,
     include_archived: bool = False,
 ):
-    query = select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    query = select(PomodoroSession).where(
+        PomodoroSession.user_id == current_user.id,
+        PomodoroSession.is_deleted == False  # noqa: E712
+    )
     if not include_archived:
         query = query.where(PomodoroSession.archived == False)  # noqa: E712
     sessions = db.exec(query).all()
@@ -130,7 +133,10 @@ def read_sessions(
         # Get tasks for this session ordered by order field
         tasks = db.exec(
             select(Task)
-            .where(Task.session_id == session.id)
+            .where(
+                Task.session_id == session.id,
+                Task.is_deleted == False  # noqa: E712
+            )
             .order_by(Task.order)
         ).all()
         
@@ -244,7 +250,11 @@ def start_active_session(
 ):
     # Get the session to validate it belongs to the user
     db_session = db.get(PomodoroSession, session_data.session_id)
-    if not db_session or db_session.user_id != current_user.id:
+    if (
+        not db_session
+        or db_session.user_id != current_user.id
+        or db_session.is_deleted
+    ):
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Prevent starting completed sessions
@@ -278,7 +288,9 @@ def start_active_session(
         existing_active.time_remaining = db_session.focus_duration * 60
         existing_active.phase = "focus"
         existing_active.pomodoros_completed = 0
-        existing_active.current_task_id = db_session.tasks[0].id if db_session.tasks else None
+        # Set first non-deleted task as current if available
+        first_task = next((t for t in db_session.tasks if not t.is_deleted), None)
+        existing_active.current_task_id = first_task.id if first_task else None
         db.add(existing_active)
     else:
         # Create new active session
@@ -289,7 +301,7 @@ def start_active_session(
             time_remaining=db_session.focus_duration * 60,
             phase="focus",
             pomodoros_completed=0,
-            current_task_id=db_session.tasks[0].id if db_session.tasks else None,
+            current_task_id=(next((t.id for t in db_session.tasks if not t.is_deleted), None)),
         )
         db.add(active_session)
     
@@ -530,11 +542,15 @@ def get_daily_progress(
     completed_tasks_query = select(Task).where(
         Task.completed == True,
         Task.completed_at >= today_start,
-        Task.completed_at <= today_end
+        Task.completed_at <= today_end,
+        Task.is_deleted == False  # noqa: E712
     )
     
     # Get tasks that belong to user's sessions
-    user_sessions = select(PomodoroSession.id).where(PomodoroSession.user_id == current_user.id)
+    user_sessions = select(PomodoroSession.id).where(
+        PomodoroSession.user_id == current_user.id,
+        PomodoroSession.is_deleted == False  # noqa: E712
+    )
     completed_tasks_query = completed_tasks_query.where(Task.session_id.in_(user_sessions))
     
     completed_tasks_result = db.exec(completed_tasks_query)
@@ -546,12 +562,18 @@ def get_daily_progress(
     completed_sessions = 0
     
     # Get all user's sessions
-    user_sessions_query = select(PomodoroSession).where(PomodoroSession.user_id == current_user.id)
+    user_sessions_query = select(PomodoroSession).where(
+        PomodoroSession.user_id == current_user.id,
+        PomodoroSession.is_deleted == False  # noqa: E712
+    )
     user_sessions_result = db.exec(user_sessions_query)
     
     for session in user_sessions_result:
         # Get all tasks for this session
-        session_tasks_query = select(Task).where(Task.session_id == session.id)
+        session_tasks_query = select(Task).where(
+            Task.session_id == session.id,
+            Task.is_deleted == False  # noqa: E712
+        )
         session_tasks = list(db.exec(session_tasks_query))
         
         if not session_tasks:
@@ -601,13 +623,20 @@ def read_session(
     include_archived: bool = False,
 ):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session or db_session.user_id != current_user.id:
+    if (
+        not db_session
+        or db_session.user_id != current_user.id
+        or db_session.is_deleted
+    ):
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Get tasks ordered by the order field
     ordered_tasks = db.exec(
         select(Task)
-        .where(Task.session_id == session_id)
+        .where(
+            Task.session_id == session_id,
+            Task.is_deleted == False  # noqa: E712
+        )
         .order_by(Task.order)
     ).all()
     
@@ -648,7 +677,11 @@ def update_session(
     current_user: ActiveUserDep,
 ):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session or db_session.user_id != current_user.id:
+    if (
+        not db_session
+        or db_session.user_id != current_user.id
+        or db_session.is_deleted
+    ):
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Check if there's an active session running for this session
@@ -725,11 +758,33 @@ def delete_session(
     current_user: ActiveUserDep,
 ):
     db_session = db.get(PomodoroSession, session_id)
-    if not db_session or db_session.user_id != current_user.id:
+    if (
+        not db_session
+        or db_session.user_id != current_user.id
+    ):
         raise HTTPException(status_code=404, detail="Session not found")
-    db.delete(db_session)
-    db.commit()
-    return {"message": "Session deleted successfully"}
+    # Soft delete session and its tasks
+    if not db_session.is_deleted:
+        db_session.is_deleted = True
+        db_session.deleted_at = datetime.utcnow()
+        # Soft delete tasks
+        for task in db_session.tasks:
+            if not task.is_deleted:
+                task.is_deleted = True
+                task.deleted_at = datetime.utcnow()
+                db.add(task)
+        # Remove active session if pointing to this
+        active = db.exec(
+            select(ActivePomodoroSession).where(
+                ActivePomodoroSession.user_id == current_user.id,
+                ActivePomodoroSession.session_id == session_id,
+            )
+        ).first()
+        if active:
+            db.delete(active)
+        db.add(db_session)
+        db.commit()
+    return {"message": "Session deleted (soft) successfully"}
 
 
 # Task management endpoints
@@ -755,7 +810,10 @@ def add_task_to_session(
     
     # Get the highest order value for tasks in this session
     max_order_result = db.exec(
-        select(func.max(Task.order)).where(Task.session_id == session_id)
+        select(func.max(Task.order)).where(
+            Task.session_id == session_id,
+            Task.is_deleted == False  # noqa: E712
+        )
     ).first()
     next_order = (max_order_result or 0) + 1
     
@@ -791,7 +849,7 @@ def update_task(
     current_user: ActiveUserDep,
 ):
     task = db.get(Task, task_id)
-    if not task:
+    if not task or task.is_deleted:
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Verify the task belongs to a session owned by the user
@@ -839,7 +897,7 @@ def delete_task(
     current_user: ActiveUserDep,
 ):
     task = db.get(Task, task_id)
-    if not task:
+    if not task or task.is_deleted:
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Verify the task belongs to a session owned by the user
@@ -847,9 +905,25 @@ def delete_task(
     if not session or session.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    db.delete(task)
+    # Soft delete task
+    task.is_deleted = True
+    task.deleted_at = datetime.utcnow()
+    db.add(task)
+    # If active session points to this task, unset it
+    parent_session = db.get(PomodoroSession, task.session_id) if task.session_id else None
+    if parent_session:
+        active = db.exec(
+            select(ActivePomodoroSession).where(
+                ActivePomodoroSession.user_id == parent_session.user_id,
+                ActivePomodoroSession.session_id == parent_session.id,
+                ActivePomodoroSession.current_task_id == task_id,
+            )
+        ).first()
+        if active:
+            active.current_task_id = None
+            db.add(active)
     db.commit()
-    return {"message": "Task deleted successfully"}
+    return {"message": "Task deleted (soft) successfully"}
 
 
 @router.post("/tasks/{task_id}/archive", response_model=TaskPublic)
@@ -917,7 +991,12 @@ def reorder_tasks(
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Get all tasks for this session
-    tasks = db.exec(select(Task).where(Task.session_id == session_id)).all()
+    tasks = db.exec(
+        select(Task).where(
+            Task.session_id == session_id,
+            Task.is_deleted == False  # noqa: E712
+        )
+    ).all()
     task_dict = {task.id: task for task in tasks}
     
     # Verify all task IDs belong to this session
@@ -947,7 +1026,7 @@ def complete_task(
     current_user: ActiveUserDep,
 ):
     task = db.get(Task, task_id)
-    if not task:
+    if not task or task.is_deleted:
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Check if task belongs to user's session
@@ -999,7 +1078,7 @@ def uncomplete_task(
     current_user: ActiveUserDep,
 ):
     task = db.get(Task, task_id)
-    if not task:
+    if not task or task.is_deleted:
         raise HTTPException(status_code=404, detail="Task not found")
     
     # Check if task belongs to user's session
@@ -1083,7 +1162,7 @@ def complete_session(
         .where(PomodoroSession.user_id == current_user.id)
     ).first()
     
-    if not session:
+    if not session or session.is_deleted:
         raise HTTPException(status_code=404, detail="Session not found")
     
     if session.completed:
@@ -1095,7 +1174,7 @@ def complete_session(
     
     # Mark ALL tasks as completed when session is completed
     incomplete_tasks = []
-    for task in session.tasks:
+    for task in (t for t in session.tasks if not t.is_deleted):
         if not task.completed:
             task.completed = True
             task.completed_at = datetime.utcnow()
@@ -1119,7 +1198,7 @@ def complete_session(
         )
     
     # Calculate session statistics (all tasks are now completed)
-    completed_tasks = len(session.tasks)
+    completed_tasks = len([t for t in session.tasks if not t.is_deleted])
     failed_tasks = 0  # No failed tasks since we completed all
     total_focus_time = sum(task.actual_completion_time or 0 for task in session.tasks if task.completed)
     focus_duration_minutes = total_focus_time // 60

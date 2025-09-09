@@ -37,6 +37,9 @@ class PomodoroSession(SQLModel, table=True):
     completed_at: Optional[datetime] = None
     archived: bool = SQLField(default=False, index=True)
     archived_at: Optional[datetime] = None
+    # Soft delete fields
+    is_deleted: bool = SQLField(default=False, index=True)
+    deleted_at: Optional[datetime] = None
     tasks: List["Task"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={
@@ -80,6 +83,9 @@ class Task(SQLModel, table=True):
     completed_at: Optional[datetime] = None
     archived: bool = SQLField(default=False, index=True)
     archived_at: Optional[datetime] = None
+    # Soft delete fields
+    is_deleted: bool = SQLField(default=False, index=True)
+    deleted_at: Optional[datetime] = None
     order: int = SQLField(default=0, index=True)  # Add order field for task sorting
     categories: List[Category] = Relationship(
         back_populates="tasks", link_model=TaskCategoryLink

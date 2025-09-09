@@ -28,6 +28,7 @@ class UserAnalyticsService:
             select(PomodoroSession)
             .where(PomodoroSession.user_id == user.id)
             .where(PomodoroSession.completed_at >= cutoff_date)
+            .where(PomodoroSession.is_deleted == False)  # noqa: E712
         ).all()
         
         if not sessions:
@@ -37,7 +38,7 @@ class UserAnalyticsService:
         completed_tasks = 0
         
         for session in sessions:
-            session_tasks = [task for task in session.tasks]
+            session_tasks = [task for task in session.tasks if not task.is_deleted]
             total_tasks += len(session_tasks)
             completed_tasks += len([task for task in session_tasks if task.completed])
         
@@ -87,6 +88,7 @@ class UserAnalyticsService:
             select(PomodoroSession)
             .where(PomodoroSession.user_id == user.id)
             .where(PomodoroSession.completed_at >= cutoff_date)
+            .where(PomodoroSession.is_deleted == False)  # noqa: E712
         ).all()
         
         total_estimated = 0
@@ -94,7 +96,7 @@ class UserAnalyticsService:
         
         for session in sessions:
             for task in session.tasks:
-                if task.completed and task.actual_completion_time:
+                if (not task.is_deleted) and task.completed and task.actual_completion_time:
                     total_estimated += task.estimated_completion_time
                     total_actual += task.actual_completion_time
         
@@ -111,6 +113,7 @@ class UserAnalyticsService:
         sessions = db.exec(
             select(PomodoroSession)
             .where(PomodoroSession.user_id == user.id)
+            .where(PomodoroSession.is_deleted == False)  # noqa: E712
         ).all()
         
         category_stats = {}
@@ -122,8 +125,9 @@ class UserAnalyticsService:
                     if cat_name not in category_stats:
                         category_stats[cat_name] = {"total": 0, "completed": 0}
                     
-                    category_stats[cat_name]["total"] += 1
-                    if task.completed:
+                    if not task.is_deleted:
+                        category_stats[cat_name]["total"] += 1
+                    if (not task.is_deleted) and task.completed:
                         category_stats[cat_name]["completed"] += 1
         
         # Calculate completion rates
@@ -145,6 +149,7 @@ class UserAnalyticsService:
             select(PomodoroSession)
             .where(PomodoroSession.user_id == user.id)
             .where(PomodoroSession.completed_at.isnot(None))
+            .where(PomodoroSession.is_deleted == False)  # noqa: E712
         ).all()
         
         time_stats = {
@@ -164,7 +169,7 @@ class UserAnalyticsService:
                 else:
                     time_period = "evening"
                 
-                for task in session.tasks:
+                for task in (t for t in session.tasks if not t.is_deleted):
                     time_stats[time_period]["total"] += 1
                     if task.completed:
                         time_stats[time_period]["completed"] += 1
@@ -203,6 +208,7 @@ class UserAnalyticsService:
             .where(PomodoroSession.user_id == user.id)
             .where(PomodoroSession.completed_at >= start_of_day)
             .where(PomodoroSession.completed_at < end_of_day)
+            .where(PomodoroSession.is_deleted == False)  # noqa: E712
         ).all()
         
         total_focus_time = 0
@@ -214,7 +220,7 @@ class UserAnalyticsService:
             # Assuming focus_duration is in minutes
             total_focus_time += session.focus_duration
             
-            for task in session.tasks:
+            for task in (t for t in session.tasks if not t.is_deleted):
                 tasks_total += 1
                 if task.completed:
                     tasks_completed += 1

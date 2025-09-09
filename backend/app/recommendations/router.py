@@ -53,6 +53,7 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
             .where(Category.name == task.category)
             .where(Task.name.ilike(f"%{task.name}%"))
             .where(Task.actual_completion_time != None)
+            .where(Task.is_deleted == False)  # noqa: E712
         )
         results = db.exec(statement).all()
 

@@ -20,7 +20,8 @@ def schedule_tasks_with_ga(session_ids: List[int], db, user: ActiveUserDep) -> S
     statement = select(Task).where(
         Task.session_id.in_(session_ids),
         Task.completed == False,
-        Task.archived == False
+        Task.archived == False,
+        Task.is_deleted == False  # noqa: E712
     )
     all_tasks = db.exec(statement).all()
     
@@ -81,7 +82,8 @@ def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUser
     # Verify user owns all requested sessions
     query = select(PomodoroSession).where(
         PomodoroSession.id.in_(request.session_ids),
-        PomodoroSession.user_id != user.id
+        PomodoroSession.user_id != user.id,
+        PomodoroSession.is_deleted == False  # noqa: E712
     )
 
     unauthorized_sessions = db.exec(query).first()

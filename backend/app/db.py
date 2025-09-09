@@ -48,6 +48,18 @@ def create_db_and_tables():
             except Exception as e:
                 print(f"Could not add archived columns: {e}")
 
+        # Add soft delete columns if they don't exist (session)
+        try:
+            session.exec(text("SELECT is_deleted FROM session LIMIT 1"))
+        except Exception:
+            try:
+                session.exec(text("ALTER TABLE session ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
+                session.exec(text("ALTER TABLE session ADD COLUMN deleted_at TIMESTAMP NULL"))
+                session.commit()
+                print("Added soft delete columns to session table")
+            except Exception as e:
+                print(f"Could not add soft delete columns to session: {e}")
+
         try:
             session.exec(text("SELECT archived FROM task LIMIT 1"))
         except Exception:
@@ -58,6 +70,18 @@ def create_db_and_tables():
                 print("Added archived columns to task table")
             except Exception as e:
                 print(f"Could not add archived columns to task: {e}")
+
+        # Add soft delete columns if they don't exist (task)
+        try:
+            session.exec(text("SELECT is_deleted FROM task LIMIT 1"))
+        except Exception:
+            try:
+                session.exec(text("ALTER TABLE task ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
+                session.exec(text("ALTER TABLE task ADD COLUMN deleted_at TIMESTAMP NULL"))
+                session.commit()
+                print("Added soft delete columns to task table")
+            except Exception as e:
+                print(f"Could not add soft delete columns to task: {e}")
 
     # seed basic categories if empty
     from .models import Category

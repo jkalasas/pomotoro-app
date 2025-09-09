@@ -19,7 +19,8 @@ def schedule_tasks_with_ga(session_ids: List[int], db: SessionDep, user: ActiveU
     statement = select(Task).where(
         Task.session_id.in_(session_ids),
         Task.completed == False,
-        Task.archived == False
+        Task.archived == False,
+        Task.is_deleted == False  # noqa: E712
     )
     all_tasks = db.exec(statement).all()
     
@@ -82,6 +83,7 @@ def generate_schedule(request: ScheduleRequest, db: SessionDep, user: ActiveUser
         select(PomodoroSession)
         .where(PomodoroSession.id.in_(request.session_ids))
         .where(PomodoroSession.user_id != user.id)
+        .where(PomodoroSession.is_deleted == False)  # noqa: E712
         .exists()
     )
 

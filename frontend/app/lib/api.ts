@@ -58,7 +58,35 @@ class ApiClient {
       throw new Error(`API Error: ${response.status} - ${error}`);
     }
 
-    return response.json();
+    // Gracefully handle responses with no content (e.g., 204) or non-JSON bodies
+    if (response.status === 204) {
+      // No Content
+      return undefined as unknown as T;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const contentLength = response.headers.get('content-length');
+    const hasBody = contentLength === null || contentLength === undefined || contentLength === '0' ? false : true;
+
+    if (!hasBody) {
+      return undefined as unknown as T;
+    }
+
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+
+    // Fallback: attempt to read text; if empty, return undefined
+    const text = await response.text();
+    if (!text) {
+      return undefined as unknown as T;
+    }
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // Return raw text when JSON parsing fails
+      return text as unknown as T;
+    }
   }
 
   // Auth endpoints
