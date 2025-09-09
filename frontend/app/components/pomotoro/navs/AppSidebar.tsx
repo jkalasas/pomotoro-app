@@ -37,7 +37,7 @@ const items: SidebarItem[] = [
     icon: Settings,
   },
   {
-    label: "Insight",
+    label: "Insights",
     url: "/analytics",
     icon: ChartPie,
   },

@@ -26,6 +26,7 @@ import {
   RotateCcw,
   Settings,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import { ScheduleGeneratorDialog } from "~/components/pomotoro/schedule-generator-dialog";
 import { ScheduledTasksList } from "~/components/pomotoro/scheduled-tasks-list";
@@ -289,11 +290,22 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 border border-border/50 shadow-sm">
-        <SidebarTrigger />
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
+    <main className="flex flex-col pb-8 gap-8 p-8 min-h-screen">
+      <div className="w-full flex justify-between items-center backdrop-blur-md bg-card/70 rounded-xl p-4 border border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-primary" />
+            </div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              My Tasks
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/30 px-3 py-2 rounded-lg backdrop-blur-sm border border-border/30">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
             <Clock className="h-4 w-4" />
             <span className="font-medium">
               {visibleSchedule.filter((t) => !t.completed).length > 0
@@ -306,35 +318,59 @@ export default function Home() {
             </span>
           </div>
           {sessionInfo && (
-            <Button type="button" variant="outline" onClick={() => setIsSessionDialogOpen(true)} className="rounded-full">Session Details</Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setIsSessionDialogOpen(true)} 
+              className="rounded-lg hover:bg-primary/10 hover:text-primary hover:border-primary/40 hover:shadow-md hover:shadow-primary/20 transition-all duration-300"
+            >
+              Session Details
+            </Button>
           )}
 
           <Dialog open={isNewSessionDialogOpen} onOpenChange={(open) => setIsNewSessionDialogOpen(open)}>
             <DialogTrigger disabled={isGenerating}>
-              <Button className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6" disabled={isGenerating}>
-                <Plus className="h-5 w-5" />
+              <Button 
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:shadow-primary/20 transition-all duration-300 rounded-full px-6 py-2 text-sm font-medium" 
+                disabled={isGenerating}
+              >
+                <Plus className="h-4 w-4" />
                 <span>{isGenerating ? "Generating..." : "New Session"}</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-2xl">
-              <SessionInfoForm className="w-full" onSubmit={({ data }) => { startGenerating(data.projectDetails); setIsNewSessionDialogOpen(false); }} disabled={isGenerating} />
+            <DialogContent className="rounded-xl border-border/40 bg-card/90 backdrop-blur-md">
+              <SessionInfoForm 
+                className="w-full" 
+                onSubmit={({ data }) => { 
+                  startGenerating(data.projectDetails); 
+                  setIsNewSessionDialogOpen(false); 
+                }} 
+                disabled={isGenerating} 
+              />
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <SessionEditorDialog isOpen={isSessionDialogOpen} onOpenChange={(open) => setIsSessionDialogOpen(open)} sessionInfo={sessionInfo || null} onSessionChange={setSessionInfo} onCreateSession={createSessionFromGenerated} isGenerating={isGenerating} />
+      <SessionEditorDialog 
+        isOpen={isSessionDialogOpen} 
+        onOpenChange={(open) => setIsSessionDialogOpen(open)} 
+        sessionInfo={sessionInfo || null} 
+        onSessionChange={setSessionInfo} 
+        onCreateSession={createSessionFromGenerated} 
+        isGenerating={isGenerating} 
+      />
 
       <Dialog open={isSessionSettingsOpen} onOpenChange={(open) => setIsSessionSettingsOpen(open)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl border-border/40 bg-card/90 backdrop-blur-md">
           <DialogHeader>
-            <DialogTitle>Session Settings</DialogTitle>
-            <CardDescription>Customize the timing for your Pomodoro session</CardDescription>
+            <DialogTitle className="text-lg font-bold">Session Settings</DialogTitle>
+            <CardDescription className="text-sm">Customize the timing for your Pomodoro session</CardDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
+              <Label htmlFor="focus-duration" className="text-sm font-medium">Focus Duration (minutes)</Label>
               <Input
                 id="focus-duration"
                 type="number"
@@ -348,11 +384,12 @@ export default function Home() {
                     focus_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="rounded-lg border-border/40 bg-card/50 backdrop-blur-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="short-break">Short Break Duration (minutes)</Label>
+              <Label htmlFor="short-break" className="text-sm font-medium">Short Break Duration (minutes)</Label>
               <Input
                 id="short-break"
                 type="number"
@@ -366,11 +403,12 @@ export default function Home() {
                     short_break_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="rounded-lg border-border/40 bg-card/50 backdrop-blur-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
+              <Label htmlFor="long-break" className="text-sm font-medium">Long Break Duration (minutes)</Label>
               <Input
                 id="long-break"
                 type="number"
@@ -384,11 +422,12 @@ export default function Home() {
                     long_break_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="rounded-lg border-border/40 bg-card/50 backdrop-blur-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break-frequency">Long Break After (pomodoros)</Label>
+              <Label htmlFor="long-break-frequency" className="text-sm font-medium">Long Break After (pomodoros)</Label>
               <Input
                 id="long-break-frequency"
                 type="number"
@@ -402,68 +441,119 @@ export default function Home() {
                     long_break_per_pomodoros: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="rounded-lg border-border/40 bg-card/50 backdrop-blur-sm"
               />
             </div>
           </div>
 
           <div className="flex gap-2 mt-6">
-            <Button variant="outline" onClick={cancelSessionSettings} className="flex-1">Cancel</Button>
-            <Button onClick={saveSessionSettings} className="flex-1">Save Settings</Button>
+            <Button 
+              variant="outline" 
+              onClick={cancelSessionSettings} 
+              className="flex-1 rounded-lg border-border/40 hover:bg-muted/20 transition-all duration-300"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveSessionSettings} 
+              className="flex-1 rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
+            >
+              Save Settings
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-col xl:flex-row gap-8 w-full items-stretch h-full">
-        <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
-          <CardContent>
-            <div className="flex flex-col items-center">
-              <span className="font-bold text-center mb-1">Current Task</span>
-              <span className="font-normal text-center">{(() => { const t = schedulerStore.getCurrentTask(); return t ? (t.name?.trim() || "Untitled Task") : "No active task"; })()}</span>
+      <div className="flex flex-col xl:flex-row gap-4 w-full items-stretch h-full">
+        <Card className="flex-1 max-h-fit backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 rounded-xl overflow-hidden" ref={pomodoroWidgetRef}>
+          <CardContent className="px-6 py-2">
+            <div className="flex flex-col items-center mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                  <Clock className="h-3 w-3 text-primary" />
+                </div>
+                <span className="font-bold text-lg text-center bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Current Task</span>
+              </div>
+              <div className="px-3 py-2 rounded-lg bg-gradient-to-r from-muted/30 to-muted/20 border border-border/30 backdrop-blur-sm">
+                <span className="font-medium text-center text-foreground text-sm">{(() => { const t = schedulerStore.getCurrentTask(); return t ? (t.name?.trim() || "Untitled Task") : "No active task"; })()}</span>
+              </div>
             </div>
-            <div className="mx-auto"><PomodoroTimer time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0} endTime={pomodoroStore.maxTime} /></div>
-            <div className="-mt-4 mb-12 flex flex-col items-center">
+            <div className="mx-auto mb-6">
+              <PomodoroTimer 
+                time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0} 
+                endTime={pomodoroStore.maxTime} 
+              />
+            </div>
+            <div className="mb-6 flex flex-col items-center">
               {schedulerStore.getCurrentTask() ? (
                 <>
-                  <p className="text-center">{pomodoroStore.phase === "focus" ? "Stay focused!" : pomodoroStore.phase === "short_break" ? "Short break" : "Long break"}</p>
-                  <p className="text-sm text-muted-foreground">{Math.floor(pomodoroStore.time / 60)} minutes remaining</p>
+                  <div className="px-3 py-2 rounded-lg bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/20 mb-2">
+                    <p className="text-center font-medium text-primary text-sm">
+                      {pomodoroStore.phase === "focus" ? "Stay focused!" : pomodoroStore.phase === "short_break" ? "Short break" : "Long break"}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{Math.floor(pomodoroStore.time / 60)} minutes remaining</p>
                 </>
               ) : null}
             </div>
 
             {pomodoroStore.showRestOverlay && (
-              <p className="text-center text-sm text-orange-600 font-medium"><LogoIcon className="h-5 w-5 mr-2" />Rest Overlay Active</p>
+              <div className="flex items-center justify-center mb-4 p-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-500/10 border border-amber-500/20">
+                <p className="text-center text-xs text-amber-600 font-medium">Rest Overlay Active</p>
+              </div>
             )}
 
-            <div className="mt-3 flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-3">
               {schedulerStore.getCurrentTask() && (
                 <>
                   <div className="flex gap-3">
-                    <Button className="flex flex-1 items-center gap-3" variant="default" onClick={async () => { 
-                      try {
-                        if (pomodoroStore.isRunning) { 
-                          await pomodoroStore.pauseTimer(); 
-                        } else { 
-                          await pomodoroStore.startTimer(); 
+                    <Button 
+                      className="flex flex-1 items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 text-sm" 
+                      variant="default" 
+                      onClick={async () => { 
+                        try {
+                          if (pomodoroStore.isRunning) { 
+                            await pomodoroStore.pauseTimer(); 
+                          } else { 
+                            await pomodoroStore.startTimer(); 
+                          }
+                        } catch (error) {
+                          toast.error(error instanceof Error ? error.message : "Failed to start timer");
                         }
-                      } catch (error) {
-                        toast.error(error instanceof Error ? error.message : "Failed to start timer");
-                      }
-                    }} disabled={pomodoroStore.isLoading}>
-                      {pomodoroStore.isRunning ? (<><Pause /><span>Pause Task</span></>) : (<><Play /><span>Start Task</span></>)}
+                      }} 
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      {pomodoroStore.isRunning ? (<><Pause className="h-4 w-4" /><span>Pause Task</span></>) : (<><Play className="h-4 w-4" /><span>Start Task</span></>)}
                     </Button>
-                    <Button className="flex items-center gap-3" variant="outline" onClick={async () => { 
-                      try {
-                        await pomodoroStore.resetTimer(); 
-                      } catch (error) {
-                        toast.error("Failed to reset timer");
-                      }
-                    }} disabled={pomodoroStore.isLoading}><RotateCcw /></Button>
+                    <Button 
+                      className="flex items-center gap-2 rounded-xl border-border/40 hover:bg-muted/20 hover:shadow-md transition-all duration-300" 
+                      variant="outline" 
+                      onClick={async () => { 
+                        try {
+                          await pomodoroStore.resetTimer(); 
+                        } catch (error) {
+                          toast.error("Failed to reset timer");
+                        }
+                      }} 
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
                   </div>
                 </>
               )}
               {schedulerStore.getCurrentTask() && (
-                <Button className="flex items-center gap-3" variant="outline" onClick={() => { const currentTask = schedulerStore.getCurrentTask(); if (currentTask) { schedulerStore.completeScheduledTask(currentTask.id); } }}>
-                  <Check />
+                <Button 
+                  className="flex items-center gap-2 rounded-xl border-border/40 hover:bg-primary/10 hover:text-primary hover:border-primary/40 hover:shadow-md hover:shadow-primary/20 transition-all duration-300 text-sm" 
+                  variant="outline" 
+                  onClick={() => { 
+                    const currentTask = schedulerStore.getCurrentTask(); 
+                    if (currentTask) { 
+                      schedulerStore.completeScheduledTask(currentTask.id); 
+                    } 
+                  }}
+                >
+                  <Check className="h-4 w-4" />
                   <span>Mark Task Complete</span>
                 </Button>
               )}
@@ -471,49 +561,81 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card className="flex-2 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl" style={{ maxHeight: pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : "auto" }}>
-          <CardContent className="max-h-full overflow-hidden ">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-foreground">Schedule</h2>
+        <Card className="flex-2 backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 rounded-xl overflow-hidden" style={{ maxHeight: pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : "auto" }}>
+          <CardContent className="max-h-full overflow-hidden px-6 py-2">
+            <div className="flex justify-between items-center mb-6 ">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                  <Calendar className="h-3 w-3 text-primary" />
+                </div>
+                <h2 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Schedule</h2>
+              </div>
               <div className="flex gap-3">
-                <Button variant="outline" size="sm" onClick={() => schedulerStore.clearSchedule()} disabled={!schedulerStore.currentSchedule || schedulerStore.currentSchedule.length === 0} className="rounded-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all duration-300">
-                  <Trash2 className="size-4 mr-2" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => schedulerStore.clearSchedule()} 
+                  disabled={!schedulerStore.currentSchedule || schedulerStore.currentSchedule.length === 0} 
+                  className="rounded-lg hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 hover:shadow-md hover:shadow-destructive/20 transition-all duration-300 border-border/40 text-xs"
+                >
+                  <Trash2 className="size-3 mr-1" />
                   Clear
                 </Button>
                 <ScheduleGeneratorDialog onScheduleGenerated={() => {}} />
               </div>
             </div>
-            <div className="max-h-full overflow-y-auto pb-4 custom-scrollbar">
+            <div className="max-h-full overflow-y-auto pb-2 custom-scrollbar">
               <ScheduledTasksList sessionSettings={pomodoroStore.settings} onOpenSettings={openSessionSettings} />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex gap-6 w-full mt-4">
-        <Card className="flex-1 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-          <CardContent className="">
-            <h3 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">Quick Checklist</h3>
+      <div className="flex gap-4 w-full">
+        <Card className="flex-1 backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 rounded-xl overflow-hidden">
+          <CardContent className="px-6 py-2">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <Check className="h-3 w-3 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Quick Checklist</h3>
+            </div>
             <div className="flex flex-col gap-3">
               {visibleSchedule.length > 0 ? (
                 visibleSchedule.slice(0, 5).map((task: any, index: number) => (
-                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group">
-                    <Checkbox checked={task.completed || false} onCheckedChange={() => { if (task.completed) { schedulerStore.uncompleteScheduledTask(task.id); } else { schedulerStore.completeScheduledTask(task.id); } }} className="rounded-md" />
-                    <span className={`flex-1 transition-all duration-200 ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-foreground"}`}>{task.name?.trim() || "Untitled Task"}</span>
-                    <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">{index + 1}</div>
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-muted/20 to-muted/10 hover:from-muted/30 hover:to-muted/20 transition-all duration-300 group border border-border/20 hover:border-border/40 hover:shadow-md">
+                    <Checkbox 
+                      checked={task.completed || false} 
+                      onCheckedChange={() => { 
+                        if (task.completed) { 
+                          schedulerStore.uncompleteScheduledTask(task.id); 
+                        } else { 
+                          schedulerStore.completeScheduledTask(task.id); 
+                        } 
+                      }} 
+                      className="rounded-md border-border/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary" 
+                    />
+                    <span className={`flex-1 transition-all duration-200 font-medium text-sm ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-primary"}`}>
+                      {task.name?.trim() || "Untitled Task"}
+                    </span>
+                    <div className="text-xs text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/30 px-2 py-1 rounded-md font-medium">
+                      #{index + 1}
+                    </div>
                   </div>
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
-                    <PlusCircle className="h-8 w-8" />
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-muted/30 to-muted/20 flex items-center justify-center shadow-md">
+                    <PlusCircle className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <p className="font-medium">No tasks yet</p>
-                  <p className="text-sm">Generate a schedule to see tasks here</p>
+                  <h4 className="font-bold text-base mb-2">No tasks yet</h4>
+                  <p className="text-xs leading-relaxed">Generate a schedule to see tasks here</p>
                 </div>
               )}
               {visibleSchedule.length > 5 && (
-                <div className="text-xs text-muted-foreground mt-1">+{visibleSchedule.length - 5} more tasks in full schedule</div>
+                <div className="text-xs text-muted-foreground mt-2 px-2 py-1 rounded-lg bg-gradient-to-r from-muted/20 to-muted/10 border border-border/20 text-center font-medium">
+                  +{visibleSchedule.length - 5} more tasks in full schedule
+                </div>
               )}
             </div>
           </CardContent>

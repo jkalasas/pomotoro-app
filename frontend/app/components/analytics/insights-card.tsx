@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
+import { Lightbulb } from 'lucide-react';
 import type { ProductivityInsights } from '~/lib/analytics';
 
 interface InsightsCardProps {
@@ -31,9 +32,12 @@ export function InsightsCard({ insights }: InsightsCardProps) {
   };
 
   return (
-    <Card>
+    <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
       <CardHeader>
-        <CardTitle>Productivity Insights</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5" />
+          Productivity Insights
+        </CardTitle>
         <CardDescription>
           AI-powered analysis of your productivity patterns
         </CardDescription>

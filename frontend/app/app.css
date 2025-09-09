@@ -147,7 +147,132 @@ body {
   
   /* Custom scrollbar for better aesthetics */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-muted/20 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Enhanced focus styles */
+  *:focus-visible {
+    @apply outline-2 outline-primary/50 outline-offset-2;
+  }
+
+  /* Smooth transitions for all interactive elements */
+  .transition-cozy {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Gradient text animation */
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 6s ease infinite;
+  }
+
+  /* Soft glow effect for important elements */
+  .glow-primary {
+    box-shadow: 0 0 20px hsla(var(--primary) / 0.15);
+  }
+
+  .glow-primary:hover {
+    box-shadow: 0 0 30px hsla(var(--primary) / 0.25);
+  }
+
+  /* Enhanced card backdrop effects */
+  .card-glass {
+    @apply backdrop-blur-xl bg-card/80 border-border/40;
+    background-image: linear-gradient(135deg, 
+      hsla(var(--card) / 0.8) 0%, 
+      hsla(var(--card) / 0.6) 100%);
+  }
+
+  /* Floating animation for decorative elements */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Enhanced button styles */
+  .btn-cozy {
+    @apply rounded-2xl px-6 py-3 font-medium transition-all duration-300;
+    @apply shadow-lg hover:shadow-xl;
+    @apply bg-gradient-to-r from-primary to-primary/90;
+    @apply hover:from-primary/90 hover:to-primary/80;
+    @apply text-primary-foreground;
+  }
+
+  .btn-cozy:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Improved form elements */
+  input, textarea, select {
+    @apply rounded-xl border-border/40 bg-card/50 backdrop-blur-sm;
+    @apply focus:border-primary/50 focus:ring-2 focus:ring-primary/20;
+    @apply transition-all duration-300;
+  }
+
+  /* Enhanced typography */
+  .text-display {
+    @apply font-bold text-2xl;
+    background: linear-gradient(135deg, 
+      hsl(var(--foreground)) 0%, 
+      hsl(var(--foreground) / 0.8) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .text-accent {
+    @apply text-primary font-medium;
+  }
+
+  /* Improved spacing and layout */
+  .container-cozy {
+    @apply max-w-7xl mx-auto px-6 py-8;
+  }
+
+  .section-cozy {
+    @apply space-y-8;
+  }
+
+  /* Enhanced shadows for depth */
+  .shadow-cozy {
+    box-shadow: 
+      0 4px 6px -1px hsla(var(--primary) / 0.1),
+      0 2px 4px -1px hsla(var(--primary) / 0.06);
+  }
+
+  .shadow-cozy-lg {
+    box-shadow: 
+      0 10px 15px -3px hsla(var(--primary) / 0.1),
+      0 4px 6px -2px hsla(var(--primary) / 0.05);
+  }
+
+  .shadow-cozy-xl {
+    box-shadow: 
+      0 20px 25px -5px hsla(var(--primary) / 0.1),
+      0 10px 10px -5px hsla(var(--primary) / 0.04);
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {

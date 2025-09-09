@@ -1,6 +1,7 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
+import { Timer } from 'lucide-react';
 import type { SessionDurationData } from '~/lib/analytics';
 
 interface SessionDurationChartProps {
@@ -11,9 +12,12 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export function SessionDurationChart({ data }: SessionDurationChartProps) {
   return (
-    <Card>
+    <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
       <CardHeader>
-        <CardTitle>Session Duration Distribution</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Timer className="h-5 w-5" />
+          Session Duration Distribution
+        </CardTitle>
         <CardDescription>
           How your sessions are distributed by duration
         </CardDescription>

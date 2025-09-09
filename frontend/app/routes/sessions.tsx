@@ -287,25 +287,36 @@ export default function Sessions() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading sessions...</div>
+          <div className="text-muted-foreground text-sm">Loading sessions...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 border border-border/50 shadow-sm">
+    <main className="flex flex-col pb-8 gap-8 p-8 min-h-screen">
+      {/* Header Bar */}
+      <div className="w-full flex justify-between items-center backdrop-blur-md bg-card/70 rounded-xl p-4 border border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
-          <h1 className="text-xl font-semibold">Sessions</h1>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+              <Clock className="h-5 w-5 text-primary" />
+            </div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              Sessions
+            </h1>
+          </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/30 px-4 py-2.5 rounded-2xl backdrop-blur-sm border border-border/30">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
             <Clock className="h-4 w-4" />
-            <span className="font-medium">Sessions</span>
+            <span className="font-medium">
+              {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+            </span>
           </div>
           <Dialog open={isCreatingSession} onOpenChange={(open) => {
             setIsCreatingSession(open);
@@ -322,37 +333,41 @@ export default function Sessions() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="rounded-full">
-                <Plus className="h-4 w-4 mr-2" />
-                New Session
+              <Button 
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:shadow-primary/20 transition-all duration-300 rounded-full px-6 py-2 text-sm font-medium"
+              >
+                <Plus className="h-4 w-4 " />
+                New Custom Session
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[400px] rounded-xl">
               <DialogHeader>
-                <DialogTitle>Create New Session</DialogTitle>
+                <DialogTitle className="text-lg">Create New Session</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 mt-6">
+              <div className="space-y-3 mt-4">
                 <div>
-                  <Label htmlFor="newName">Session Name</Label>
+                  <Label htmlFor="newName" className="text-sm">Session Name</Label>
                   <Input
                     id="newName"
                     value={sessionForm.name}
                     onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })}
                     placeholder="Enter session name"
+                    className="rounded-lg text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="newDescription">Description</Label>
+                  <Label htmlFor="newDescription" className="text-sm">Description</Label>
                   <Textarea
                     id="newDescription"
                     value={sessionForm.description}
                     onChange={(e) => setSessionForm({ ...sessionForm, description: e.target.value })}
                     placeholder="Enter session description"
+                    className="rounded-lg text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="newFocus">Focus Duration (min)</Label>
+                    <Label htmlFor="newFocus" className="text-sm">Focus Duration (min)</Label>
                     <Input
                       id="newFocus"
                       type="number"
@@ -361,10 +376,11 @@ export default function Sessions() {
                         const v = parseInt(e.target.value, 10);
                         setSessionForm({ ...sessionForm, focus_duration: Number.isNaN(v) ? 0 : v });
                       }}
+                      className="rounded-lg text-sm"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="newShort">Short Break (min)</Label>
+                    <Label htmlFor="newShort" className="text-sm">Short Break (min)</Label>
                     <Input
                       id="newShort"
                       type="number"
@@ -373,12 +389,13 @@ export default function Sessions() {
                         const v = parseInt(e.target.value, 10);
                         setSessionForm({ ...sessionForm, short_break_duration: Number.isNaN(v) ? 0 : v });
                       }}
+                      className="rounded-lg text-sm"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="newLong">Long Break (min)</Label>
+                    <Label htmlFor="newLong" className="text-sm">Long Break (min)</Label>
                     <Input
                       id="newLong"
                       type="number"
@@ -387,10 +404,11 @@ export default function Sessions() {
                         const v = parseInt(e.target.value, 10);
                         setSessionForm({ ...sessionForm, long_break_duration: Number.isNaN(v) ? 0 : v });
                       }}
+                      className="rounded-lg text-sm"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="newCycles">Cycles for Long Break</Label>
+                    <Label htmlFor="newCycles" className="text-sm">Cycles for Long Break</Label>
                     <Input
                       id="newCycles"
                       type="number"
@@ -399,14 +417,15 @@ export default function Sessions() {
                         const v = parseInt(e.target.value, 10);
                         setSessionForm({ ...sessionForm, long_break_per_pomodoros: Number.isNaN(v) ? 0 : v });
                       }}
+                      className="rounded-lg text-sm"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={handleCreateSession} className="flex-1">
+                <div className="flex gap-2 pt-3">
+                  <Button onClick={handleCreateSession} className="flex-1 rounded-lg text-sm">
                     Create Session
                   </Button>
-                  <Button variant="outline" onClick={() => setIsCreatingSession(false)}>
+                  <Button variant="outline" onClick={() => setIsCreatingSession(false)} className="rounded-lg text-sm">
                     Cancel
                   </Button>
                 </div>
@@ -416,25 +435,25 @@ export default function Sessions() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sessions List */}
         <div className="lg:col-span-1">
-          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden">
-            <CardHeader className="pb-3 border-b border-border/50">
+          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl overflow-hidden">
+            <CardHeader className="pb-2 border-b border-border/50">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">Your Sessions</CardTitle>
+                <CardTitle className="text-lg">Your Sessions</CardTitle>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setShowArchived(a => !a)}>
+                  <Button variant="outline" size="sm" onClick={() => setShowArchived(a => !a)} className="text-xs rounded-lg">
                     {showArchived ? 'Hide Archived' : 'Show Archived'}
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-3">
+            <CardContent className="p-3">
+              <div className="space-y-2">
                 {(showArchived ? archivedSessions : sessions).map((session) => (
                   <Card
                     key={session.id}
@@ -443,9 +462,9 @@ export default function Sessions() {
                     }`}
                     onClick={() => handleSelectSession(session.id)}
                   >
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{session.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">{session.name}</CardTitle>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
                         {session.description}
                       </p>
                     </CardHeader>
@@ -454,12 +473,12 @@ export default function Sessions() {
                         <Clock className="h-3 w-3" />
                         <span>{session.focus_duration}m focus</span>
                         {session.completed && (
-                          <Badge variant="secondary" className="ml-auto">
+                          <Badge variant="secondary" className="ml-auto text-xs">
                             Completed
                           </Badge>
                         )}
                         {session.archived && (
-                          <Badge variant="outline" className="ml-auto">Archived</Badge>
+                          <Badge variant="outline" className="ml-auto text-xs">Archived</Badge>
                         )}
                       </div>
                     </CardContent>
@@ -467,15 +486,15 @@ export default function Sessions() {
                 ))}
                 
                 {sessions.length === 0 && (
-                  <div className="text-center text-muted-foreground py-8">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <div>No sessions found</div>
+                  <div className="text-center text-muted-foreground py-6">
+                    <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    <div className="text-sm">No sessions found</div>
                     <Button 
                       variant="outline" 
-                      className="mt-4"
+                      className="mt-3 text-xs rounded-lg"
                       onClick={() => setIsCreatingSession(true)}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus className="h-3 w-3 mr-1" />
                       Create your first session
                     </Button>
                   </div>
@@ -487,47 +506,49 @@ export default function Sessions() {
 
         {/* Session Details */}
         <div className="lg:col-span-2">
-          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl h-full">
-            <CardContent className="p-6">
+          <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl h-full">
+            <CardContent className="p-4">
               {selectedSession ? (
                 <div>
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-2xl font-bold">{selectedSession.name}</h2>
-                      <p className="text-muted-foreground">{selectedSession.description}</p>
+                      <h2 className="text-xl font-bold">{selectedSession.name}</h2>
+                      <p className="text-muted-foreground text-sm">{selectedSession.description}</p>
                     </div>
                     <div className="flex gap-2">
                       <Dialog open={isEditingSession} onOpenChange={setIsEditingSession}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleEditSession(selectedSession)}>
-                            <Edit className="h-4 w-4 mr-2" />
+                          <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={() => handleEditSession(selectedSession)}>
+                            <Edit className="h-3 w-3 mr-1" />
                             Edit
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="sm:max-w-[400px] rounded-xl">
                           <DialogHeader>
-                            <DialogTitle>Edit Session</DialogTitle>
+                            <DialogTitle className="text-lg">Edit Session</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4 mt-6">
+                          <div className="space-y-3 mt-4">
                             <div>
-                              <Label htmlFor="name">Name</Label>
+                              <Label htmlFor="name" className="text-sm">Name</Label>
                               <Input
                                 id="name"
                                 value={sessionForm.name}
                                 onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })}
+                                className="rounded-lg text-sm"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="description">Description</Label>
+                              <Label htmlFor="description" className="text-sm">Description</Label>
                               <Textarea
                                 id="description"
                                 value={sessionForm.description}
                                 onChange={(e) => setSessionForm({ ...sessionForm, description: e.target.value })}
+                                className="rounded-lg text-sm"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <Label htmlFor="focus">Focus Duration (min)</Label>
+                                <Label htmlFor="focus" className="text-sm">Focus Duration (min)</Label>
                                 <Input
                                   id="focus"
                                   type="number"
@@ -536,10 +557,11 @@ export default function Sessions() {
                                     const v = parseInt(e.target.value, 10);
                                     setSessionForm({ ...sessionForm, focus_duration: Number.isNaN(v) ? 0 : v });
                                   }}
+                                  className="rounded-lg text-sm"
                                 />
                               </div>
                               <div>
-                                <Label htmlFor="short">Short Break (min)</Label>
+                                <Label htmlFor="short" className="text-sm">Short Break (min)</Label>
                                 <Input
                                   id="short"
                                   type="number"
@@ -548,12 +570,13 @@ export default function Sessions() {
                                     const v = parseInt(e.target.value, 10);
                                     setSessionForm({ ...sessionForm, short_break_duration: Number.isNaN(v) ? 0 : v });
                                   }}
+                                  className="rounded-lg text-sm"
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <Label htmlFor="long">Long Break (min)</Label>
+                                <Label htmlFor="long" className="text-sm">Long Break (min)</Label>
                                 <Input
                                   id="long"
                                   type="number"
@@ -562,10 +585,11 @@ export default function Sessions() {
                                     const v = parseInt(e.target.value, 10);
                                     setSessionForm({ ...sessionForm, long_break_duration: Number.isNaN(v) ? 0 : v });
                                   }}
+                                  className="rounded-lg text-sm"
                                 />
                               </div>
                               <div>
-                                <Label htmlFor="cycles">Cycles for Long Break</Label>
+                                <Label htmlFor="cycles" className="text-sm">Cycles for Long Break</Label>
                                 <Input
                                   id="cycles"
                                   type="number"
@@ -574,14 +598,15 @@ export default function Sessions() {
                                     const v = parseInt(e.target.value, 10);
                                     setSessionForm({ ...sessionForm, long_break_per_pomodoros: Number.isNaN(v) ? 0 : v });
                                   }}
+                                  className="rounded-lg text-sm"
                                 />
                               </div>
                             </div>
-                            <div className="flex gap-2 pt-4">
-                              <Button onClick={handleSaveSession} className="flex-1">
+                            <div className="flex gap-2 pt-3">
+                              <Button onClick={handleSaveSession} className="flex-1 rounded-lg text-sm">
                                 Save Changes
                               </Button>
-                              <Button variant="outline" onClick={() => setIsEditingSession(false)}>
+                              <Button variant="outline" onClick={() => setIsEditingSession(false)} className="rounded-lg text-sm">
                                 Cancel
                               </Button>
                             </div>
@@ -593,20 +618,20 @@ export default function Sessions() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          className="rounded-full"
+                          className="rounded-lg text-xs"
                           onClick={async () => { await archiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
                         >
-                          <Archive className="h-4 w-4 mr-2" />
+                          <Archive className="h-3 w-3 mr-1" />
                           Archive
                         </Button>
                       ) : (
                         <Button 
                           variant="outline" 
                           size="sm"
-                          className="rounded-full"
+                          className="rounded-lg text-xs"
                           onClick={async () => { await unarchiveSession(selectedSession.id); const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed); }}
                         >
-                          <ArchiveRestore className="h-4 w-4 mr-2" />
+                          <ArchiveRestore className="h-3 w-3 mr-1" />
                           Unarchive
                         </Button>
                       )}
@@ -614,79 +639,81 @@ export default function Sessions() {
                       <Button 
                         variant="destructive" 
                         size="sm"
-                        className="rounded-full"
+                        className="rounded-lg text-xs"
                         onClick={() => handleDeleteSession(selectedSession.id)}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="h-3 w-3 mr-1" />
                         Delete
                       </Button>
                     </div>
                   </div>
 
                   {/* Session Config */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">{selectedSession.focus_duration}m</div>
-                        <div className="text-sm text-muted-foreground">Focus Duration</div>
+                      <CardContent className="p-3">
+                        <div className="text-lg font-bold">{selectedSession.focus_duration}m</div>
+                        <div className="text-xs text-muted-foreground">Focus Duration</div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">{selectedSession.short_break_duration}m</div>
-                        <div className="text-sm text-muted-foreground">Short Break</div>
+                      <CardContent className="p-3">
+                        <div className="text-lg font-bold">{selectedSession.short_break_duration}m</div>
+                        <div className="text-xs text-muted-foreground">Short Break</div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">{selectedSession.long_break_duration}m</div>
-                        <div className="text-sm text-muted-foreground">Long Break</div>
+                      <CardContent className="p-3">
+                        <div className="text-lg font-bold">{selectedSession.long_break_duration}m</div>
+                        <div className="text-xs text-muted-foreground">Long Break</div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">{selectedSession.long_break_per_pomodoros}</div>
-                        <div className="text-sm text-muted-foreground">Cycles for Long Break</div>
+                      <CardContent className="p-3">
+                        <div className="text-lg font-bold">{selectedSession.long_break_per_pomodoros}</div>
+                        <div className="text-xs text-muted-foreground">Cycles for Long Break</div>
                       </CardContent>
                     </Card>
                   </div>
 
                   {/* Tasks */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-semibold">Tasks</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold">Tasks</h3>
                       <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
                         <DialogTrigger asChild>
-                          <Button onClick={() => setIsAddingTask(true)} className="rounded-full" size="sm">
-                            <Plus className="h-4 w-4 mr-2" />
+                          <Button onClick={() => setIsAddingTask(true)} className="rounded-lg text-xs" size="sm">
+                            <Plus className="h-3 w-3 mr-1" />
                             Add Task
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="sm:max-w-[400px] rounded-xl">
                           <DialogHeader>
-                            <DialogTitle>Add New Task</DialogTitle>
+                            <DialogTitle className="text-lg">Add New Task</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4 mt-6">
+                          <div className="space-y-3 mt-4">
                             <div>
-                              <Label htmlFor="taskName">Task Name</Label>
+                              <Label htmlFor="taskName" className="text-sm">Task Name</Label>
                               <Input
                                 id="taskName"
                                 value={taskForm.name}
                                 onChange={(e) => setTaskForm({ ...taskForm, name: e.target.value })}
                                 placeholder="Enter task name"
+                                className="rounded-lg text-sm"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="category">Category</Label>
+                              <Label htmlFor="category" className="text-sm">Category</Label>
                               <Input
                                 id="category"
                                 value={taskForm.category}
                                 onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
                                 placeholder="Enter category"
+                                className="rounded-lg text-sm"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="duration">Estimated Duration (minutes)</Label>
+                              <Label htmlFor="duration" className="text-sm">Estimated Duration (minutes)</Label>
                               <Input
                                 id="duration"
                                 type="number"
@@ -695,13 +722,14 @@ export default function Sessions() {
                                   const v = parseInt(e.target.value, 10);
                                   setTaskForm({ ...taskForm, estimated_completion_time: Number.isNaN(v) ? 0 : v });
                                 }}
+                                className="rounded-lg text-sm"
                               />
                             </div>
-                            <div className="flex gap-2 pt-4">
-                              <Button onClick={handleAddTask} className="flex-1">
+                            <div className="flex gap-2 pt-3">
+                              <Button onClick={handleAddTask} className="flex-1 rounded-lg text-sm">
                                 Add Task
                               </Button>
-                              <Button variant="outline" onClick={() => setIsAddingTask(false)}>
+                              <Button variant="outline" onClick={() => setIsAddingTask(false)} className="rounded-lg text-sm">
                                 Cancel
                               </Button>
                             </div>
@@ -713,12 +741,13 @@ export default function Sessions() {
                     </div>
 
                     {/* Task Filters */}
-                    <div className="flex flex-col gap-2 mb-4">
+                    <div className="flex flex-col gap-2 mb-3">
                       <div className="flex gap-2">
                         <Button
                           variant={taskFilter === 'all' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setTaskFilter('all')}
+                          className="text-xs rounded-lg"
                         >
                           All Tasks ({selectedSession.tasks?.length || 0})
                         </Button>
@@ -726,6 +755,7 @@ export default function Sessions() {
                           variant={taskFilter === 'active' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setTaskFilter('active')}
+                          className="text-xs rounded-lg"
                         >
                           Active ({selectedSession.tasks?.filter(t => !t.completed && !t.archived).length || 0})
                         </Button>
@@ -733,6 +763,7 @@ export default function Sessions() {
                           variant={taskFilter === 'completed' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setTaskFilter('completed')}
+                          className="text-xs rounded-lg"
                         >
                           Completed ({selectedSession.tasks?.filter(t => t.completed).length || 0})
                         </Button>
@@ -740,6 +771,7 @@ export default function Sessions() {
                           variant={taskFilter === 'archived' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setTaskFilter('archived')}
+                          className="text-xs rounded-lg"
                         >
                           Archived ({selectedSession.tasks?.filter(t => t.archived).length || 0})
                         </Button>
@@ -756,9 +788,9 @@ export default function Sessions() {
                             variant="outline"
                             size="sm"
                             onClick={handleMoveCompletedToBottom}
-                            className="ml-auto"
+                            className="ml-auto text-xs rounded-lg"
                           >
-                            <ArrowDown className="h-4 w-4 mr-2" />
+                            <ArrowDown className="h-3 w-3 mr-1" />
                             Move Completed/Archived to Bottom
                           </Button>
                         )}
@@ -768,7 +800,7 @@ export default function Sessions() {
                     <DragDropContext onDragEnd={handleDragEnd}>
                       <Droppable droppableId="tasks">
                         {(provided: DroppableProvided) => (
-                          <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+                          <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
                             {getFilteredTasks(selectedSession.tasks)?.map((task, index) => (
                               <Draggable
                                 key={task.id}
@@ -780,16 +812,16 @@ export default function Sessions() {
                                   <Card
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
-                                    className={`bg-card/60 backdrop-blur-sm ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"} hover:shadow-md transition-all ${
+                                    className={`bg-card/60 backdrop-blur-sm ${snapshot.isDragging ? "shadow-md" : "shadow-sm"} hover:shadow-md transition-all ${
                                       task.completed ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" :
                                       task.archived ? "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800" : ""
                                     }`}
                                   >
-                                    <CardContent className="p-4">
-                                      <div className="flex items-center gap-3">
+                                    <CardContent className="p-3">
+                                      <div className="flex items-center gap-2">
                                         <div {...provided.dragHandleProps}>
                                           <GripVertical
-                                            className={`h-5 w-5 ${
+                                            className={`h-4 w-4 ${
                                               taskFilter === 'all'
                                                 ? 'text-muted-foreground cursor-grab'
                                                 : 'text-muted-foreground/30 cursor-not-allowed'
@@ -798,13 +830,13 @@ export default function Sessions() {
                                         </div>
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="font-medium">{task.name}</h4>
-                                            <Badge variant="secondary">{task.category}</Badge>
+                                            <h4 className="font-medium text-sm">{task.name}</h4>
+                                            <Badge variant="secondary" className="text-xs">{task.category}</Badge>
                                             {task.completed && (
-                                              <Badge variant="default">Completed</Badge>
+                                              <Badge variant="default" className="text-xs">Completed</Badge>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <Target className="h-3 w-3" />
                                             <span>{task.estimated_completion_time} minutes</span>
                                             {task.actual_completion_time && (
@@ -812,36 +844,38 @@ export default function Sessions() {
                                             )}
                                           </div>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-1">
                                           <Dialog open={isEditingTask && editingTask?.id === task.id} onOpenChange={setIsEditingTask}>
                                             <DialogTrigger asChild>
-                                              <Button variant="ghost" size="sm" onClick={() => handleEditTask(task)}>
-                                                <Edit className="h-4 w-4" />
+                                              <Button variant="ghost" size="sm" onClick={() => handleEditTask(task)} className="h-7 w-7 p-0">
+                                                <Edit className="h-3 w-3" />
                                               </Button>
                                             </DialogTrigger>
-                                            <DialogContent className="sm:max-w-[425px]">
+                                            <DialogContent className="sm:max-w-[400px] rounded-xl">
                                               <DialogHeader>
-                                                <DialogTitle>Edit Task</DialogTitle>
+                                                <DialogTitle className="text-lg">Edit Task</DialogTitle>
                                               </DialogHeader>
-                                              <div className="space-y-4 mt-6">
+                                              <div className="space-y-3 mt-4">
                                                 <div>
-                                                  <Label htmlFor="editTaskName">Task Name</Label>
+                                                  <Label htmlFor="editTaskName" className="text-sm">Task Name</Label>
                                                   <Input
                                                     id="editTaskName"
                                                     value={taskForm.name}
                                                     onChange={(e) => setTaskForm({ ...taskForm, name: e.target.value })}
+                                                    className="rounded-lg text-sm"
                                                   />
                                                 </div>
                                                 <div>
-                                                  <Label htmlFor="editCategory">Category</Label>
+                                                  <Label htmlFor="editCategory" className="text-sm">Category</Label>
                                                   <Input
                                                     id="editCategory"
                                                     value={taskForm.category}
                                                     onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
+                                                    className="rounded-lg text-sm"
                                                   />
                                                 </div>
                                                 <div>
-                                                  <Label htmlFor="editDuration">Estimated Duration (minutes)</Label>
+                                                  <Label htmlFor="editDuration" className="text-sm">Estimated Duration (minutes)</Label>
                                                   <Input
                                                     id="editDuration"
                                                     type="number"
@@ -850,13 +884,14 @@ export default function Sessions() {
                                                       const v = parseInt(e.target.value, 10);
                                                       setTaskForm({ ...taskForm, estimated_completion_time: Number.isNaN(v) ? 0 : v });
                                                     }}
+                                                    className="rounded-lg text-sm"
                                                   />
                                                 </div>
-                                                <div className="flex gap-2 pt-4">
-                                                  <Button onClick={handleSaveTask} className="flex-1">
+                                                <div className="flex gap-2 pt-3">
+                                                  <Button onClick={handleSaveTask} className="flex-1 rounded-lg text-sm">
                                                     Save Changes
                                                   </Button>
-                                                  <Button variant="outline" onClick={() => setIsEditingTask(false)}>
+                                                  <Button variant="outline" onClick={() => setIsEditingTask(false)} className="rounded-lg text-sm">
                                                     Cancel
                                                   </Button>
                                                 </div>
@@ -868,16 +903,17 @@ export default function Sessions() {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleDeleteTask(task.id)}
+                                            className="h-7 w-7 p-0"
                                           >
-                                            <Trash2 className="h-4 w-4" />
+                                            <Trash2 className="h-3 w-3" />
                                           </Button>
                                           {!task.archived ? (
-                                            <Button variant="ghost" size="sm" onClick={async () => { await archiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
-                                              <Archive className="h-4 w-4" />
+                                            <Button variant="ghost" size="sm" onClick={async () => { await archiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }} className="h-7 w-7 p-0">
+                                              <Archive className="h-3 w-3" />
                                             </Button>
                                           ) : (
-                                            <Button variant="ghost" size="sm" onClick={async () => { await unarchiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }}>
-                                              <ArchiveRestore className="h-4 w-4" />
+                                            <Button variant="ghost" size="sm" onClick={async () => { await unarchiveTask(task.id); if(selectedSession){ const refreshed = await getSession(selectedSession.id); setSelectedSession(refreshed);} }} className="h-7 w-7 p-0">
+                                              <ArchiveRestore className="h-3 w-3" />
                                             </Button>
                                           )}
                                         </div>
@@ -894,9 +930,9 @@ export default function Sessions() {
                     </DragDropContext>
 
                     {(getFilteredTasks(selectedSession.tasks)?.length === 0) && (
-                      <div className="text-center text-muted-foreground py-8">
-                        <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <div>
+                      <div className="text-center text-muted-foreground py-6">
+                        <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                        <div className="text-sm">
                           {taskFilter === 'all'
                             ? "No tasks yet. Add some tasks to get started!"
                             : taskFilter === 'active'
@@ -909,10 +945,10 @@ export default function Sessions() {
                         {taskFilter === 'all' && (
                           <Button
                             variant="outline"
-                            className="mt-4"
+                            className="mt-3 text-xs rounded-lg"
                             onClick={() => setIsAddingTask(true)}
                           >
-                            <Plus className="h-4 w-4 mr-2" />
+                            <Plus className="h-3 w-3 mr-1" />
                             Add your first task
                           </Button>
                         )}
@@ -922,8 +958,8 @@ export default function Sessions() {
               ) : (
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <div>Select a session to view details</div>
+                    <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    <div className="text-sm">Select a session to view details</div>
                   </div>
                 </div>
               )}

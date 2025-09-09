@@ -243,7 +243,7 @@ export function ScheduledTasksList({
       </DragDropContext>
 
   {visible.length > 0 && (
-        <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+        <div className="mt-4 mb-16 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
           <strong>Tip:</strong> Drag and drop tasks to reorder them manually.
           The AI has optimized this schedule for urgency, momentum, and variety.
         </div>

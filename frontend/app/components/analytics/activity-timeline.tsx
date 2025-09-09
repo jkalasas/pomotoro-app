@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/com
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { Badge } from '~/components/ui/badge';
 import { LogoIcon } from '~/components/ui/logo';
+import { Activity } from 'lucide-react';
 import type { AnalyticsEvent } from '~/lib/analytics';
 
 interface ActivityTimelineProps {
@@ -74,28 +75,31 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
   };
 
   return (
-    <Card>
+    <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
       <CardHeader>
-        <CardTitle>Recent Activity</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Recent Activity
+        </CardTitle>
         <CardDescription>
           Your latest productivity events and milestones
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {events.map((event) => {
               const eventData = parseEventData(event.event_data);
               return (
-                <div key={event.id} className="flex items-start space-x-3">
+                <div key={event.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                    <div className="w-8 h-8 rounded-full bg-muted/30 flex items-center justify-center text-sm group-hover:bg-primary/20 transition-colors">
                       {getEventIcon(event.event_type)}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={getEventColor(event.event_type)}>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Badge variant={getEventColor(event.event_type)} className="text-xs">
                         {formatEventName(event.event_type)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
@@ -103,7 +107,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
                       </span>
                     </div>
                     {eventData && (
-                      <div className="mt-1 text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                         {event.event_type === 'task_complete' && eventData.task_name && (
                           <span>Completed: {eventData.task_name}</span>
                         )}
@@ -124,7 +128,10 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
             })}
             {events.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No recent activity</p>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                  <Activity className="h-8 w-8" />
+                </div>
+                <p className="font-medium">No recent activity</p>
                 <p className="text-sm">Start a pomodoro session to see your activity here!</p>
               </div>
             )}

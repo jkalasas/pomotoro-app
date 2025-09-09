@@ -5,6 +5,8 @@ import { Label } from '~/components/ui/label';
 import { Button } from '~/components/ui/button';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
+import { SidebarTrigger } from '~/components/ui/sidebar';
+import { Settings, Clock } from 'lucide-react';
 
 export function meta() {
   return [
@@ -68,11 +70,38 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="p-6 flex flex-col gap-6 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
-      <Card>
+    <main className="flex flex-col pb-8 gap-8 p-8 min-h-screen">
+      <div className="w-full flex justify-between items-center backdrop-blur-md bg-card/70 rounded-xl p-4 border border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+              <Settings className="h-4 w-4 text-primary" />
+            </div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              Settings
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/30 px-3 py-2 rounded-lg backdrop-blur-sm border border-border/30">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+            <Settings className="h-4 w-4" />
+            <span className="font-medium">
+              App Configuration
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <Card className="backdrop-blur-md bg-gradient-to-br from-card/90 to-card/70 border-border/40 shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 rounded-xl overflow-hidden">
         <CardHeader>
-          <CardTitle>Break Overlay</CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+              <Clock className="h-3 w-3 text-primary" />
+            </div>
+            <CardTitle className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Break Overlay</CardTitle>
+          </div>
           <CardDescription>Customize audio and video used during rest cycles.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -87,7 +116,7 @@ export default function SettingsPage() {
               setFocusSound(val);
               if (!val.startsWith('blob:')) setSelectedAudioName(null);
             }}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full rounded-lg border-border/40 bg-card/50 backdrop-blur-sm">
                 <SelectValue placeholder="Select audio" />
               </SelectTrigger>
               <SelectContent>
@@ -120,9 +149,9 @@ export default function SettingsPage() {
               }}
             />
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setFocusSound('/audio/teleleleng.mp3')}>Default</Button>
-        <Button type="button" onClick={handlePreview}>Preview</Button>
-        <Button type="button" variant="destructive" onClick={stopAudioPreview}>Stop</Button>
+              <Button type="button" variant="outline" onClick={() => setFocusSound('/audio/teleleleng.mp3')} className="rounded-lg border-border/40 hover:bg-muted/20 transition-all duration-300">Default</Button>
+              <Button type="button" onClick={handlePreview} className="rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300">Preview</Button>
+              <Button type="button" variant="destructive" onClick={stopAudioPreview} className="rounded-lg hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 hover:shadow-md hover:shadow-destructive/20 transition-all duration-300">Stop</Button>
             </div>
             <p className="text-xs text-muted-foreground">Choose default, recent, or pick an mp3 from your files (not persisted across restarts unless you save). Object URLs won't persist after reload.</p>
           </div>
@@ -137,7 +166,7 @@ export default function SettingsPage() {
               setWaitingVideo(val);
               if (!val.startsWith('blob:')) setSelectedVideoName(null);
             }}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full rounded-lg border-border/40 bg-card/50 backdrop-blur-sm">
                 <SelectValue placeholder="Select video" />
               </SelectTrigger>
               <SelectContent>
@@ -169,8 +198,8 @@ export default function SettingsPage() {
               }}
             />
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setWaitingVideo('/videos/waiting.mp4')}>Default</Button>
-              <Button type="button" onClick={toggleVideoPlayback}>{videoRef.current && !videoRef.current.paused ? 'Pause' : 'Play'}</Button>
+              <Button type="button" variant="outline" onClick={() => setWaitingVideo('/videos/waiting.mp4')} className="rounded-lg border-border/40 hover:bg-muted/20 transition-all duration-300">Default</Button>
+              <Button type="button" onClick={toggleVideoPlayback} className="rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300">{videoRef.current && !videoRef.current.paused ? 'Pause' : 'Play'}</Button>
             </div>
             <p className="text-xs text-muted-foreground">Looping video displayed in overlay. Selecting a local file uses an in-memory URL until saved & app remains open.</p>
             <div className="mt-2">
@@ -178,7 +207,7 @@ export default function SettingsPage() {
                 ref={videoRef}
                 key={waitingVideo}
                 src={waitingVideo.startsWith('blob:') ? waitingVideo : (waitingVideo.startsWith('/') ? waitingVideo : `/videos/${waitingVideo}`)}
-                className="rounded-md border w-full max-w-sm aspect-video object-cover"
+                className="rounded-xl border border-border/40 w-full max-w-sm aspect-video object-cover shadow-md"
                 loop
                 muted
                 controls
@@ -186,7 +215,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" type="button" onClick={() => { setFocusSound(settings.focusResumeSound); setWaitingVideo(settings.waitingVideo); }}>Cancel</Button>
+            <Button variant="outline" type="button" onClick={() => { setFocusSound(settings.focusResumeSound); setWaitingVideo(settings.waitingVideo); }} className="flex-1 rounded-lg border-border/40 hover:bg-muted/20 transition-all duration-300">Cancel</Button>
             <Button type="button" onClick={async () => {
               // Only persist if not object URLs (blob:). For object URLs user must choose again next session.
               if (focusSound.startsWith('blob:')) toast.message('Local audio will not persist unless you copy it to public/audio');
@@ -195,7 +224,7 @@ export default function SettingsPage() {
               // Persist to history arrays
               if (!focusSound.startsWith('blob:')) await settings.setFocusResumeSound(focusSound);
               if (!waitingVideo.startsWith('blob:')) await settings.setWaitingVideo(waitingVideo);
-            }}>Save</Button>
+            }} className="flex-1 rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300">Save</Button>
           </div>
         </CardContent>
       </Card>

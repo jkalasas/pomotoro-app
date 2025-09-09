@@ -20,8 +20,8 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
   const trend = calculateTrend(stats);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Focus Time</CardTitle>
           <div className="h-4 w-4 text-muted-foreground">⏱️</div>
@@ -34,7 +34,7 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
           <div className="h-4 w-4 text-muted-foreground">✅</div>
@@ -47,7 +47,7 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Pomodoros Completed</CardTitle>
           <div className="h-4 w-4 text-muted-foreground">🍅</div>
@@ -60,7 +60,7 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
           <div className="h-4 w-4 text-muted-foreground">🔥</div>

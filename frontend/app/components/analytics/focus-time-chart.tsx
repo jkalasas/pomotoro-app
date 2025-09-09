@@ -1,6 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
+import { Clock } from 'lucide-react';
 import type { ChartDataPoint } from '~/lib/analytics';
 
 interface FocusTimeChartProps {
@@ -9,9 +10,12 @@ interface FocusTimeChartProps {
 
 export function FocusTimeChart({ data }: FocusTimeChartProps) {
   return (
-    <Card>
+    <Card className="backdrop-blur-sm bg-card/90 border-border/50 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl">
       <CardHeader>
-        <CardTitle>Focus Time Trend</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Focus Time Trend
+        </CardTitle>
         <CardDescription>
           Your daily focus and break time over the past weeks
         </CardDescription>
