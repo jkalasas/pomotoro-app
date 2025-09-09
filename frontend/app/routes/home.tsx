@@ -209,6 +209,7 @@ export default function Home() {
   const startGenerating = async (projectDetails: string) => {
     try {
       setIsGenerating(true);
+      toast.info("Generating session recommendations...");
       const resp = (await apiClient.getRecommendations(projectDetails)) as RecommendationResponse;
 
       const generated: GeneratedSessionInfo = {
@@ -316,7 +317,7 @@ export default function Home() {
             <DialogTrigger disabled={isGenerating}>
               <Button className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6" disabled={isGenerating}>
                 <Plus className="h-5 w-5" />
-                <span>New Session</span>
+                <span>{isGenerating ? "Generating..." : "New Session"}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-2xl">
