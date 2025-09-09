@@ -244,8 +244,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       } catch {}
 
-      // Refresh data to keep lists in sync
-      await get().refreshAllData();
+  // Avoid redundant full refresh here; UI is updated optimistically and
+  // specific reloads happen via events and scheduler/pomodoro sync.
       
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));

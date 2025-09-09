@@ -3,6 +3,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 class ApiClient {
   private token: string | null = null;
   private refreshTokenCallback: (() => Promise<boolean>) | null = null;
+  // In-flight request deduplication and a very short-lived cache to avoid bursty duplicate GETs
+  private inflight: Map<string, Promise<any>> = new Map();
+  private cache: Map<string, { timestamp: number; data: any }> = new Map();
+  private readonly CACHE_TTL_MS = 1000; // 1s TTL is enough to collapse rapid duplicates
 
   setToken(token: string) {
     this.token = token;
@@ -35,10 +39,30 @@ class ApiClient {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    // Build a stable key for GET requests for dedup/cache
+    const method = (options.method || 'GET').toUpperCase();
+    const key = `${method} ${url}::${this.token || ''}`;
+
+    // For GET requests, first try to serve from a tiny cache window
+    if (method === 'GET') {
+      const cached = this.cache.get(key);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        return cached.data as T;
+      }
+
+      // If an identical request is in-flight, return the same promise
+      const inflight = this.inflight.get(key);
+      if (inflight) {
+        return inflight as Promise<T>;
+      }
+    }
+
+    const doFetch = fetch(url, { ...options, headers });
+    if (method === 'GET') {
+      this.inflight.set(key, doFetch);
+    }
+
+    const response = await doFetch;
 
     if (!response.ok) {
       // If we get a 401 and have a refresh callback, try to refresh the token
@@ -55,12 +79,19 @@ class ApiClient {
       }
       
       const error = await response.text();
+      if (method === 'GET') {
+        this.inflight.delete(key);
+      }
       throw new Error(`API Error: ${response.status} - ${error}`);
     }
 
     // Gracefully handle responses with no content (e.g., 204) or non-JSON bodies
     if (response.status === 204) {
       // No Content
+      if (method === 'GET') {
+        this.cache.set(key, { timestamp: Date.now(), data: undefined });
+        this.inflight.delete(key);
+      }
       return undefined as unknown as T;
     }
 
@@ -73,18 +104,36 @@ class ApiClient {
     }
 
     if (contentType.includes('application/json')) {
-      return response.json();
+      const json = await response.json();
+      if (method === 'GET') {
+        this.cache.set(key, { timestamp: Date.now(), data: json });
+        this.inflight.delete(key);
+      }
+      return json as T;
     }
 
     // Fallback: attempt to read text; if empty, return undefined
     const text = await response.text();
     if (!text) {
+      if (method === 'GET') {
+        this.cache.set(key, { timestamp: Date.now(), data: undefined });
+        this.inflight.delete(key);
+      }
       return undefined as unknown as T;
     }
     try {
-      return JSON.parse(text) as T;
+      const parsed = JSON.parse(text) as T;
+      if (method === 'GET') {
+        this.cache.set(key, { timestamp: Date.now(), data: parsed });
+        this.inflight.delete(key);
+      }
+      return parsed;
     } catch {
       // Return raw text when JSON parsing fails
+      if (method === 'GET') {
+        this.cache.set(key, { timestamp: Date.now(), data: text });
+        this.inflight.delete(key);
+      }
       return text as unknown as T;
     }
   }

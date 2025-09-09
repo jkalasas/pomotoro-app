@@ -34,6 +34,9 @@ export interface PomodoroState {
     long_break_duration: number;
     long_break_per_pomodoros: number;
   };
+  // Track which session last set the settings and when, to avoid duplicate fetches
+  lastSettingsFromSessionId: number | null;
+  lastSettingsFetchedAt: number | null;
   startTimer: () => Promise<void>;
   pauseTimer: () => Promise<void>;
   resetTimer: () => Promise<void>;
@@ -314,6 +317,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     long_break_duration: 15,
     long_break_per_pomodoros: 4,
   },
+  lastSettingsFromSessionId: null,
+  lastSettingsFetchedAt: null,
 
   startTimer: async () => {
     set({ isLoading: true });
@@ -470,6 +475,16 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
 
   updateSettingsFromTask: async (taskSessionId: number) => {
     try {
+      const { lastSettingsFromSessionId, lastSettingsFetchedAt } = get();
+      // Skip duplicate fetches for the same session within a short window
+      if (
+        lastSettingsFromSessionId === taskSessionId &&
+        lastSettingsFetchedAt !== null &&
+        Date.now() - lastSettingsFetchedAt < 1000
+      ) {
+        return;
+      }
+
       const session = await apiClient.getSession(taskSessionId) as {
         focus_duration: number;
         short_break_duration: number;
@@ -485,6 +500,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       };
       
       get().updateSettings(newSettings);
+      set({ lastSettingsFromSessionId: taskSessionId, lastSettingsFetchedAt: Date.now() });
     } catch (error) {
       // Failed to update settings from task session
     }
@@ -542,8 +558,14 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   setSession: async (sessionId: number) => {
     set({ isLoading: true });
     try {
-      // First check if the session is completed
-      const session = await apiClient.getSession(sessionId) as { completed: boolean };
+      // First check if the session is completed and get its config in one call
+      const session = await apiClient.getSession(sessionId) as {
+        completed: boolean;
+        focus_duration: number;
+        short_break_duration: number;
+        long_break_duration: number;
+        long_break_per_pomodoros: number;
+      };
       if (session.completed) {
         throw new Error("Cannot start a completed session");
       }
@@ -551,9 +573,14 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const previousSessionId = get().sessionId;
       await apiClient.startActiveSession(sessionId);
       set({ sessionId });
-      
-      // Update settings from the session configuration
-      await get().updateSettingsFromTask(sessionId);
+      // Apply settings directly from fetched session (avoid extra fetch)
+      get().updateSettings({
+        focus_duration: session.focus_duration,
+        short_break_duration: session.short_break_duration,
+        long_break_duration: session.long_break_duration,
+        long_break_per_pomodoros: session.long_break_per_pomodoros,
+      });
+      set({ lastSettingsFromSessionId: sessionId, lastSettingsFetchedAt: Date.now() });
       
       await get().loadActiveSession();
       
@@ -645,26 +672,14 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const isAtBeginning = !currentState.maxTime || currentState.time === currentState.maxTime || currentState.maxTime === 0;
       
       if (phaseChanged || sessionChanged || configChanged || isAtBeginning) {
-        // Get session details to determine correct maxTime for the current phase
-        // Use the config session ID to ensure we get the right timing values
-        try {
-          const session = await apiClient.getSession(configSessionId) as {
-            focus_duration: number;
-            short_break_duration: number;
-            long_break_duration: number;
-          };
-          
-          if (activeSession.phase === "focus") {
-            newMaxTime = session.focus_duration * 60;
-          } else if (activeSession.phase === "short_break") {
-            newMaxTime = session.short_break_duration * 60;
-          } else if (activeSession.phase === "long_break") {
-            newMaxTime = session.long_break_duration * 60;
-          }
-        } catch (error) {
-          // Failed to get session details for maxTime calculation
-          // Fall back to using time_remaining as maxTime
-          newMaxTime = activeSession.time_remaining;
+        // Use locally-synced settings to determine correct maxTime for the current phase
+        const s = get().settings;
+        if (activeSession.phase === "focus") {
+          newMaxTime = s.focus_duration * 60;
+        } else if (activeSession.phase === "short_break") {
+          newMaxTime = s.short_break_duration * 60;
+        } else if (activeSession.phase === "long_break") {
+          newMaxTime = s.long_break_duration * 60;
         }
       } else {
         // Keep existing maxTime to preserve progress visualization

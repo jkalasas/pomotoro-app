@@ -128,10 +128,8 @@ export default function Home() {
   useEffect(() => {
     if (authStore.user) {
       tasksStore.loadSessions();
-      pomodoroStore.loadActiveSession().then(() => {
-        // Sync pomodoro config with current task after loading active session
-        pomodoroStore.syncConfigWithCurrentTask();
-      });
+      // loadActiveSession already syncs settings with the current task/session
+      pomodoroStore.loadActiveSession();
     }
   }, [authStore.user]);
 
@@ -159,10 +157,8 @@ export default function Home() {
     };
 
     const handleTaskCompleted = () => {
-      if (tasksStore.currentSession) {
-        tasksStore.loadSession(tasksStore.currentSession.id);
-      }
-      // Defer analytics update
+      // Session/task data refresh is already triggered by the stores.
+      // Only update analytics here to avoid duplicate network calls.
       setTimeout(() => analyticsStore.updateDailyStats(), 100);
     };
 

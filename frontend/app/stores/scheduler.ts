@@ -269,9 +269,6 @@ export const useSchedulerStore = create<SchedulerState>()(
         // Don't block task completion if sync fails
       }
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('task-completed'));
-      }
       toast.success('Task completed');
     } catch (error) {
       // Rollback on failure
@@ -295,9 +292,6 @@ export const useSchedulerStore = create<SchedulerState>()(
       const { useTaskStore } = await import('./tasks');
       await useTaskStore.getState().uncompleteTask(taskId);
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('task-uncompleted'));
-      }
       toast.success('Task marked incomplete');
     } catch (error) {
       // Rollback on failure
