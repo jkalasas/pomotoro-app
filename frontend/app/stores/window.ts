@@ -1,6 +1,7 @@
 import { getCurrentWindow, PhysicalSize, PhysicalPosition, Window } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { create } from "zustand";
+import { showOverlay } from "~/lib/env";
 
 export interface Dimension {
   width: number;
@@ -27,7 +28,7 @@ export interface WindowState {
   toggleAlwaysOnTop: () => void;
   toggleFullscreen: () => void;
   updateWindow: (newWindow: Window) => Promise<void>;
-  createOverlayWindow: (timeRemaining: number) => Promise<WebviewWindow>;
+  createOverlayWindow: (timeRemaining: number) => Promise<WebviewWindow | null>;
   closeOverlayWindow: () => Promise<void>;
 }
 
@@ -87,6 +88,12 @@ export const useWindowStore = create<WindowState>((set, get) => ({
   },
   
   createOverlayWindow: async (timeRemaining: number) => {
+    // Check if overlay is enabled via environment variable
+    if (!showOverlay()) {
+      console.log('Overlay disabled via VITE_SHOW_OVERLAY environment variable');
+      return null as any; // Return a dummy value to maintain interface compatibility
+    }
+
     try {
       console.log('Starting overlay window creation...', { timeRemaining });
       

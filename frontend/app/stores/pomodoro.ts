@@ -5,6 +5,7 @@ import { create } from "zustand";
 // the next focus phase and CONTINUES running (was previously pausing).
 import { listen } from "@tauri-apps/api/event";
 import { apiClient } from "~/lib/api";
+import { isTauri } from "~/lib/utils";
 import { useWindowStore } from "./window";
 import { useAnalyticsStore } from "./analytics";
 
@@ -56,7 +57,7 @@ export interface PomodoroState {
     pomodoros_completed?: number;
     is_running?: boolean;
   }) => Promise<void>;
-  setShowRestOverlay: (show: boolean) => void;
+  setShowRestOverlay: (show: boolean) => Promise<void>;
   skipRest: () => Promise<void>;
   triggerSessionCompletion: (sessionId: number, sessionName: string, totalTasks: number, completedTasks: number, focusDuration: number) => void;
   setShowFeedbackModal: (show: boolean) => void;
@@ -82,7 +83,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     });
 
     // Listen for Tauri app close events (when user actually quits via tray)
-    if ('__TAURI__' in window) {
+    if (isTauri()) {
       listen('tauri://close-requested', () => {
         const state = get();
         if (state.isRunning) {
@@ -128,7 +129,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         clearInterval(_bgInterval);
       }
       
-      _bgInterval = setInterval(() => {
+      _bgInterval = setInterval(async () => {
         try {
           const state = get();
 
@@ -155,7 +156,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           if (isBreakPhase && state.isRunning && state.time > 0 && !state.showRestOverlay) {
             set({ showRestOverlay: true });
             try {
-              useWindowStore.getState().createOverlayWindow(state.time);
+              const overlayWindow = await useWindowStore.getState().createOverlayWindow(state.time);
+              if (!overlayWindow) {
+                // Overlay disabled via environment variable
+                set({ showRestOverlay: false });
+              }
             } catch (error) {
               // Failed to create overlay window from background ticker
               set({ showRestOverlay: false });
@@ -163,7 +168,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           } else if ((!isBreakPhase || !state.isRunning || state.time <= 0) && state.showRestOverlay) {
             set({ showRestOverlay: false });
             try {
-              useWindowStore.getState().closeOverlayWindow();
+              await useWindowStore.getState().closeOverlayWindow();
             } catch (error) {
               // Failed to close overlay window from background ticker
             }
@@ -200,7 +205,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     
     // Listen for Tauri window hide events (since close is prevented)
-    if (typeof window !== "undefined" && '__TAURI__' in window) {
+    if (isTauri()) {
       // For Tauri apps, we need special handling since close is prevented
       let hideTimer: NodeJS.Timeout | null = null;
       
@@ -264,7 +269,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
 
   // Notification helper function
   const sendFocusNotification = async () => {
-    if (typeof window === "undefined" || !("__TAURI__" in window)) {
+    if (!isTauri()) {
       return; // Not in Tauri environment
     }
 
@@ -833,7 +838,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     }
   },
 
-  setShowRestOverlay: (show: boolean) => {
+  setShowRestOverlay: async (show: boolean) => {
     const currentState = get();
     
     if (show && !currentState.showRestOverlay) {
@@ -842,7 +847,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       set({ showRestOverlay: true });
       
       try {
-        useWindowStore.getState().createOverlayWindow(time);
+        const overlayWindow = await useWindowStore.getState().createOverlayWindow(time);
+        if (!overlayWindow) {
+          // Overlay disabled via environment variable
+          set({ showRestOverlay: false });
+          return;
+        }
       } catch (error) {
         // Failed to create overlay window - reset state
         set({ showRestOverlay: false });
@@ -852,7 +862,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       set({ showRestOverlay: false });
       
       try {
-        useWindowStore.getState().closeOverlayWindow();
+        await useWindowStore.getState().closeOverlayWindow();
       } catch (error) {
         // Failed to close overlay window
       }

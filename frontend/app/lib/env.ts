@@ -6,6 +6,20 @@ export const SHOW_TEST_FEATURES =
   import.meta.env.VITE_SHOW_TEST_FEATURES === "true" ||
   import.meta.env.VITE_SHOW_TEST_FEATURES === "yes";
 
+export const SHOW_OVERLAY =
+  import.meta.env.VITE_SHOW_OVERLAY !== "false" &&
+  import.meta.env.VITE_SHOW_OVERLAY !== "0" &&
+  import.meta.env.VITE_SHOW_OVERLAY !== "no" &&
+  (import.meta.env.VITE_SHOW_OVERLAY === "1" ||
+   import.meta.env.VITE_SHOW_OVERLAY === "true" ||
+   import.meta.env.VITE_SHOW_OVERLAY === "yes" ||
+   import.meta.env.VITE_SHOW_OVERLAY === undefined ||
+   import.meta.env.VITE_SHOW_OVERLAY === "");
+
 export function showTestFeatures() {
   return SHOW_TEST_FEATURES;
+}
+
+export function showOverlay() {
+  return SHOW_OVERLAY;
 }

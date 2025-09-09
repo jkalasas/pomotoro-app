@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { Store } from '@tauri-apps/plugin-store';
+import { isTauri } from '~/lib/utils';
 
 interface AppSettingsState {
   focusResumeSound: string; // relative path under public/audio
@@ -15,7 +16,7 @@ interface AppSettingsState {
 // Lazily loaded persistent store (Tauri only)
 let storePromise: Promise<Store> | null = null;
 const getStore = () => {
-  if (typeof window === 'undefined' || !('__TAURI__' in window)) return null;
+  if (!isTauri()) return null;
   if (!storePromise) {
     storePromise = Store.load('settings.json');
   }

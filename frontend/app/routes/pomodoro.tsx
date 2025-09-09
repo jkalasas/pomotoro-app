@@ -83,12 +83,16 @@ export default function Pomodoro() {
 
   // Handle rest overlay display
   useEffect(() => {
-    const isBreakPhase = phase === "short_break" || phase === "long_break";
-    const shouldShowOverlay = isBreakPhase && isRunning && time > 0;
+    const handleOverlay = async () => {
+      const isBreakPhase = phase === "short_break" || phase === "long_break";
+      const shouldShowOverlay = isBreakPhase && isRunning && time > 0;
+      
+      if (shouldShowOverlay !== showRestOverlay) {
+        await setShowRestOverlay(shouldShowOverlay);
+      }
+    };
     
-    if (shouldShowOverlay !== showRestOverlay) {
-      setShowRestOverlay(shouldShowOverlay);
-    }
+    handleOverlay();
   }, [phase, isRunning, time, showRestOverlay, setShowRestOverlay]);
 
   return (
