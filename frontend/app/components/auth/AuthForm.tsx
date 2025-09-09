@@ -44,22 +44,38 @@ export function AuthForm() {
     if (!ctx) return;
 
     // Set canvas size to match window
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
+    let prevWidth = window.innerWidth;
+    let prevHeight = window.innerHeight;
+    
     // Circle properties
-    const circles = Array(5).fill(0).map(() => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
+    const circles = Array(10).fill(0).map(() => ({
+      x: Math.random() * prevWidth,
+      y: Math.random() * prevHeight,
       radius: 50 + Math.random() * 100,
       speedX: (Math.random() - 0.5) * 0.8,
       speedY: (Math.random() - 0.5) * 0.8,
       opacity: 0.1 + Math.random() * 0.2,
     }));
+    
+    const resizeCanvas = () => {
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight;
+      
+      // Scale circles' positions relative to the resize
+      const scaleX = newWidth / prevWidth;
+      const scaleY = newHeight / prevHeight;
+      circles.forEach(circle => {
+        circle.x *= scaleX;
+        circle.y *= scaleY;
+      });
+      
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      prevWidth = newWidth;
+      prevHeight = newHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     // Animation loop
     let animationId: number;
