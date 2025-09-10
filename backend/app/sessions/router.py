@@ -56,17 +56,20 @@ def create_session(
             # Fallback to a generic name
             session_name = f"Session {len(session_data.tasks)} tasks"
     
+    # Create and persist the session first so it has an ID for FK references
     db_session = PomodoroSession(
         name=session_name,
         description=session_data.description,
         user_id=current_user.id,
         **session_data.pomodoro_config.model_dump()
     )
+    db.add(db_session)
+    db.commit()  # ensure db_session.id is populated
+    db.refresh(db_session)
 
-    for task_data in session_data.tasks:
-        category = db.exec(
-            select(Category).where(Category.name == task_data.category)
-        ).first()
+    # Now create tasks with a proper session_id and sequential order
+    for idx, task_data in enumerate(session_data.tasks):
+        category = db.exec(select(Category).where(Category.name == task_data.category)).first()
         if not category:
             category = Category(name=task_data.category)
             db.add(category)
@@ -77,13 +80,18 @@ def create_session(
             name=task_data.name,
             estimated_completion_time=task_data.estimated_completion_time,
             categories=[category],
-            session=db_session,
+            session_id=db_session.id,
+            order=idx,
         )
         db.add(db_task)
+        # Keep in-memory relationship collection in sync so tasks are present without a second refresh
+        if db_session.tasks is not None:
+            db_session.tasks.append(db_task)
 
-    db.add(db_session)
-    db.commit()
-    db.refresh(db_session)
+    if session_data.tasks:
+        db.commit()
+        # Refresh session to load tasks relationship (ensures ordering from DB)
+        db.refresh(db_session)
 
     tasks_public = [
         TaskPublic(
@@ -108,6 +116,8 @@ def create_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+            completed=db_session.completed,
+            completed_at=db_session.completed_at,
     archived=db_session.archived,
     archived_at=db_session.archived_at,
     )
@@ -168,6 +178,8 @@ def read_sessions(
             long_break_duration=session.long_break_duration,
             long_break_per_pomodoros=session.long_break_per_pomodoros,
             tasks=task_publics,
+                completed=session.completed,
+                completed_at=session.completed_at,
             archived=session.archived,
             archived_at=session.archived_at,
         )
@@ -664,6 +676,8 @@ def read_session(
         long_break_duration=db_session.long_break_duration,
         long_break_per_pomodoros=db_session.long_break_per_pomodoros,
         tasks=tasks_public,
+            completed=db_session.completed,
+            completed_at=db_session.completed_at,
     archived=db_session.archived,
     archived_at=db_session.archived_at,
     )

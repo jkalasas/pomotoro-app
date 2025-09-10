@@ -40,6 +40,8 @@ class SessionPublic(BaseModel):
     short_break_duration: int
     long_break_duration: int
     long_break_per_pomodoros: int
+    completed: Optional[bool] = False
+    completed_at: Optional[datetime] = None
     archived: Optional[bool] = False
     archived_at: Optional[datetime] = None
 
