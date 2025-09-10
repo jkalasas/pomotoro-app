@@ -687,8 +687,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
       
       set({
-        time: activeSession.time_remaining,
-        maxTime: newMaxTime,
+        time: Number.isFinite(activeSession.time_remaining) && activeSession.time_remaining >= 0 ? activeSession.time_remaining : newMaxTime,
+        maxTime: Number.isFinite(newMaxTime) && newMaxTime > 0 ? newMaxTime : (get().settings.focus_duration * 60),
         isRunning: activeSession.is_running,
         phase: activeSession.phase,
         currentTaskId: activeSession.current_task_id,
@@ -783,10 +783,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       });
       
       // Update local state (including total pomodoros) and keep running
+      const safeDuration = Number.isFinite(nextDuration) && nextDuration > 0 ? nextDuration : (get().settings.focus_duration * 60);
       set({
         phase: nextPhase,
-        time: nextDuration,
-        maxTime: nextDuration,
+        time: safeDuration,
+        maxTime: safeDuration,
         isRunning: true, // Continuous timer across phases
         pomodorosCompleted: newPomodorosCompleted,
         totalPomodorosCompleted: newTotalPomodorosCompleted

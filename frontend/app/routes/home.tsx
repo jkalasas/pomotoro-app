@@ -424,7 +424,11 @@ export default function Home() {
               {schedulerStore.getCurrentTask() ? (
                 <>
                   <p className="text-center">{pomodoroStore.phase === "focus" ? "Stay focused!" : pomodoroStore.phase === "short_break" ? "Short break" : "Long break"}</p>
-                  <p className="text-sm text-muted-foreground">{Math.floor(pomodoroStore.time / 60)} minutes remaining</p>
+                  <p className="text-sm text-muted-foreground">{(() => {
+                    const t = pomodoroStore.time;
+                    const mins = Number.isFinite(t) && t >= 0 ? Math.floor(t / 60) : 0;
+                    return `${mins} minute${mins === 1 ? '' : 's'} remaining`;
+                  })()}</p>
                 </>
               ) : null}
             </div>

@@ -30,9 +30,18 @@ type TProps = {
 };
 
 export function PomodoroTimer({ time, endTime }: TProps) {
-  const hours = Math.floor(time / 3600);
-  const minutes = String(Math.floor((time % 3600) / 60)).padStart(2, "0");
-  const seconds = String(time % 60).padStart(2, "0");
+  // Defensive guards: avoid NaN / Infinity causing "Na:Na" rendering
+  const safeTimeRaw = Number.isFinite(time) && time >= 0 ? time : 0;
+  const safeEndTimeRaw = Number.isFinite(endTime) && endTime > 0 ? endTime : safeTimeRaw || 1;
+
+  const clampedTime = Math.min(safeTimeRaw, safeEndTimeRaw);
+  const progress = safeEndTimeRaw > 0 ? clampedTime / safeEndTimeRaw : 0; // 0..1
+
+  const hours = Math.floor(clampedTime / 3600);
+  const minutesNum = Math.floor((clampedTime % 3600) / 60);
+  const secondsNum = clampedTime % 60;
+  const minutes = String(minutesNum).padStart(2, "0");
+  const seconds = String(secondsNum).padStart(2, "0");
   const showHours = hours > 0;
 
   return (
@@ -44,7 +53,7 @@ export function PomodoroTimer({ time, endTime }: TProps) {
         <RadialBarChart
           data={chartData}
           startAngle={0}
-          endAngle={(time / endTime) * 360}
+          endAngle={progress * 360}
           innerRadius={80}
           outerRadius={110}
         >
