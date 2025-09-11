@@ -220,10 +220,14 @@ class ApiClient {
 
   async getSessions(includeArchived: boolean = false) {
     const query = includeArchived ? '?include_archived=true' : '';
-    return this.request(`/sessions/${query}`);
+    const result = await this.request(`/sessions/${query}`);
+    return Array.isArray(result) ? result : [];
   }
 
   async getSession(sessionId: number, includeArchived: boolean = true) {
+    if (!sessionId || !Number.isInteger(sessionId) || sessionId <= 0) {
+      throw new Error(`Invalid sessionId: ${sessionId}`);
+    }
     const query = includeArchived ? '?include_archived=true' : '';
     return this.request(`/sessions/${sessionId}${query}`);
   }

@@ -505,6 +505,9 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
 
   updateSettingsFromTask: async (taskSessionId: number) => {
     try {
+      if (!taskSessionId || !Number.isInteger(taskSessionId) || taskSessionId <= 0) {
+        return;
+      }
       const { lastSettingsFromSessionId, lastSettingsFetchedAt } = get();
       // Skip duplicate fetches for the same session within a short window
       if (
@@ -589,6 +592,9 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     set({ isLoading: true });
     try {
       // First check if the session is completed and get its config in one call
+      if (!sessionId || !Number.isInteger(sessionId) || sessionId <= 0) {
+        throw new Error("Invalid session ID");
+      }
       const session = await apiClient.getSession(sessionId) as {
         completed: boolean;
         focus_duration: number;
@@ -682,7 +688,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const sessionChanged = currentState.sessionId !== activeSession.session_id;
       const configChanged = useCurrentTaskSession || sessionChanged || currentState.sessionId === null;
       
-      if (configChanged) {
+      if (configChanged && configSessionId && Number.isInteger(configSessionId) && configSessionId > 0) {
         try {
           await get().updateSettingsFromTask(configSessionId);
         } catch (error) {

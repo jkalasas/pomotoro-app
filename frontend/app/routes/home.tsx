@@ -134,7 +134,12 @@ export default function Home() {
   }, [authStore.user]);
 
   useEffect(() => {
-    if (pomodoroStore.sessionId && !tasksStore.currentSession) {
+    if (
+      pomodoroStore.sessionId &&
+      Number.isInteger(pomodoroStore.sessionId) &&
+      pomodoroStore.sessionId > 0 &&
+      !tasksStore.currentSession
+    ) {
       tasksStore.loadSession(pomodoroStore.sessionId);
     }
   }, [pomodoroStore.sessionId]);
@@ -419,7 +424,7 @@ export default function Home() {
               <span className="font-bold text-center mb-1">Current Task</span>
               <span className="font-normal text-center">{(() => { const t = schedulerStore.getCurrentTask(); return t ? (t.name?.trim() || "Untitled Task") : "No active task"; })()}</span>
             </div>
-            <div className="mx-auto"><PomodoroTimer time={schedulerStore.getCurrentTask() ? pomodoroStore.time : 0} endTime={pomodoroStore.maxTime} /></div>
+            <div className="mx-auto"><PomodoroTimer time={pomodoroStore.time} endTime={pomodoroStore.maxTime} /></div>
             <div className="-mt-4 mb-12 flex flex-col items-center">
               {schedulerStore.getCurrentTask() ? (
                 <>
@@ -483,7 +488,10 @@ export default function Home() {
                   <Trash2 className="size-4 mr-2" />
                   Clear
                 </Button>
-                <ScheduleGeneratorDialog onScheduleGenerated={() => {}} />
+                <ScheduleGeneratorDialog onScheduleGenerated={() => {
+                  // Optional: refresh sessions/schedule after generation
+                  tasksStore.loadSessions();
+                }} />
               </div>
             </div>
             <div className="max-h-full overflow-y-auto pb-4 custom-scrollbar">

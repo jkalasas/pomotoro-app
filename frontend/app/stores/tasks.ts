@@ -104,15 +104,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   loadSessions: async () => {
     set({ isLoading: true });
     try {
-  const sessions = await apiClient.getSessions(false) as Session[];
+      const sessions = await apiClient.getSessions(false) as Session[] | any;
+      const sessionsArray: Session[] = Array.isArray(sessions) ? sessions : [];
       // Ensure all sessions have a tasks array
-      const sessionsWithTasks = sessions.map(session => ({
+      const sessionsWithTasks = sessionsArray.map(session => ({
         ...session,
         tasks: session.tasks || []
       }));
       set({ sessions: sessionsWithTasks });
     } catch (error) {
       console.error("Failed to load sessions:", error);
+      set({ sessions: [] });
     } finally {
       set({ isLoading: false });
     }
@@ -120,17 +122,22 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   loadArchivedSessions: async () => {
     try {
-      const sessions = await apiClient.getSessions(true) as Session[];
-      return sessions.filter(s => s.archived);
+      const sessions = await apiClient.getSessions(true) as Session[] | any;
+      const sessionsArray: Session[] = Array.isArray(sessions) ? sessions : [];
+      return sessionsArray.filter(s => s.archived);
     } catch (e) {
       return [];
     }
   },
 
   loadSession: async (sessionId: number) => {
+    if (!sessionId || !Number.isInteger(sessionId) || sessionId <= 0) {
+      console.error("Invalid session ID:", sessionId);
+      return;
+    }
     set({ isLoading: true });
     try {
-  const session = await apiClient.getSession(sessionId, true) as Session;
+      const session = await apiClient.getSession(sessionId, true) as Session;
       // Ensure session has a tasks array
       const sessionWithTasks = {
         ...session,
@@ -145,8 +152,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   getSession: async (sessionId: number) => {
+    if (!sessionId || !Number.isInteger(sessionId) || sessionId <= 0) {
+      const err = new Error(`Invalid session ID: ${sessionId}`);
+      console.error("Failed to get session:", err);
+      throw err;
+    }
     try {
-  const session = await apiClient.getSession(sessionId, true) as Session;
+      const session = await apiClient.getSession(sessionId, true) as Session;
       // Ensure session has a tasks array
       return {
         ...session,
