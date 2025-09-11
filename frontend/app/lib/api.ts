@@ -292,9 +292,14 @@ class ApiClient {
   }
 
   // Task endpoints
-  async completeTask(taskId: number) {
+  async completeTask(taskId: number, actualCompletionTime?: number) {
+    const body = actualCompletionTime !== undefined ? {
+      actual_completion_time: actualCompletionTime
+    } : undefined;
+    
     return this.request(`/sessions/tasks/${taskId}/complete`, {
       method: 'PUT',
+      ...(body && { body: JSON.stringify(body) }),
     });
   }
 

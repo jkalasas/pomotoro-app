@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import func
 
@@ -14,6 +14,7 @@ from .schemas import (
     ActiveSessionCreate,
     ActiveSessionPublic,
     ActiveSessionUpdate,
+    TaskComplete,
     SessionFeedbackCreate,
     SessionFeedbackPublic,
     SessionCompleteRequest,
@@ -1038,6 +1039,7 @@ def complete_task(
     db: SessionDep,
     task_id: int,
     current_user: ActiveUserDep,
+    task_completion: Optional[TaskComplete] = None,
 ):
     task = db.get(Task, task_id)
     if not task or task.is_deleted:
@@ -1052,8 +1054,11 @@ def complete_task(
     # Treat completed task as archived
     task.archived = True
     task.archived_at = datetime.utcnow()
-    # For now, set actual_completion_time to estimated if not set
-    if task.actual_completion_time is None:
+    
+    # Set actual completion time from request or default to estimated
+    if task_completion and task_completion.actual_completion_time is not None:
+        task.actual_completion_time = task_completion.actual_completion_time
+    elif task.actual_completion_time is None:
         task.actual_completion_time = task.estimated_completion_time
     
     db.add(task)

@@ -32,6 +32,10 @@ class SessionCreate(BaseModel):
     tasks: List[TaskResponse]
 
 
+class TaskComplete(BaseModel):
+    actual_completion_time: Optional[int] = None
+
+
 class SessionPublic(BaseModel):
     id: int
     name: str

@@ -28,6 +28,10 @@ export interface PomodoroState {
     completedTasks: number;
     focusDuration: number;
   } | null;
+  // Time tracking for completion analytics
+  totalFocusTime: number; // Total focus time in seconds across all tasks
+  currentTaskTime: number; // Time spent on current task in seconds
+  taskStartTime: number | null; // Timestamp when current task started
   settings: {
     focus_duration: number;
     short_break_duration: number;
@@ -66,6 +70,12 @@ export interface PomodoroState {
   setShowFeedbackModal: (show: boolean) => void;
   submitSessionFeedback: (focusLevel: string, reflection?: string) => Promise<void>;
   cleanup: () => void;
+  // Time tracking methods
+  resetTimeTracking: () => void;
+  startTaskTimer: (taskId?: number) => void;
+  pauseTaskTimer: () => void;
+  getTaskCompletionTime: () => number;
+  resetTaskTimer: () => void;
 }
 
 export const usePomodoroStore = create<PomodoroState>((set, get) => {
@@ -308,6 +318,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     ? parseInt(localStorage.getItem('totalPomodorosCompleted') || '0', 10) 
     : 0,
   isLoading: false,
+  // Initialize time tracking
+  totalFocusTime: typeof window !== "undefined" 
+    ? parseInt(localStorage.getItem('totalFocusTime') || '0', 10) 
+    : 0,
+  currentTaskTime: 0,
+  taskStartTime: null,
   showRestOverlay: false,
   showFeedbackModal: false,
   pendingSessionCompletion: null,
@@ -356,6 +372,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Then update local state
       set({ isRunning: true });
       
+      // Start task timer tracking for focus phases
+      const { phase, currentTaskId } = get();
+      if (phase === "focus") {
+        get().startTaskTimer(currentTaskId || undefined);
+      }
+      
       // Log analytics event
       const currentSessionId = get().sessionId;
       if (currentSessionId) {
@@ -373,11 +395,16 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   pauseTimer: async () => {
     set({ isLoading: true });
     try {
-      const { time, sessionId } = get();
+      const { time, sessionId, phase } = get();
       
       // Check if we have an active session
       if (!sessionId) {
         throw new Error("No active session found");
+      }
+      
+      // Pause task timer tracking for focus phases
+      if (phase === "focus") {
+        get().pauseTaskTimer();
       }
       
       // Update backend first with current time and paused state
@@ -428,6 +455,9 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         maxTime: resetTime,
         phase: "focus"
       });
+      
+      // Reset time tracking
+      get().resetTimeTracking();
       
       // Log analytics event
       if (sessionId) {
@@ -695,6 +725,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         sessionId: activeSession.session_id,
         pomodorosCompleted: activeSession.pomodoros_completed,
       });
+      
+      // If the session is running in focus phase, start task timing
+      if (activeSession.is_running && activeSession.phase === "focus" && activeSession.current_task_id) {
+        get().startTaskTimer(activeSession.current_task_id);
+      }
     } catch (error) {
       // Failed to load active session - reset to default state
       // Initialize with default focus duration instead of 0
@@ -735,6 +770,17 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       let newTotalPomodorosCompleted = totalPomodorosCompleted;
 
   if (phase === "focus") {
+        // Focus phase completed - pause task timer and add to total focus time
+        get().pauseTaskTimer();
+        const state = get();
+        const focusTime = session.focus_duration * 60; // Get the full focus duration in seconds
+        set({ totalFocusTime: state.totalFocusTime + focusTime });
+        
+        // Store total focus time in localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem('totalFocusTime', (state.totalFocusTime + focusTime).toString());
+        }
+        
         // Focus phase completed - increment pomodoro count and move to break
         newPomodorosCompleted = pomodorosCompleted + 1;
         newTotalPomodorosCompleted = totalPomodorosCompleted + 1;
@@ -758,6 +804,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         // Break phase completed - move back to focus
         nextPhase = "focus";
         nextDuration = session.focus_duration * 60;
+        
+        // Resume task timer for focus phase
+        const { currentTaskId } = get();
+        get().startTaskTimer(currentTaskId || undefined);
+        
         // Play focus resume sound
         try {
           const { useAppSettings } = await import('./settings');
@@ -1039,6 +1090,77 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       clearInterval(_bgInterval);
       _bgInterval = null;
     }
+  },
+
+  // Time tracking methods
+  resetTimeTracking: () => {
+    set({ 
+      totalFocusTime: 0, 
+      currentTaskTime: 0, 
+      taskStartTime: null 
+    });
+    if (typeof window !== "undefined") {
+      localStorage.setItem('totalFocusTime', '0');
+    }
+  },
+
+  startTaskTimer: (taskId?: number) => {
+    const state = get();
+    const now = Date.now();
+    
+    // If switching to a different task, add current task time to total and reset
+    if (taskId && state.currentTaskId !== taskId) {
+      if (state.taskStartTime && state.phase === "focus") {
+        const sessionTime = Math.floor((now - state.taskStartTime) / 1000);
+        set({ 
+          currentTaskTime: 0,
+          taskStartTime: now,
+          currentTaskId: taskId
+        });
+      } else {
+        set({ 
+          currentTaskTime: 0,
+          taskStartTime: now,
+          currentTaskId: taskId
+        });
+      }
+    } else if (!state.taskStartTime) {
+      // Starting timer for first time or after pause
+      set({ taskStartTime: now });
+    }
+  },
+
+  pauseTaskTimer: () => {
+    const state = get();
+    if (state.taskStartTime && state.phase === "focus") {
+      const now = Date.now();
+      const sessionTime = Math.floor((now - state.taskStartTime) / 1000);
+      set({ 
+        currentTaskTime: state.currentTaskTime + sessionTime,
+        taskStartTime: null
+      });
+    }
+  },
+
+  getTaskCompletionTime: () => {
+    const state = get();
+    let completionTime = state.currentTaskTime;
+    
+    // Add current session time if timer is running
+    if (state.taskStartTime && state.phase === "focus") {
+      const now = Date.now();
+      const currentSessionTime = Math.floor((now - state.taskStartTime) / 1000);
+      completionTime += currentSessionTime;
+    }
+    
+    return Math.floor(completionTime / 60); // Return in minutes
+  },
+
+  resetTaskTimer: () => {
+    set({ 
+      currentTaskTime: 0, 
+      taskStartTime: null 
+    });
   },
   };
 });

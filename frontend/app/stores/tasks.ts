@@ -192,7 +192,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   completeTask: async (taskId: number) => {
     try {
-      await apiClient.completeTask(taskId);
+      // Get actual completion time from pomodoro store
+      const { usePomodoroStore } = await import('./pomodoro');
+      const pomodoroStore = usePomodoroStore.getState();
+      const actualCompletionTime = pomodoroStore.getTaskCompletionTime();
+      
+      await apiClient.completeTask(taskId, actualCompletionTime);
       
       // Handle next task transition for pomodoro configuration updates
       await get().handleNextTaskTransition(taskId);
@@ -613,12 +618,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         index > completedTaskIndex && !task.completed
       );
       
+      // Get the current pomodoro state BEFORE any updates
+      const pomodoroStore = usePomodoroStore.getState();
+      
+      // Reset the task timer after completing the previous task
+      pomodoroStore.resetTaskTimer();
+      
       if (!nextTask) {
         return;
       }
-      
-      // Get the current pomodoro state BEFORE any updates
-      const pomodoroStore = usePomodoroStore.getState();
       const currentTime = pomodoroStore.time;
       const currentPhase = pomodoroStore.phase;
       const isRunning = pomodoroStore.isRunning;
@@ -656,6 +664,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           is_running: true,
           time_remaining: newTimeRemaining,
         });
+        
+        // Start timer for the new task
+        pomodoroStore.startTaskTimer(nextTask.id);
         
         // Sync configuration after updating the timer
         await pomodoroStore.syncConfigWithCurrentTask();
