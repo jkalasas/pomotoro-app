@@ -13,7 +13,8 @@ from .schemas import (
     DailyStatsPublic,
     WeeklyStatsPublic,
     ProductivityInsights,
-    AnalyticsDashboard
+    AnalyticsDashboard,
+    UpdateDailyStatsRequest
 )
 from .service import AnalyticsService
 
@@ -130,35 +131,32 @@ def get_daily_stats(
     current_user: ActiveUserDep,
     days: int = Query(30, ge=1, le=365)
 ):
-    """Get daily statistics for the current user"""
+    """Get daily statistics for the current user (computed on-the-fly)."""
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
-    
-    daily_stats = db.exec(
-        select(DailyStats).where(
-            and_(
-                DailyStats.user_id == current_user.id,
-                DailyStats.date >= start_date,
-                DailyStats.date <= end_date
+
+    results: List[DailyStatsPublic] = []
+    current = start_date
+    id_counter = 1
+    while current <= end_date:
+        stats = AnalyticsService.compute_daily_stats_for_date(db, current_user.id, current)
+        results.append(
+            DailyStatsPublic(
+                id=id_counter,
+                date=stats["date"],
+                total_focus_time=stats["total_focus_time"],
+                total_break_time=stats["total_break_time"],
+                sessions_completed=stats["sessions_completed"],
+                tasks_completed=stats["tasks_completed"],
+                pomodoros_completed=stats["pomodoros_completed"],
+                average_focus_duration=stats["average_focus_duration"],
+                interruptions_count=stats["interruptions_count"],
+                productivity_score=stats.get("productivity_score"),
             )
-        ).order_by(DailyStats.date)
-    ).all()
-    
-    return [
-        DailyStatsPublic(
-            id=stats.id,
-            date=stats.date,
-            total_focus_time=stats.total_focus_time,
-            total_break_time=stats.total_break_time,
-            sessions_completed=stats.sessions_completed,
-            tasks_completed=stats.tasks_completed,
-            pomodoros_completed=stats.pomodoros_completed,
-            average_focus_duration=stats.average_focus_duration,
-            interruptions_count=stats.interruptions_count,
-            productivity_score=stats.productivity_score
         )
-        for stats in daily_stats
-    ]
+        id_counter += 1
+        current += timedelta(days=1)
+    return results
 
 
 @router.get("/session-analytics", response_model=List[SessionAnalyticsPublic])
@@ -258,16 +256,18 @@ def get_analytics_dashboard(
 def update_daily_stats(
     db: SessionDep,
     current_user: ActiveUserDep,
-    target_date: Optional[date] = None
+    body: Optional[UpdateDailyStatsRequest] = None,
 ):
-    """Manually trigger daily stats update"""
-    stats = AnalyticsService.update_daily_stats(
-        db=db,
-        user_id=current_user.id,
-        target_date=target_date
-    )
-    
-    return {"message": "Daily stats updated successfully", "date": stats.date}
+    """Compatibility endpoint: no-op compute to keep frontend flow intact."""
+    parsed_date: Optional[date] = None
+    if body and body.target_date:
+        try:
+            parsed_date = date.fromisoformat(body.target_date)
+        except Exception:
+            parsed_date = None
+    # Trigger a compute to validate inputs; result is not stored
+    stats = AnalyticsService.compute_daily_stats_for_date(db=db, user_id=current_user.id, target_date=parsed_date)
+    return {"message": "Daily stats recomputed", "date": stats["date"].isoformat()}
 
 
 @router.post("/session/{session_id}/start")
@@ -312,8 +312,5 @@ def end_session_tracking(
     
     # End session analytics
     session_analytics = AnalyticsService.end_session_analytics(db=db, session_id=session_id)
-    
-    # Update daily stats
-    AnalyticsService.update_daily_stats(db=db, user_id=current_user.id)
-    
+
     return {"message": "Session tracking ended", "analytics_id": session_analytics.id if session_analytics else None}

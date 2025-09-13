@@ -429,7 +429,7 @@ def update_active_session(
                 AnalyticsService.update_session_analytics(
                     db=db,
                     session_id=active_session.session_id,
-                    interruptions_count=1  # This would need to be incremented properly
+                    inc__interruptions_count=1
                 )
 
     if session_update.time_remaining is not None:
@@ -463,7 +463,10 @@ def update_active_session(
                     }
                 )
         
+        # Apply phase change only when provided
         active_session.phase = session_update.phase
+
+    # Avoid attributing break time automatically; skip-time vs completion isn't distinguishable here
 
     if session_update.current_task_id is not None:
         # Log task switch if different
@@ -482,9 +485,11 @@ def update_active_session(
         
         active_session.current_task_id = session_update.current_task_id
 
+    # Handle pomodoro count updates independently of task switching
     if session_update.pomodoros_completed is not None:
         # Log pomodoro completion if increased
         if session_update.pomodoros_completed > active_session.pomodoros_completed:
+            delta = session_update.pomodoros_completed - active_session.pomodoros_completed
             AnalyticsService.log_event(
                 db=db,
                 user_id=current_user.id,
@@ -495,16 +500,28 @@ def update_active_session(
                     "completion_time": datetime.utcnow().isoformat()
                 }
             )
-            
-            # Update session analytics
+
+            # Update session analytics with delta increments
             AnalyticsService.update_session_analytics(
                 db=db,
                 session_id=active_session.session_id,
-                pomodoros_completed=session_update.pomodoros_completed
+                inc__pomodoros_completed=delta
             )
-        
+
+            # Increment total focus time by one full focus duration for each pomodoro completion
+            session = db.get(PomodoroSession, active_session.session_id)
+            if session and session.focus_duration:
+                AnalyticsService.update_session_analytics(
+                    db=db,
+                    session_id=active_session.session_id,
+                    inc__total_focus_time=delta * session.focus_duration * 60
+                )
+
         active_session.pomodoros_completed = session_update.pomodoros_completed
 
+    # Ensure required fields are non-null before persisting
+    if not active_session.phase:
+        active_session.phase = "focus"
     db.add(active_session)
     db.commit()
     db.refresh(active_session)

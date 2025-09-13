@@ -184,8 +184,8 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="focus">Focus Time</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          {/* <TabsTrigger value="focus">Focus Time</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger> */}
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -196,7 +196,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="focus" className="space-y-4">
+        {/* <TabsContent value="focus" className="space-y-4">
           <FocusTimeChart data={dashboardData.focus_time_trend} />
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
@@ -251,7 +251,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
   {/** Insights tab removed intentionally to disable AI-powered insights **/}
 

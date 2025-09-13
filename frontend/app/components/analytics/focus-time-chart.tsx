@@ -1,13 +1,34 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import type { ChartDataPoint } from '~/lib/analytics';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "~/components/ui/chart";
 
 interface FocusTimeChartProps {
   data: ChartDataPoint[];
 }
 
 export function FocusTimeChart({ data }: FocusTimeChartProps) {
+  const chartConfig: ChartConfig = {
+    focus_time: {
+      label: "Focus Time",
+      color: "#8884d8",
+    },
+    break_time: {
+      label: "Break Time",
+      color: "#82ca9d",
+    },
+    date: {
+      label: "Date",
+    },
+  };
   return (
     <Card>
       <CardHeader>
@@ -17,38 +38,64 @@ export function FocusTimeChart({ data }: FocusTimeChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="date" 
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(value) => new Date(value).toLocaleDateString()}
             />
-            <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-            <Tooltip 
-              labelFormatter={(value) => new Date(value).toLocaleDateString()}
-              formatter={(value: number, name: string) => [
-                `${value.toFixed(2)} hours`, 
-                name === 'focus_time' ? 'Focus Time' : 'Break Time'
-              ]}
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              label={{ value: 'Hours', angle: -90, position: 'insideLeft' }}
             />
-            <Legend />
-            <Line 
-              type="monotone" 
-              dataKey="focus_time" 
-              stroke="#8884d8" 
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  indicator="line"
+                  labelFormatter={(value) => {
+                    try {
+                      return new Date(String(value)).toLocaleDateString();
+                    } catch {
+                      return String(value);
+                    }
+                  }}
+                  formatter={(value, name) => {
+                    const hours = Math.floor(value as number);
+                    const minutes = Math.round((value as number - hours) * 60);
+                    return (
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="text-muted-foreground">{name}:</span>
+                        <span className="text-foreground font-mono">{hours ? `${hours} hours` : ''}{minutes ? ` ${minutes} minutes` : ' 0 minutes'}</span>
+                      </div>
+                    )
+                  }}
+                />
+              }
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Line
+              type="monotone"
+              dataKey="focus_time"
+              stroke="var(--color-focus_time)"
               strokeWidth={2}
+              dot={false}
               name="Focus Time"
             />
-            <Line 
-              type="monotone" 
-              dataKey="break_time" 
-              stroke="#82ca9d" 
+            <Line
+              type="monotone"
+              dataKey="break_time"
+              stroke="var(--color-break_time)"
               strokeWidth={2}
+              dot={false}
               name="Break Time"
             />
           </LineChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );

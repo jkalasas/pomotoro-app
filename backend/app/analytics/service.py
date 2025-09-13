@@ -94,9 +94,31 @@ class AnalyticsService:
             db.commit()
 
         # Apply provided updates to the analytics record
+        # Support increment semantics via keys prefixed with "inc__"
         for key, value in kwargs.items():
+            if key.startswith("inc__"):
+                field = key.replace("inc__", "", 1)
+                if hasattr(analytics, field):
+                    current = getattr(analytics, field) or 0
+                    try:
+                        increment = int(value)
+                    except Exception:
+                        # Skip invalid increments silently
+                        continue
+                    setattr(analytics, field, current + increment)
+                continue
+
             if hasattr(analytics, key):
-                setattr(analytics, key, value)
+                # For interruptions_count specifically, treat values as absolute only when higher; else preserve/increment pattern
+                if key == "interruptions_count":
+                    current = getattr(analytics, key) or 0
+                    try:
+                        incoming = int(value)
+                    except Exception:
+                        incoming = 0
+                    setattr(analytics, key, max(current, incoming))
+                else:
+                    setattr(analytics, key, value)
         db.add(analytics)
         db.commit()
 
@@ -133,52 +155,68 @@ class AnalyticsService:
         return analytics
     
     @staticmethod
-    def update_daily_stats(db: SessionDep, user_id: int, target_date: Optional[date] = None):
-        """Update daily statistics for a user"""
+    def compute_daily_stats_for_date(db: SessionDep, user_id: int, target_date: Optional[date] = None) -> Dict[str, Any]:
+        """Compute daily statistics for a user for a specific date without persisting.
+
+        Returns a dict matching DailyStatsPublic fields (except id).
+        """
         if not target_date:
             target_date = date.today()
-        
-        # Get or create daily stats
-        daily_stats = db.exec(
-            select(DailyStats).where(
-                and_(
-                    DailyStats.user_id == user_id,
-                    DailyStats.date == target_date
-                )
-            )
-        ).first()
-        
-        if not daily_stats:
-            daily_stats = DailyStats(user_id=user_id, date=target_date)
-        
-    # Calculate daily metrics from session analytics
+
         day_start = datetime.combine(target_date, datetime.min.time())
         day_end = datetime.combine(target_date, datetime.max.time())
-        
+
         session_analytics = db.exec(
             select(SessionAnalytics).where(
                 and_(
                     SessionAnalytics.user_id == user_id,
                     SessionAnalytics.session_started_at >= day_start,
-                    SessionAnalytics.session_started_at <= day_end
+                    SessionAnalytics.session_started_at <= day_end,
                 )
             )
         ).all()
-        
-        # Count session feedback events
-        from ..models import SessionFeedback
-        session_feedbacks = db.exec(
-            select(SessionFeedback).where(
+
+        # Robust sessions_completed
+        completed_sessions_count = 0
+        sessions_completed_flag = db.exec(
+            select(PomodoroSession)
+            .where(
                 and_(
-                    SessionFeedback.user_id == user_id,
-                    SessionFeedback.created_at >= day_start,
-                    SessionFeedback.created_at <= day_end
+                    PomodoroSession.user_id == user_id,
+                    PomodoroSession.completed == True,  # noqa: E712
+                    PomodoroSession.completed_at.isnot(None),
+                    PomodoroSession.completed_at >= day_start,
+                    PomodoroSession.completed_at <= day_end,
+                    PomodoroSession.is_deleted == False,  # noqa: E712
                 )
             )
         ).all()
-        
-        # Compute tasks completed TODAY by looking at task completion timestamps
-        # This ensures tasks completed in sessions started on previous days are counted correctly.
+        counted_ids = {s.id for s in sessions_completed_flag}
+        completed_sessions_count += len(counted_ids)
+
+        candidate_sessions = db.exec(
+            select(PomodoroSession)
+            .where(
+                and_(
+                    PomodoroSession.user_id == user_id,
+                    PomodoroSession.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).all()
+        for sess in candidate_sessions:
+            if sess.id in counted_ids:
+                continue
+            tasks = [t for t in (sess.tasks or []) if not getattr(t, "is_deleted", False)]
+            if not tasks:
+                continue
+            if all(getattr(t, "completed", False) for t in tasks):
+                completed_times = [t.completed_at for t in tasks if getattr(t, "completed_at", None) is not None]
+                if completed_times:
+                    latest = max(completed_times)
+                    if day_start <= latest <= day_end:
+                        completed_sessions_count += 1
+
+        # Tasks completed on this day
         from ..models import Task, PomodoroSession as _PomodoroSession
         completed_tasks_today = db.exec(
             select(Task)
@@ -189,31 +227,31 @@ class AnalyticsService:
                     Task.completed == True,  # noqa: E712
                     Task.completed_at >= day_start,
                     Task.completed_at <= day_end,
-                    Task.is_deleted == False  # noqa: E712
+                    Task.is_deleted == False,  # noqa: E712
                 )
             )
         ).all()
 
-        # Aggregate metrics
-        daily_stats.total_focus_time = sum(sa.total_focus_time for sa in session_analytics)
-        daily_stats.total_break_time = sum(sa.total_break_time for sa in session_analytics)
-        daily_stats.sessions_completed = len(session_feedbacks)  # Use feedback count for completed sessions
-        daily_stats.tasks_completed = len(completed_tasks_today)
-        daily_stats.pomodoros_completed = sum(sa.pomodoros_completed for sa in session_analytics)
-        daily_stats.interruptions_count = sum(sa.interruptions_count for sa in session_analytics)
-        
-        # Calculate average focus duration
-        if daily_stats.pomodoros_completed > 0:
-            daily_stats.average_focus_duration = daily_stats.total_focus_time / daily_stats.pomodoros_completed
-        
-        # Remove productivity score calculation
-        daily_stats.productivity_score = None
-        daily_stats.updated_at = datetime.utcnow()
-        
-        db.add(daily_stats)
-        db.commit()
-        
-        return daily_stats
+        total_focus_time = sum(sa.total_focus_time for sa in session_analytics)
+        total_break_time = sum(sa.total_break_time for sa in session_analytics)
+        pomodoros_completed = sum(sa.pomodoros_completed for sa in session_analytics)
+        interruptions_count = sum(sa.interruptions_count for sa in session_analytics)
+
+        average_focus_duration = None
+        if pomodoros_completed > 0:
+            average_focus_duration = total_focus_time / pomodoros_completed
+
+        return {
+            "date": day_start,
+            "total_focus_time": total_focus_time,
+            "total_break_time": total_break_time,
+            "sessions_completed": completed_sessions_count,
+            "tasks_completed": len(completed_tasks_today),
+            "pomodoros_completed": pomodoros_completed,
+            "average_focus_duration": average_focus_duration,
+            "interruptions_count": interruptions_count,
+            "productivity_score": None,
+        }
     
     @staticmethod
     def generate_productivity_insights(db: SessionDep, user_id: int, days: int = 30) -> ProductivityInsights:
@@ -221,16 +259,12 @@ class AnalyticsService:
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
         
-        # Get daily stats for the period
-        daily_stats = db.exec(
-            select(DailyStats).where(
-                and_(
-                    DailyStats.user_id == user_id,
-                    DailyStats.date >= start_date,
-                    DailyStats.date <= end_date
-                )
-            ).order_by(DailyStats.date)
-        ).all()
+        # Compute daily stats for the period on-the-fly
+        daily_stats = []
+        current = start_date
+        while current <= end_date:
+            daily_stats.append(AnalyticsService.compute_daily_stats_for_date(db, user_id, current))
+            current += timedelta(days=1)
         
         if not daily_stats:
             return ProductivityInsights(
@@ -242,8 +276,8 @@ class AnalyticsService:
             )
         
         # Calculate insights
-        total_focus_time = sum(ds.total_focus_time for ds in daily_stats)
-        total_sessions = sum(ds.sessions_completed for ds in daily_stats)
+        total_focus_time = sum(ds["total_focus_time"] for ds in daily_stats)
+        total_sessions = sum(ds["sessions_completed"] for ds in daily_stats)
         
         average_session_length = total_focus_time / total_sessions if total_sessions > 0 else 0
         
@@ -273,8 +307,8 @@ class AnalyticsService:
         
         focus_time_trend = "stable"
         if older_stats:
-            recent_avg_focus = sum(ds.total_focus_time for ds in recent_stats) / len(recent_stats)
-            older_avg_focus = sum(ds.total_focus_time for ds in older_stats) / len(older_stats)
+            recent_avg_focus = sum(ds["total_focus_time"] for ds in recent_stats) / len(recent_stats)
+            older_avg_focus = sum(ds["total_focus_time"] for ds in older_stats) / len(older_stats)
             
             if recent_avg_focus > older_avg_focus * 1.1:
                 focus_time_trend = "improving"
@@ -283,7 +317,7 @@ class AnalyticsService:
         
         # Generate recommendations
         recommendations = []
-        avg_productivity = sum(ds.productivity_score or 0 for ds in daily_stats) / len(daily_stats)
+        avg_productivity = sum((ds.get("productivity_score") or 0) for ds in daily_stats) / len(daily_stats)
         
         if avg_productivity < 60:
             recommendations.append("Try reducing interruptions during focus time")
@@ -337,22 +371,19 @@ class AnalyticsService:
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
         
-        daily_stats = db.exec(
-            select(DailyStats).where(
-                and_(
-                    DailyStats.user_id == user_id,
-                    DailyStats.date >= start_date,
-                    DailyStats.date <= end_date
-                )
-            ).order_by(DailyStats.date)
-        ).all()
+        # Compute daily stats on-the-fly for the range
+        daily_stats = []
+        current = start_date
+        while current <= end_date:
+            daily_stats.append(AnalyticsService.compute_daily_stats_for_date(db, user_id, current))
+            current += timedelta(days=1)
         
         # Focus time trend
         focus_time_trend = [
             {
-                "date": ds.date.isoformat(),
-                "focus_time": ds.total_focus_time / 3600,  # Convert to hours
-                "break_time": ds.total_break_time / 3600
+                "date": ds["date"].isoformat(),
+                "focus_time": ds["total_focus_time"] / 3600,  # Convert to hours
+                "break_time": ds["total_break_time"] / 3600,
             }
             for ds in daily_stats
         ]
@@ -379,9 +410,9 @@ class AnalyticsService:
                 )
             ).all()
 
-            # sessions_completed from daily_stats for this date if present
-            ds_for_day = next((ds for ds in daily_stats if ds.date == current_day), None)
-            sessions_count = ds_for_day.sessions_completed if ds_for_day else 0
+            # sessions_completed from computed daily_stats for this date
+            ds_for_day = next((ds for ds in daily_stats if ds["date"].date() == current_day), None)
+            sessions_count = ds_for_day["sessions_completed"] if ds_for_day else 0
 
             task_completion_trend.append({
                 "date": current_day.isoformat(),
@@ -394,8 +425,8 @@ class AnalyticsService:
         # Productivity heatmap (simplified - could be enhanced)
         productivity_heatmap = [
             {
-                "date": ds.date.isoformat(),
-                "productivity": ds.productivity_score or 0
+                "date": ds["date"].isoformat(),
+                "productivity": ds.get("productivity_score") or 0,
             }
             for ds in daily_stats
         ]

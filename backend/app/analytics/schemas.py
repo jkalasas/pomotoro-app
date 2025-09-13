@@ -77,3 +77,7 @@ class AnalyticsDashboard(BaseModel):
     task_completion_trend: List[Dict[str, Any]]
     productivity_heatmap: List[Dict[str, Any]]
     session_duration_distribution: List[Dict[str, Any]]
+
+
+class UpdateDailyStatsRequest(BaseModel):
+    target_date: Optional[str] = None
