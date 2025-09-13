@@ -137,7 +137,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
         <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
           <div className="flex items-center gap-4">
             <SidebarTrigger />
-            <h2 className="text-xl font-bold ">Insigts</h2>
+            <h2 className="text-xl font-bold ">Insights</h2>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
