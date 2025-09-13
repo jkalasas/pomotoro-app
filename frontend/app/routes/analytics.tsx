@@ -17,7 +17,7 @@ export default function Analytics() {
   }, [analyticsStore]);
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="flex flex-col pb-8 gap-8 p-6 min-h-screen">
       <AnalyticsDashboard />
     </div>
   );

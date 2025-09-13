@@ -1,16 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
-import { Button } from '~/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-import { FocusTimeChart } from './focus-time-chart';
-import { TaskCompletionChart } from './task-completion-chart';
-import { ProductivityOverview } from './productivity-overview';
-import { ActivityTimeline } from './activity-timeline';
-import { analyticsAPI, type AnalyticsDashboard } from '~/lib/analytics';
-import { useAuthStore } from '~/stores/auth';
-import { useAnalyticsStore } from '~/stores/analytics';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { FocusTimeChart } from "./focus-time-chart";
+import { TaskCompletionChart } from "./task-completion-chart";
+import { ProductivityOverview } from "./productivity-overview";
+import { ActivityTimeline } from "./activity-timeline";
+import { analyticsAPI, type AnalyticsDashboard } from "~/lib/analytics";
+import { useAuthStore } from "~/stores/auth";
+import { useAnalyticsStore } from "~/stores/analytics";
+import { toast } from "sonner";
+import { SidebarTrigger } from "~/components/ui/sidebar";
+import { RefreshCcw } from "lucide-react";
 
 interface AnalyticsDashboardProps {
   className?: string;
@@ -19,14 +33,16 @@ interface AnalyticsDashboardProps {
 export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   const { user, token } = useAuthStore();
   const analyticsStore = useAnalyticsStore();
-  const [dashboardData, setDashboardData] = useState<AnalyticsDashboard | null>(null);
+  const [dashboardData, setDashboardData] = useState<AnalyticsDashboard | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('30');
+  const [timeRange, setTimeRange] = useState("30");
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardData = async () => {
     if (!token) {
-      toast.error('Please log in to view analytics');
+      toast.error("Please log in to view analytics");
       setLoading(false);
       return;
     }
@@ -35,13 +51,13 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       setLoading(true);
       // Ensure any queued analytics events are flushed before fetching
       await analyticsStore.flushEvents().catch(() => {});
-  // Force a daily stats recomputation so the dashboard isn't empty
-  await analyticsAPI.updateDailyStats().catch(() => {});
+      // Force a daily stats recomputation so the dashboard isn't empty
+      await analyticsAPI.updateDailyStats().catch(() => {});
       const data = await analyticsAPI.getDashboard(parseInt(timeRange));
       setDashboardData(data);
     } catch (error) {
-      console.error('Failed to fetch analytics dashboard:', error);
-      toast.error('Failed to load analytics data');
+      console.error("Failed to fetch analytics dashboard:", error);
+      toast.error("Failed to load analytics data");
     } finally {
       setLoading(false);
     }
@@ -54,18 +70,18 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       const today = new Date().toISOString().slice(0, 10);
       await analyticsAPI.updateDailyStats(today);
       await fetchDashboardData();
-      toast.success('Analytics data refreshed');
+      toast.success("Analytics data refreshed");
     } catch (error) {
-      console.error('Failed to refresh analytics:', error);
-      toast.error('Failed to refresh analytics data');
+      console.error("Failed to refresh analytics:", error);
+      toast.error("Failed to refresh analytics data");
     } finally {
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-  // Flush queued events when the time range or token changes so charts aren't empty
-  fetchDashboardData();
+    // Flush queued events when the time range or token changes so charts aren't empty
+    fetchDashboardData();
   }, [timeRange, token]);
 
   // Refresh dashboard when tasks or sessions change elsewhere
@@ -77,19 +93,19 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       await fetchDashboardData();
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('task-completed', handler);
-      window.addEventListener('task-uncompleted', handler);
-      window.addEventListener('session-completed', handler);
-      window.addEventListener('session-reset', handler);
+    if (typeof window !== "undefined") {
+      window.addEventListener("task-completed", handler);
+      window.addEventListener("task-uncompleted", handler);
+      window.addEventListener("session-completed", handler);
+      window.addEventListener("session-reset", handler);
     }
 
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('task-completed', handler);
-        window.removeEventListener('task-uncompleted', handler);
-        window.removeEventListener('session-completed', handler);
-        window.removeEventListener('session-reset', handler);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("task-completed", handler);
+        window.removeEventListener("task-uncompleted", handler);
+        window.removeEventListener("session-completed", handler);
+        window.removeEventListener("session-reset", handler);
       }
     };
   }, []);
@@ -100,11 +116,13 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       <div className={`space-y-6 ${className}`}>
         <Card>
           <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              Authentication Required
+            </h3>
             <p className="text-muted-foreground mb-4">
               Please log in to view your analytics dashboard
             </p>
-            <Button onClick={() => window.location.href = '/login'}>
+            <Button onClick={() => (window.location.href = "/login")}>
               Go to Login
             </Button>
           </CardContent>
@@ -116,8 +134,11 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   if (loading) {
     return (
       <div className={`space-y-6 ${className}`}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Analytics</h2>
+        <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
+          <div className="flex items-center gap-4">
+            <SidebarTrigger />
+            <h2 className="text-xl font-bold ">Insigts</h2>
+          </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -152,8 +173,11 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Analytics</h2>
+      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <h2 className="text-xl font-bold">Insights</h2>
+        </div>
         <div className="flex items-center space-x-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[120px]">
@@ -167,12 +191,15 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
               <SelectItem value="90">90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
-            onClick={handleRefresh} 
+          <Button
+            onClick={handleRefresh}
             disabled={refreshing}
+            size="sm"
             variant="outline"
+            className="rounded-full"
           >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
       </div>
@@ -253,7 +280,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
           </Card>
         </TabsContent> */}
 
-  {/** Insights tab removed intentionally to disable AI-powered insights **/}
+        {/** Insights tab removed intentionally to disable AI-powered insights **/}
 
         <TabsContent value="activity" className="space-y-4">
           <ActivityTimeline events={dashboardData.recent_events} />

@@ -105,7 +105,8 @@ export function ScheduleGeneratorDialog({ onScheduleGenerated }: ScheduleGenerat
                 availableSessions.map((session) => (
                   <div
                     key={session.id}
-                    className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => handleSessionToggle(session.id)}
                   >
                     <Checkbox
                       checked={selectedSessions.includes(session.id)}

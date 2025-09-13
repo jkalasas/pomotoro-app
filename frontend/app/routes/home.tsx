@@ -508,7 +508,7 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               {visibleSchedule.length > 0 ? (
                 visibleSchedule.slice(0, 5).map((task: any, index: number) => (
-                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group">
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group cursor-pointer" onClick={() => { if (task.completed) { schedulerStore.uncompleteScheduledTask(task.id); } else { schedulerStore.completeScheduledTask(task.id); } }}>
                     <Checkbox checked={task.completed || false} onCheckedChange={() => { if (task.completed) { schedulerStore.uncompleteScheduledTask(task.id); } else { schedulerStore.completeScheduledTask(task.id); } }} className="rounded-md" />
                     <span className={`flex-1 transition-all duration-200 ${task.completed ? "line-through text-muted-foreground" : "group-hover:text-foreground"}`}>{task.name?.trim() || "Untitled Task"}</span>
                     <div className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">{index + 1}</div>

@@ -402,11 +402,11 @@ export default function Sessions() {
   }
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 border border-border/50 shadow-sm">
+    <main className="flex flex-col pb-6 gap-6 p-6 min-h-screen rounded-xl">
+      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
-          <h1 className="text-xl font-semibold">Sessions</h1>
+          <h1 className="text-xl font-bold">Sessions</h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
@@ -1118,9 +1118,9 @@ export default function Sessions() {
                                         : "shadow-sm"
                                     } hover:shadow-md transition-all ${
                                       task.completed
-                                        ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                                        ? " border-green-800"
                                         : task.archived
-                                        ? "bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800"
+                                        ? " border-gray-800"
                                         : ""
                                     }`}
                                   >
