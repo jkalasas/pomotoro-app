@@ -189,10 +189,22 @@ class AnalyticsService:
                 session_cfg_cache[sid] = sess
             return sess
 
-        total_focus_time = 0  # seconds
-        total_break_time = 0  # seconds
+        total_focus_time = 0  # seconds across all sessions
+        total_break_time = 0  # seconds across all sessions
         pomodoros_completed = 0
         interruptions_count = 0
+
+        # Track fine-grained focus intervals per session
+        from collections import defaultdict
+        session_state = defaultdict(lambda: {
+            "focus_active": False,
+            "focus_start_time": None,
+            "focus_start_remaining": None,
+            "elapsed_in_pomodoro": 0,  # seconds accumulated toward current pomodoro
+        })
+
+        # Sort events chronologically
+        day_events.sort(key=lambda e: e.created_at or day_start)
 
         for ev in day_events:
             etype = ev.event_type or ""
@@ -201,30 +213,83 @@ class AnalyticsService:
             except Exception:
                 data = {}
 
-            if etype == "pomodoro_complete":
-                sid = data.get("session_id")
-                cfg = get_session_cfg(sid)
-                if cfg and cfg.focus_duration:
-                    total_focus_time += int(cfg.focus_duration) * 60
-                else:
-                    # Fallback to a default 25min if config missing
-                    total_focus_time += 25 * 60
+            sid = data.get("session_id")
+            if not sid:
+                # Unscoped events (e.g., user_action) don't affect timing
+                if etype == "timer_pause" and (data or {}).get("phase") == "focus":
+                    interruptions_count += 1
+                continue
+
+            st = session_state[sid]
+            cfg = get_session_cfg(sid)
+            focus_duration_sec = (int(cfg.focus_duration) * 60) if (cfg and cfg.focus_duration) else 25 * 60
+
+            if etype == "timer_start" and (data or {}).get("phase") == "focus":
+                st["focus_active"] = True
+                st["focus_start_time"] = ev.created_at
+                st["focus_start_remaining"] = data.get("time_remaining")
+
+            elif etype == "timer_pause" and (data or {}).get("phase") == "focus":
+                interruptions_count += 1
+                if st["focus_active"] and st["focus_start_time"]:
+                    # Prefer remaining-time delta if available
+                    pause_rem = data.get("time_remaining")
+                    if (st["focus_start_remaining"] is not None) and (pause_rem is not None):
+                        diff = max(0, int(st["focus_start_remaining"]) - int(pause_rem))
+                        st["elapsed_in_pomodoro"] += diff
+                        total_focus_time += diff
+                    else:
+                        # Fallback to wall-clock delta bounded by remaining in pomodoro
+                        delta = int((ev.created_at - st["focus_start_time"]).total_seconds())
+                        remaining = max(0, focus_duration_sec - st["elapsed_in_pomodoro"])
+                        add = max(0, min(delta, remaining))
+                        st["elapsed_in_pomodoro"] += add
+                        total_focus_time += add
+                # Pause ends active focus
+                st["focus_active"] = False
+                st["focus_start_time"] = None
+                st["focus_start_remaining"] = None
+
+            elif etype == "pomodoro_complete":
+                # Close current pomodoro to full duration
+                remaining = max(0, focus_duration_sec - st["elapsed_in_pomodoro"])
+                total_focus_time += remaining
+                st["elapsed_in_pomodoro"] = 0
+                # Completing a pomodoro implicitly ends any active focus
+                st["focus_active"] = False
+                st["focus_start_time"] = None
+                st["focus_start_remaining"] = None
                 pomodoros_completed += 1
 
+            elif etype == "phase_change":
+                # If leaving focus without pause, close the running interval by wall-clock delta
+                if (data.get("from_phase") == "focus") and st["focus_active"] and st["focus_start_time"]:
+                    delta = int((ev.created_at - st["focus_start_time"]).total_seconds())
+                    remaining = max(0, focus_duration_sec - st["elapsed_in_pomodoro"])
+                    add = max(0, min(delta, remaining))
+                    st["elapsed_in_pomodoro"] += add
+                    total_focus_time += add
+                    st["focus_active"] = False
+                    st["focus_start_time"] = None
+                    st["focus_start_remaining"] = None
+
             elif etype == "break_start":
-                sid = data.get("session_id")
                 btype = data.get("break_type")
-                cfg = get_session_cfg(sid)
                 if cfg:
                     if btype == "short_break" and cfg.short_break_duration is not None:
                         total_break_time += int(cfg.short_break_duration) * 60
                     elif btype == "long_break" and cfg.long_break_duration is not None:
                         total_break_time += int(cfg.long_break_duration) * 60
 
-            elif etype == "timer_pause":
-                # Count interruptions when pausing during focus
-                if (data or {}).get("phase") == "focus":
-                    interruptions_count += 1
+        # Close any still-active focus segments at end-of-day by wall-clock
+        for sid, st in session_state.items():
+            if st["focus_active"] and st["focus_start_time"]:
+                cfg = get_session_cfg(sid)
+                focus_duration_sec = (int(cfg.focus_duration) * 60) if (cfg and cfg.focus_duration) else 25 * 60
+                delta = int((day_end - st["focus_start_time"]).total_seconds())
+                remaining = max(0, focus_duration_sec - st["elapsed_in_pomodoro"])
+                add = max(0, min(delta, remaining))
+                total_focus_time += add
 
         # Fallback for historical data without events: use SessionAnalytics for that day
         if total_focus_time == 0 and pomodoros_completed == 0 and total_break_time == 0:
