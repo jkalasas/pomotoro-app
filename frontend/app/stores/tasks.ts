@@ -2,6 +2,16 @@ import { create } from "zustand";
 import { apiClient } from "~/lib/api";
 import { useAnalyticsStore } from "./analytics";
 
+// Debounce window 'session-completion' dispatch to avoid duplicates
+let _lastSessionCompletionEmitMs = 0;
+const emitSessionCompletion = (detail: { sessionId: number; sessionName: string; totalTasks: number; completedTasks: number; focusDuration: number; }) => {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - _lastSessionCompletionEmitMs < 1000) return;
+  _lastSessionCompletionEmitMs = now;
+  window.dispatchEvent(new CustomEvent('session-completion', { detail }));
+};
+
 export interface Task {
   id: number;
   name: string;
@@ -241,10 +251,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       // Get task details for analytics logging (from currentSession if available)
       const task = currentSession?.tasks.find(t => t.id === taskId);
 
-      if (task && currentSession && currentSession.id === targetSessionId) {
-        // Log task completion analytics
-        useAnalyticsStore.getState().logTaskComplete(taskId, task.name, currentSession.id);
-      }
+      // Task completion analytics logged by backend; skip client log to avoid duplicates
       
       // Independently verify completion on the ACTUAL session for this task (include archived tasks)
       try {
@@ -257,17 +264,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             const focusDuration = Math.floor(
               allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent('session-completion', {
-                detail: {
-                  sessionId: targetSession.id,
-                  sessionName: targetSession.name || targetSession.description,
-                  totalTasks: allTasks.length,
-                  completedTasks: completedTasksCount,
-                  focusDuration
-                }
-              }));
-            }
+            emitSessionCompletion({
+              sessionId: targetSession.id,
+              sessionName: targetSession.name || targetSession.description,
+              totalTasks: allTasks.length,
+              completedTasks: completedTasksCount,
+              focusDuration,
+            });
           }
         }
       } catch {}
@@ -438,17 +441,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     );
     
     // Trigger session completion via custom event
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent('session-completion', {
-        detail: {
-          sessionId: currentSession.id,
-          sessionName: currentSession.name || currentSession.description,
-          totalTasks: allTasks.length,
-          completedTasks: completedTasksCount,
-          focusDuration
-        }
-      }));
-    }
+    emitSessionCompletion({
+      sessionId: currentSession.id,
+      sessionName: currentSession.name || currentSession.description,
+      totalTasks: allTasks.length,
+      completedTasks: completedTasksCount,
+      focusDuration,
+    });
   },
 
   setCurrentSession: (session: Session | null) => set({ currentSession: session }),
@@ -693,17 +692,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             const focusDuration = Math.floor(
               allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent('session-completion', {
-                detail: {
-                  sessionId: current.id,
-                  sessionName: current.name || current.description,
-                  totalTasks: allTasks.length,
-                  completedTasks: completedTasksCount,
-                  focusDuration
-                }
-              }));
-            }
+            emitSessionCompletion({
+              sessionId: current.id,
+              sessionName: current.name || current.description,
+              totalTasks: allTasks.length,
+              completedTasks: completedTasksCount,
+              focusDuration,
+            });
           }
         }
       } catch {}
@@ -827,8 +822,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         index > completedTaskIndex && !task.completed
       );
       
-      // Get the current pomodoro state BEFORE any updates
-      const pomodoroStore = usePomodoroStore.getState();
+  // Get the current pomodoro state BEFORE any updates
+  const pomodoroStore = usePomodoroStore.getState();
       
       // Reset the task timer after completing the previous task
       pomodoroStore.resetTaskTimer();
@@ -846,51 +841,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const currentSessionId = completedTask?.session_id;
       const nextSessionId = nextTask.session_id;
       
-      // If timer is running, preserve the current time regardless of session changes
+      // Avoid backend updates here to prevent 'Task Switch' logs.
+      // Update settings and local current task only.
+      await pomodoroStore.updateSettingsFromTask(nextSessionId);
+
       if (isRunning && currentPhase === "focus") {
-        // We may need to adjust based on the next task's session focus duration
-        let newTimeRemaining = currentTimeRemaining;
-        let nextSessionFocusSeconds: number | null = null;
-
-        if (currentSessionId !== nextSessionId) {
-          // Update settings for the next session (this won't mutate running timer)
-            await pomodoroStore.updateSettingsFromTask(nextSessionId);
-            const updatedSettings = usePomodoroStore.getState().settings;
-            nextSessionFocusSeconds = updatedSettings.focus_duration * 60;
-            // Only reset (clamp) if remaining time is GREATER than the new focus duration
-            if (newTimeRemaining > nextSessionFocusSeconds) {
-              newTimeRemaining = nextSessionFocusSeconds;
-            }
-        } else {
-          // Same session; derive focus duration from existing settings for maxTime adjustment
-          const settings = usePomodoroStore.getState().settings;
-          nextSessionFocusSeconds = settings.focus_duration * 60;
-        }
-
-        // Always push current (possibly clamped) time to backend to avoid rewind caused by stale backend time
-        await pomodoroStore.updateTimer({
-          current_task_id: nextTask.id,
-          is_running: true,
-          time_remaining: newTimeRemaining,
-        });
-        
-        // Start timer for the new task
+        // Clamp locally if new session has shorter focus duration
+        const s = usePomodoroStore.getState().settings;
+        const nextFocusSeconds = s.focus_duration * 60;
+        const clamped = Math.min(currentTimeRemaining, nextFocusSeconds);
+        usePomodoroStore.setState({ currentTaskId: nextTask.id, maxTime: nextFocusSeconds, time: clamped });
+        // Start local task timer (no backend call)
         pomodoroStore.startTaskTimer(nextTask.id);
-        
-        // Sync configuration after updating the timer
-        await pomodoroStore.syncConfigWithCurrentTask();
       } else {
-        // Timer is not in focus phase (likely on a break) or not running.
-        // Preserve the current running state instead of forcing a pause.
-
-        // Update the current task while keeping whatever the current running state is
-        await pomodoroStore.updateTimer({
-          current_task_id: nextTask.id,
-          is_running: isRunning,
-        });
-
-        // Then sync configuration which will handle session differences
-        await pomodoroStore.syncConfigWithCurrentTask();
+        // During breaks or when paused, just switch task locally; backend will be updated on next intentional update
+        usePomodoroStore.setState({ currentTaskId: nextTask.id });
       }
     } catch (error) {
       // Failed to handle next task transition

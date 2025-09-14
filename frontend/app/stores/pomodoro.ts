@@ -83,6 +83,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   let _bgInterval: NodeJS.Timeout | null = null;
   // Suppress background sync for a brief window after intentional updates to avoid races
   let _suppressSyncUntilMs = 0;
+  // Prevent re-entrant rapid timer starts that can double-log analytics
+  let _lastStartMs = 0;
+  // Prevent duplicate timer_pause logs from near-simultaneous callers
+  let _lastPauseMs = 0;
   
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
@@ -148,7 +152,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
               const { useSchedulerStore } = await import('./scheduler');
               const hasTasks = useSchedulerStore.getState().hasActiveTasks();
               if (!hasTasks) {
-                await apiClient.updateActiveSession({ is_running: false, time_remaining: state.time });
+                const now = Date.now();
+                if (now - _lastPauseMs > 800) {
+                  _lastPauseMs = now;
+                  await apiClient.updateActiveSession({ is_running: false, time_remaining: state.time });
+                }
                 set({ isRunning: false });
                 if (state.showRestOverlay) {
                   set({ showRestOverlay: false });
@@ -283,6 +291,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   startTimer: async () => {
     set({ isLoading: true });
     try {
+      // Simple guard: ignore rapid double-invocations within 750ms
+      const now = Date.now();
+      if (now - _lastStartMs < 750 && get().isRunning) {
+        set({ isLoading: false });
+        return;
+      }
       // Initialize timer if not set
       const { time, maxTime, settings, sessionId } = get();
       if (time === 0 && maxTime === 0) {
@@ -315,6 +329,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Then update local state
       set({ isRunning: true });
+  _lastStartMs = now;
       
       // Start task timer tracking for focus phases
       const { phase, currentTaskId } = get();
@@ -322,11 +337,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         get().startTaskTimer(currentTaskId || undefined);
       }
       
-      // Log analytics event
-      const currentSessionId = get().sessionId;
-      if (currentSessionId) {
-        useAnalyticsStore.getState().logTimerStart(currentSessionId, get().phase);
-      }
+      // Analytics for timer start handled by backend via updateActiveSession
     } catch (error) {
       // Failed to start timer
       console.error("Failed to start timer:", error);
@@ -339,7 +350,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   pauseTimer: async () => {
     set({ isLoading: true });
     try {
-      const { time, sessionId, phase } = get();
+      const { time, sessionId, phase, isRunning } = get();
+      // If already paused, avoid duplicate backend calls
+      if (!isRunning) {
+        set({ isLoading: false });
+        return;
+      }
       
       // Check if we have an active session
       if (!sessionId) {
@@ -352,18 +368,19 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
       
       // Update backend first with current time and paused state
-      await apiClient.updateActiveSession({ 
+      const now = Date.now();
+      if (now - _lastPauseMs > 800) {
+        _lastPauseMs = now;
+        await apiClient.updateActiveSession({ 
         is_running: false,
         time_remaining: time
-      });
+        });
+      }
       
       // Then update local state
       set({ isRunning: false });
       
-      // Log analytics event
-      if (sessionId) {
-        useAnalyticsStore.getState().logTimerPause(sessionId, get().phase);
-      }
+      // Analytics for timer pause handled by backend
     } catch (error) {
       // Failed to pause timer
       console.error("Failed to pause timer:", error);
@@ -403,10 +420,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Reset time tracking
       get().resetTimeTracking();
       
-      // Log analytics event
-      if (sessionId) {
-        useAnalyticsStore.getState().logTimerReset(sessionId, phase, time);
-      }
+      // Optional: keep timer_reset as frontend-only if desired
     } catch (error) {
       // Failed to reset timer
       console.error("Failed to reset timer:", error);
@@ -424,19 +438,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     long_break_duration: number;
     long_break_per_pomodoros: number;
   }) => {
-    const oldSettings = get().settings;
     set({ settings: newSettings });
-    
-    // Log settings changes
-    Object.keys(newSettings).forEach(key => {
-      if (oldSettings[key as keyof typeof oldSettings] !== newSettings[key as keyof typeof newSettings]) {
-        useAnalyticsStore.getState().logSettingsChange(
-          key,
-          oldSettings[key as keyof typeof oldSettings],
-          newSettings[key as keyof typeof newSettings]
-        );
-      }
-    });
     
     // Only update timer with new focus duration if currently in focus phase AND timer is not running
     // This prevents resetting the timer during task transitions when the timer is actively running
@@ -516,14 +518,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
             current_task_id: currentTask.id,
             phase: mustReset ? 'focus' : undefined,
             time_remaining: newRemaining,
-            is_running: wasRunning,
           });
         } else {
           // During breaks, keep timer running state and just switch the task for UI/association
           set({ currentTaskId: currentTask.id });
           await get().updateTimer({
             current_task_id: currentTask.id,
-            is_running: wasRunning,
           });
         }
       }
@@ -564,13 +564,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       await get().loadActiveSession();
       
-      // Log analytics event
-      if (previousSessionId && previousSessionId !== sessionId) {
-        useAnalyticsStore.getState().logSessionSwitch(previousSessionId, sessionId);
-      } else {
-        // Get session name for logging (you might need to pass this as parameter)
-        useAnalyticsStore.getState().logSessionStart(sessionId, `Session ${sessionId}`);
-      }
+      // Session start/switch analytics handled by backend
     } catch (error) {
       // Failed to set session
       throw error; // Re-throw to allow UI to handle the error
@@ -744,12 +738,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           nextDuration = session.short_break_duration * 60;
         }
         
-        // Log pomodoro completion
-        try {
-          useAnalyticsStore.getState().logPomodoroComplete(sessionId, newPomodorosCompleted);
-        } catch (analyticsError) {
-          // Analytics error - continue with timer operation
-        }
+        // Pomodoro completion is logged by backend when pomodoros_completed increases
       } else {
         // Break phase completed - move back to focus
         nextPhase = "focus";
@@ -799,21 +788,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         localStorage.setItem('totalPomodorosCompleted', newTotalPomodorosCompleted.toString());
       }
       
-      // Log phase change analytics
-      try {
-        useAnalyticsStore.getState().logEvent('phase_change', {
-          session_id: sessionId,
-          from_phase: phase,
-          to_phase: nextPhase,
-          change_time: new Date().toISOString()
-        });
-        
-        if (nextPhase.includes('break')) {
-          useAnalyticsStore.getState().logBreakStart(sessionId, nextPhase);
-        }
-      } catch (analyticsError) {
-        // Analytics error - continue with timer operation
-      }
+      // Phase change and break start are logged by backend in update_active_session
       
     } catch (error) {
       // Failed to handle phase completion - fallback: just stop the timer
@@ -831,23 +806,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       await apiClient.updateActiveSession(updates);
       await get().loadActiveSession();
       
-      // Log analytics events for state changes
-      const newState = get();
-      const { sessionId } = newState;
-      
-      if (sessionId) {
-        // Log phase changes
-        if (updates.phase && updates.phase !== prevState.phase) {
-          if (updates.phase.includes('break')) {
-            useAnalyticsStore.getState().logBreakStart(sessionId, updates.phase);
-          }
-        }
-        
-        // Log pomodoro completion
-        if (updates.pomodoros_completed && updates.pomodoros_completed > prevState.pomodorosCompleted) {
-          useAnalyticsStore.getState().logPomodoroComplete(sessionId, updates.pomodoros_completed);
-        }
-      }
+      // Analytics for updates handled server-side
     } catch (error) {
       // Failed to update timer - keep UI in sync
     } finally {
@@ -1012,6 +971,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   triggerSessionCompletion: (sessionId, sessionName, totalTasks, completedTasks, focusDuration) => {
+    // Ignore duplicates if we're already handling a completion
+    const existing = get().pendingSessionCompletion;
+    if (existing && existing.sessionId === sessionId) {
+      return;
+    }
+    if (get().showFeedbackModal) {
+      return;
+    }
+
     // Show feedback UI and capture completion details
     set({
       showFeedbackModal: true,
@@ -1024,20 +992,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       },
     });
 
-    // Immediately stop the timer and close any rest overlay to avoid lingering overlay
-    try {
-      // Stop local timer state first to ensure background ticker doesn't recreate overlay
-      set({ isRunning: false });
-      // Best-effort backend sync to pause active session
-      apiClient.updateActiveSession({ is_running: false }).catch(() => { /* ignore */ });
-
-      // If rest overlay is visible, close it now
-      const state = get();
-      if (state.showRestOverlay) {
-        set({ showRestOverlay: false });
-        try { useWindowStore.getState().closeOverlayWindow(); } catch { /* ignore */ }
-      }
-    } catch { /* non-fatal */ }
+    // Do not pause the timer here. The background ticker will
+    // automatically pause when there are no active tasks left
+    // in the schedule. This prevents unwanted pauses when a
+    // session completes but other scheduled tasks remain.
   },
 
   setShowFeedbackModal: (show) => {
