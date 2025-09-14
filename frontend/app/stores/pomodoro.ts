@@ -85,6 +85,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   let _suppressSyncUntilMs = 0;
   // Prevent re-entrant rapid timer starts that can double-log analytics
   let _lastStartMs = 0;
+  // Prevent duplicate timer_pause logs from near-simultaneous callers
+  let _lastPauseMs = 0;
   
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
@@ -150,7 +152,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
               const { useSchedulerStore } = await import('./scheduler');
               const hasTasks = useSchedulerStore.getState().hasActiveTasks();
               if (!hasTasks) {
-                await apiClient.updateActiveSession({ is_running: false, time_remaining: state.time });
+                const now = Date.now();
+                if (now - _lastPauseMs > 800) {
+                  _lastPauseMs = now;
+                  await apiClient.updateActiveSession({ is_running: false, time_remaining: state.time });
+                }
                 set({ isRunning: false });
                 if (state.showRestOverlay) {
                   set({ showRestOverlay: false });
@@ -344,7 +350,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   pauseTimer: async () => {
     set({ isLoading: true });
     try {
-      const { time, sessionId, phase } = get();
+      const { time, sessionId, phase, isRunning } = get();
+      // If already paused, avoid duplicate backend calls
+      if (!isRunning) {
+        set({ isLoading: false });
+        return;
+      }
       
       // Check if we have an active session
       if (!sessionId) {
@@ -357,10 +368,14 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       }
       
       // Update backend first with current time and paused state
-      await apiClient.updateActiveSession({ 
+      const now = Date.now();
+      if (now - _lastPauseMs > 800) {
+        _lastPauseMs = now;
+        await apiClient.updateActiveSession({ 
         is_running: false,
         time_remaining: time
-      });
+        });
+      }
       
       // Then update local state
       set({ isRunning: false });
@@ -968,6 +983,15 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   },
 
   triggerSessionCompletion: (sessionId, sessionName, totalTasks, completedTasks, focusDuration) => {
+    // Ignore duplicates if we're already handling a completion
+    const existing = get().pendingSessionCompletion;
+    if (existing && existing.sessionId === sessionId) {
+      return;
+    }
+    if (get().showFeedbackModal) {
+      return;
+    }
+
     // Show feedback UI and capture completion details
     set({
       showFeedbackModal: true,
@@ -983,9 +1007,16 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     // Immediately stop the timer and close any rest overlay to avoid lingering overlay
     try {
       // Stop local timer state first to ensure background ticker doesn't recreate overlay
+      const wasRunning = get().isRunning;
       set({ isRunning: false });
       // Best-effort backend sync to pause active session
-      apiClient.updateActiveSession({ is_running: false }).catch(() => { /* ignore */ });
+      if (wasRunning) {
+        const now = Date.now();
+        if (now - _lastPauseMs > 800) {
+          _lastPauseMs = now;
+          apiClient.updateActiveSession({ is_running: false }).catch(() => { /* ignore */ });
+        }
+      }
 
       // If rest overlay is visible, close it now
       const state = get();

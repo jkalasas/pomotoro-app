@@ -2,6 +2,16 @@ import { create } from "zustand";
 import { apiClient } from "~/lib/api";
 import { useAnalyticsStore } from "./analytics";
 
+// Debounce window 'session-completion' dispatch to avoid duplicates
+let _lastSessionCompletionEmitMs = 0;
+const emitSessionCompletion = (detail: { sessionId: number; sessionName: string; totalTasks: number; completedTasks: number; focusDuration: number; }) => {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - _lastSessionCompletionEmitMs < 1000) return;
+  _lastSessionCompletionEmitMs = now;
+  window.dispatchEvent(new CustomEvent('session-completion', { detail }));
+};
+
 export interface Task {
   id: number;
   name: string;
@@ -254,17 +264,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             const focusDuration = Math.floor(
               allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent('session-completion', {
-                detail: {
-                  sessionId: targetSession.id,
-                  sessionName: targetSession.name || targetSession.description,
-                  totalTasks: allTasks.length,
-                  completedTasks: completedTasksCount,
-                  focusDuration
-                }
-              }));
-            }
+            emitSessionCompletion({
+              sessionId: targetSession.id,
+              sessionName: targetSession.name || targetSession.description,
+              totalTasks: allTasks.length,
+              completedTasks: completedTasksCount,
+              focusDuration,
+            });
           }
         }
       } catch {}
@@ -435,17 +441,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     );
     
     // Trigger session completion via custom event
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent('session-completion', {
-        detail: {
-          sessionId: currentSession.id,
-          sessionName: currentSession.name || currentSession.description,
-          totalTasks: allTasks.length,
-          completedTasks: completedTasksCount,
-          focusDuration
-        }
-      }));
-    }
+    emitSessionCompletion({
+      sessionId: currentSession.id,
+      sessionName: currentSession.name || currentSession.description,
+      totalTasks: allTasks.length,
+      completedTasks: completedTasksCount,
+      focusDuration,
+    });
   },
 
   setCurrentSession: (session: Session | null) => set({ currentSession: session }),
@@ -690,17 +692,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             const focusDuration = Math.floor(
               allTasks.reduce((sum, t) => sum + (t.actual_completion_time || t.estimated_completion_time), 0) / 60
             );
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent('session-completion', {
-                detail: {
-                  sessionId: current.id,
-                  sessionName: current.name || current.description,
-                  totalTasks: allTasks.length,
-                  completedTasks: completedTasksCount,
-                  focusDuration
-                }
-              }));
-            }
+            emitSessionCompletion({
+              sessionId: current.id,
+              sessionName: current.name || current.description,
+              totalTasks: allTasks.length,
+              completedTasks: completedTasksCount,
+              focusDuration,
+            });
           }
         }
       } catch {}

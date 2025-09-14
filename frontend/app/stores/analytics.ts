@@ -222,15 +222,8 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
       // backend logs break_start on phase change
     },
 
-    logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => {
-      get().logEvent('session_complete_frontend', {
-        session_id: sessionId,
-        focus_level: focusLevel,
-        tasks_completed: tasksCompleted,
-        total_tasks: totalTasks,
-        completion_rate: totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0,
-        completion_time: new Date().toISOString()
-      });
+    logSessionComplete: (_sessionId: number, _focusLevel: string, _tasksCompleted: number, _totalTasks: number) => {
+      // backend logs session_complete; keep frontend silent to avoid duplication
     },
 
     logSessionReset: (sessionId: number, reason: string) => {
