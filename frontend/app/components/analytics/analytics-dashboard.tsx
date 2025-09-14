@@ -113,16 +113,16 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   // Show login prompt if not authenticated
   if (!token) {
     return (
-      <div className={`space-y-6 ${className}`}>
+      <div className={`space-y-4 sm:space-y-6 ${className}`}>
         <Card>
-          <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold mb-2">
+          <CardContent className="p-4 sm:p-6 text-center">
+            <h3 className="text-base sm:text-lg font-semibold mb-2">
               Authentication Required
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">
               Please log in to view your analytics dashboard
             </p>
-            <Button onClick={() => (window.location.href = "/login")}>
+            <Button onClick={() => (window.location.href = "/login")} className="text-sm sm:text-base">
               Go to Login
             </Button>
           </CardContent>
@@ -133,20 +133,20 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
   if (loading) {
     return (
-      <div className={`space-y-6 ${className}`}>
-        <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
-          <div className="flex items-center gap-4">
+      <div className={`space-y-4 sm:space-y-6 ${className}`}>
+        <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 backdrop-blur-sm bg-card/60 rounded-2xl p-3 sm:p-4 border border-border/50 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
             <SidebarTrigger />
-            <h2 className="text-xl font-bold ">Insights</h2>
+            <h2 className="text-lg sm:text-xl font-bold ">Insights</h2>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
+                  <div className="h-3 sm:h-4 bg-muted rounded w-3/4 mb-2"></div>
+                  <div className="h-6 sm:h-8 bg-muted rounded w-1/2"></div>
                 </div>
               </CardContent>
             </Card>
@@ -158,11 +158,11 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
   if (!dashboardData) {
     return (
-      <div className={`space-y-6 ${className}`}>
+      <div className={`space-y-4 sm:space-y-6 ${className}`}>
         <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">No analytics data available</p>
-            <Button onClick={fetchDashboardData} className="mt-4">
+          <CardContent className="p-4 sm:p-6 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">No analytics data available</p>
+            <Button onClick={fetchDashboardData} className="mt-3 sm:mt-4 text-sm sm:text-base">
               Try Again
             </Button>
           </CardContent>
@@ -173,14 +173,14 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 backdrop-blur-sm bg-card/60 rounded-2xl p-3 sm:p-4 border border-border/50 shadow-sm">
+        <div className="flex items-center gap-3 sm:gap-4">
           <SidebarTrigger />
-          <h2 className="text-xl font-bold">Insights</h2>
+          <h2 className="text-lg sm:text-xl font-bold">Insights</h2>
         </div>
         <div className="flex items-center space-x-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-[100px] sm:w-[120px] text-xs sm:text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -196,10 +196,11 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
             disabled={refreshing}
             size="sm"
             variant="outline"
-            className="rounded-full"
+            className="rounded-full text-xs sm:text-sm px-2 sm:px-3"
           >
-            <RefreshCcw className="h-4 w-4 mr-2" />
-            {refreshing ? "Refreshing..." : "Refresh"}
+            <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Refresh"}</span>
+            <span className="sm:hidden">{refreshing ? "..." : "Refresh"}</span>
           </Button>
         </div>
       </div>
@@ -208,16 +209,16 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
       <ProductivityOverview stats={dashboardData.daily_stats} />
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           {/* <TabsTrigger value="focus">Focus Time</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger> */}
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="activity" className="text-xs sm:text-sm">Activity</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+        <TabsContent value="overview" className="space-y-3 sm:space-y-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
             <FocusTimeChart data={dashboardData.focus_time_trend} />
             <TaskCompletionChart data={dashboardData.task_completion_trend} />
           </div>
@@ -282,7 +283,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
 
         {/** Insights tab removed intentionally to disable AI-powered insights **/}
 
-        <TabsContent value="activity" className="space-y-4">
+        <TabsContent value="activity" className="space-y-3 sm:space-y-4">
           <ActivityTimeline events={dashboardData.recent_events} />
         </TabsContent>
       </Tabs>

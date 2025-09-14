@@ -31,19 +31,24 @@ export function SessionInfoForm(props: Props) {
       <form
         {...props}
         onSubmit={form.handleSubmit((data) => props.onSubmit?.({ data, form }))}
-        className={cn("space-y-4", props.className)}
+        className={cn("space-y-4 p-1", props.className)}
       >
         <FormField
           control={form.control}
           name="projectDetails"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Project Details</FormLabel>
-              <Textarea {...field} />
+              <FormLabel className="text-sm sm:text-base">Project Details</FormLabel>
+              <Textarea 
+                {...field} 
+                placeholder="Describe your project, goals, and any specific requirements..."
+                rows={4}
+                className="text-sm sm:text-base"
+              />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={props.disabled}>
+        <Button type="submit" className="w-full text-sm sm:text-base py-2 sm:py-3" disabled={props.disabled}>
           Submit
         </Button>
       </form>

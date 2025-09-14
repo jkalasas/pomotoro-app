@@ -371,20 +371,21 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl w-[95vw] overflow-y-auto bg-card border-border/50 shadow-lg rounded-2xl sm:w-full">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-4xl w-[95vw] overflow-y-auto bg-card border-border/50 shadow-lg rounded-2xl sm:w-full p-4 sm:p-6">
+        <DialogHeader className="space-y-2 sm:space-y-3">
           <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between items-center gap-3">
-            <span>Session Editor</span>
+            <span className="text-lg sm:text-xl">Session Editor</span>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowRefinementDialog(true)}
                 disabled={isRefining || isGenerating}
-                className="rounded-full"
+                className="rounded-full text-xs sm:text-sm px-3 sm:px-4"
               >
-                <Sparkles className="h-4 w-4 mr-2" />
-                {isRefining ? "Refining..." : "Refine with AI"}
+                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{isRefining ? "Refining..." : "Refine with AI"}</span>
+                <span className="sm:hidden">{isRefining ? "..." : "AI"}</span>
               </Button>
             </div>
           </DialogTitle>
@@ -913,29 +914,39 @@ User refinement instructions: ${refinementInstructions || "Please refine and imp
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1 rounded-full"
+            className="flex-1 rounded-full text-sm sm:text-base py-2 sm:py-3"
           >
             Cancel
           </Button>
           <Button
             onClick={onCreateSession}
             disabled={!sessionInfo || isGenerating || sessionInfo.tasks.length === 0}
-            className="flex-1 rounded-full"
+            className="flex-1 rounded-full text-sm sm:text-base py-2 sm:py-3"
           >
-            Create Session
+            {isGenerating ? (
+              <>
+                <span className="hidden sm:inline">Creating Session...</span>
+                <span className="sm:hidden">Creating...</span>
+              </>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Create Session</span>
+                <span className="sm:hidden">Create</span>
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>
       
       {/* Refinement Instructions Dialog */}
       <Dialog open={showRefinementDialog} onOpenChange={setShowRefinementDialog}>
-        <DialogContent className="max-w-2xl w-[95vw] backdrop-blur-sm bg-card/80 border-border/50 shadow-lg rounded-2xl sm:w-full">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
+        <DialogContent className="max-w-2xl w-[95vw] backdrop-blur-sm bg-card/80 border-border/50 shadow-lg rounded-2xl sm:w-full p-4 sm:p-6">
+          <DialogHeader className="space-y-2 sm:space-y-3">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
               Refine Session with AI
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm sm:text-base">
               Describe how you'd like the AI to improve your session. The AI will analyze your current tasks, timing, and structure to make targeted improvements.
             </DialogDescription>
           </DialogHeader>
