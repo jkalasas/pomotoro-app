@@ -843,29 +843,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const currentSessionId = completedTask?.session_id;
       const nextSessionId = nextTask.session_id;
       
-      // Build a single minimal backend update to avoid duplicate 'timer_start' logs
+      // Avoid backend updates here to prevent 'Task Switch' logs.
+      // Update settings and local current task only.
+      await pomodoroStore.updateSettingsFromTask(nextSessionId);
+
       if (isRunning && currentPhase === "focus") {
-        let newTimeRemaining = currentTimeRemaining;
-        if (currentSessionId !== nextSessionId) {
-          await pomodoroStore.updateSettingsFromTask(nextSessionId);
-          const updatedSettings = usePomodoroStore.getState().settings;
-          const nextSessionFocusSeconds = updatedSettings.focus_duration * 60;
-          if (newTimeRemaining > nextSessionFocusSeconds) {
-            newTimeRemaining = nextSessionFocusSeconds;
-          }
-        }
-
-        await pomodoroStore.updateTimer({
-          current_task_id: nextTask.id,
-          time_remaining: newTimeRemaining,
-        });
-
-        // Start local task timer without additional backend calls
+        // Clamp locally if new session has shorter focus duration
+        const s = usePomodoroStore.getState().settings;
+        const nextFocusSeconds = s.focus_duration * 60;
+        const clamped = Math.min(currentTimeRemaining, nextFocusSeconds);
+        usePomodoroStore.setState({ currentTaskId: nextTask.id, maxTime: nextFocusSeconds, time: clamped });
+        // Start local task timer (no backend call)
         pomodoroStore.startTaskTimer(nextTask.id);
       } else {
-        await pomodoroStore.updateTimer({
-          current_task_id: nextTask.id,
-        });
+        // During breaks or when paused, just switch task locally; backend will be updated on next intentional update
+        usePomodoroStore.setState({ currentTaskId: nextTask.id });
       }
     } catch (error) {
       // Failed to handle next task transition
