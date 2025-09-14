@@ -2,15 +2,8 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import {
-  Check,
-  RotateCcw,
-  Clock,
-  GripVertical,
-  Trash2,
-  Calendar,
-  Settings,
-} from "lucide-react";
+import { Check, RotateCcw, Clock, GripVertical, Trash2, Calendar, Settings } from "lucide-react";
+import { toast } from "sonner";
 import { useSchedulerStore } from "~/stores/scheduler";
 import { useTaskStore } from "~/stores/tasks";
 import { usePomodoroStore } from "~/stores/pomodoro";
@@ -47,7 +40,7 @@ export function ScheduledTasksList({
   } = useSchedulerStore();
 
   const { sessions } = useTaskStore();
-  const { isRunning } = usePomodoroStore();
+  const { isRunning, phase } = usePomodoroStore();
 
   const visible = (currentSchedule || []).filter(t => !t.archived);
 
@@ -217,9 +210,14 @@ export function ScheduledTasksList({
                               if (task.completed) {
                                 uncompleteScheduledTask(task.id);
                               } else {
+                                if (phase === 'short_break' || phase === 'long_break') {
+                                  toast.info('Finish your break before completing tasks.');
+                                  return;
+                                }
                                 completeScheduledTask(task.id);
                               }
                             }}
+                            disabled={!task.completed && (phase === 'short_break' || phase === 'long_break')}
                           >
                             {task.completed ? (
                               <span className="flex items-center gap-1">

@@ -249,6 +249,16 @@ export const useSchedulerStore = create<SchedulerState>()(
   },
 
   completeScheduledTask: async (taskId: number) => {
+    // Prevent completing tasks while on a break to avoid disrupting Pomodoro state
+    try {
+      const { usePomodoroStore } = await import('./pomodoro');
+      const { phase } = usePomodoroStore.getState();
+      if (phase === 'short_break' || phase === 'long_break') {
+        toast.info('You are on a break. Resume focus to complete tasks.');
+        return;
+      }
+    } catch { /* if store unavailable, proceed */ }
+
     // Optimistic update
     const prevSchedule = get().currentSchedule;
     if (prevSchedule) {

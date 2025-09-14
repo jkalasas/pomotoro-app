@@ -612,11 +612,22 @@ export default function Home() {
                   className="flex items-center gap-3"
                   variant="outline"
                   onClick={() => {
+                    if (
+                      pomodoroStore.phase === 'short_break' ||
+                      pomodoroStore.phase === 'long_break'
+                    ) {
+                      toast.info('Finish your break before completing tasks.');
+                      return;
+                    }
                     const currentTask = schedulerStore.getCurrentTask();
                     if (currentTask) {
                       schedulerStore.completeScheduledTask(currentTask.id);
                     }
                   }}
+                  disabled={
+                    pomodoroStore.phase === 'short_break' ||
+                    pomodoroStore.phase === 'long_break'
+                  }
                 >
                   <Check />
                   <span>Mark Task Complete</span>
@@ -628,7 +639,7 @@ export default function Home() {
                   pomodoroStore.phase === "long_break") && (
                   <div className="flex gap-3">
                     <Button
-                      className="flex items-center gap-3"
+                      className="flex-1 flex items-center gap-3"
                       variant="outline"
                       onClick={async () => {
                         try {
@@ -645,7 +656,7 @@ export default function Home() {
                     </Button>
 
                     <Button
-                      className="flex items-center gap-3"
+                      className="flex-1 flex items-center gap-3"
                       variant="outline"
                       onClick={async () => {
                         try {
@@ -729,6 +740,13 @@ export default function Home() {
                       if (task.completed) {
                         schedulerStore.uncompleteScheduledTask(task.id);
                       } else {
+                        if (
+                          pomodoroStore.phase === 'short_break' ||
+                          pomodoroStore.phase === 'long_break'
+                        ) {
+                          toast.info('Cannot complete tasks during a break.');
+                          return;
+                        }
                         schedulerStore.completeScheduledTask(task.id);
                       }
                     }}
@@ -739,6 +757,13 @@ export default function Home() {
                         if (task.completed) {
                           schedulerStore.uncompleteScheduledTask(task.id);
                         } else {
+                          if (
+                            pomodoroStore.phase === 'short_break' ||
+                            pomodoroStore.phase === 'long_break'
+                          ) {
+                            toast.info('Cannot complete tasks during a break.');
+                            return;
+                          }
                           schedulerStore.completeScheduledTask(task.id);
                         }
                       }}
