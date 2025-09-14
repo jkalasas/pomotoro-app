@@ -1,3 +1,4 @@
+import { Save } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -114,13 +115,13 @@ export function SessionFeedbackModal({
                 key={option.level}
                 onClick={() => setSelectedFocus(option.level)}
                 className={cn(
-                  "flex flex-col items-center p-3 rounded-lg border-2 transition-all",
+                  "flex flex-col items-center p-3 rounded-lg border-2 transition-all group mb-4",
                   selectedFocus === option.level 
                     ? "border-white bg-white/20 scale-105" 
                     : "border-white/30 hover:border-white/50"
                 )}
               >
-                <span className="text-3xl mb-1">{option.emoji}</span>
+                <span className="text-3xl mb-1 transition-transform duration-200 group-hover:scale-125">{option.emoji}</span>
                 <span className="text-xs font-medium">{option.label}</span>
               </button>
             ))}
@@ -159,7 +160,8 @@ export function SessionFeedbackModal({
             disabled={!selectedFocus || isSubmitting}
             className="w-full bg-white/20 border border-white/30 hover:bg-white/30 text-white font-medium"
           >
-            {isSubmitting ? "Submitting..." : "📋 Submit"}
+            <Save className="w-4 h-4 mr-2" />
+            {isSubmitting ? "Submitting..." : "Submit"}
           </Button>
 
           {/* Auto-submit countdown */}
