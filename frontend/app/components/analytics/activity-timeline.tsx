@@ -4,6 +4,7 @@ import { ScrollArea } from '~/components/ui/scroll-area';
 import { Badge } from '~/components/ui/badge';
 import { LogoIcon } from '~/components/ui/logo';
 import type { AnalyticsEvent } from '~/lib/analytics';
+import { formatTimeFromUTC } from '~/lib/datetime';
 
 interface ActivityTimelineProps {
   events: AnalyticsEvent[];
@@ -61,12 +62,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
       .join(' ');
   };
 
-  const formatEventTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatEventTime = (timestamp: string) => formatTimeFromUTC(timestamp);
 
   const parseEventData = (eventData: string | null) => {
     if (!eventData) return null;
