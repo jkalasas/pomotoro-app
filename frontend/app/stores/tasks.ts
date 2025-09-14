@@ -683,14 +683,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         // Sync configuration after updating the timer
         await pomodoroStore.syncConfigWithCurrentTask();
       } else {
-        // Timer is not running or not in focus phase, handle normally
-        
-        // Update the current task first
+        // Timer is not in focus phase (likely on a break) or not running.
+        // Preserve the current running state instead of forcing a pause.
+
+        // Update the current task while keeping whatever the current running state is
         await pomodoroStore.updateTimer({
           current_task_id: nextTask.id,
-          is_running: false,
+          is_running: isRunning,
         });
-        
+
         // Then sync configuration which will handle session differences
         await pomodoroStore.syncConfigWithCurrentTask();
       }
