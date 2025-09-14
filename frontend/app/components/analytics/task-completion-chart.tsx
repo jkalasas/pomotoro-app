@@ -38,7 +38,7 @@ export function TaskCompletionChart({ data }: TaskCompletionChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer config={chartConfig} className="h-[300px] w-xs sm:w-full">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
