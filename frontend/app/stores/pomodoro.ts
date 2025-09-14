@@ -1004,27 +1004,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       },
     });
 
-    // Immediately stop the timer and close any rest overlay to avoid lingering overlay
-    try {
-      // Stop local timer state first to ensure background ticker doesn't recreate overlay
-      const wasRunning = get().isRunning;
-      set({ isRunning: false });
-      // Best-effort backend sync to pause active session
-      if (wasRunning) {
-        const now = Date.now();
-        if (now - _lastPauseMs > 800) {
-          _lastPauseMs = now;
-          apiClient.updateActiveSession({ is_running: false }).catch(() => { /* ignore */ });
-        }
-      }
-
-      // If rest overlay is visible, close it now
-      const state = get();
-      if (state.showRestOverlay) {
-        set({ showRestOverlay: false });
-        try { useWindowStore.getState().closeOverlayWindow(); } catch { /* ignore */ }
-      }
-    } catch { /* non-fatal */ }
+    // Do not pause the timer here. The background ticker will
+    // automatically pause when there are no active tasks left
+    // in the schedule. This prevents unwanted pauses when a
+    // session completes but other scheduled tasks remain.
   },
 
   setShowFeedbackModal: (show) => {
