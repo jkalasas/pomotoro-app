@@ -298,6 +298,80 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       } catch {}
       
+      // If task is not in schedule but its session is selected, insert it respecting session order
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const sched = useSchedulerStore.getState();
+        const currentSchedule = sched.currentSchedule;
+        if (currentSchedule) {
+          // Find the session containing this task and the task details
+          const state = get();
+          let foundSession: Session | undefined;
+          let foundTask: Task | undefined;
+          // Search in currentSession first for performance
+          if (state.currentSession && state.currentSession.tasks?.some(t => t.id === taskId)) {
+            foundSession = state.currentSession;
+            foundTask = state.currentSession.tasks.find(t => t.id === taskId);
+          }
+          // Fallback: scan all loaded sessions
+          if (!foundTask) {
+            for (const s of state.sessions) {
+              const ft = (s.tasks || []).find(t => t.id === taskId);
+              if (ft) { foundSession = s; foundTask = ft; break; }
+            }
+          }
+
+          if (foundSession && foundTask && sched.selectedSessionIds.includes(foundSession.id)) {
+            const alreadyInSchedule = currentSchedule.some(t => t.id === taskId);
+            if (!alreadyInSchedule) {
+              // Compute insertion index using session task order
+              const sessionTasks = (foundSession.tasks || []);
+              const newIndexInSession = sessionTasks.findIndex(t => t.id === taskId);
+              const siblings = currentSchedule.filter(t => t.session_id === foundSession!.id);
+              let insertAt = currentSchedule.length; // default append
+              if (siblings.length > 0) {
+                // Map siblings to their order in the session
+                const siblingWithOrder = siblings.map(st => ({
+                  st,
+                  order: sessionTasks.findIndex(t => t.id === st.id)
+                })).filter(x => x.order !== -1);
+                const prev = siblingWithOrder
+                  .filter(x => x.order < newIndexInSession)
+                  .sort((a,b) => b.order - a.order)[0];
+                const next = siblingWithOrder
+                  .filter(x => x.order > newIndexInSession)
+                  .sort((a,b) => a.order - b.order)[0];
+                if (prev) {
+                  insertAt = currentSchedule.findIndex(t => t.id === prev.st.id) + 1;
+                } else if (next) {
+                  insertAt = currentSchedule.findIndex(t => t.id === next.st.id);
+                }
+              }
+
+              const newScheduledTask = {
+                id: foundTask.id,
+                name: (foundTask.name || '').trim() || 'Untitled Task',
+                estimated_completion_time: foundTask.estimated_completion_time,
+                session_id: foundSession.id,
+                category: foundTask.category || 'Uncategorized',
+                completed: false,
+                archived: false,
+              };
+
+              const reordered = [...currentSchedule];
+              reordered.splice(insertAt, 0, newScheduledTask);
+
+              // Persist reorder via scheduler helper to keep timer consistent
+              try {
+                const { usePomodoroStore } = await import('./pomodoro');
+                const wasRunning = usePomodoroStore.getState().isRunning;
+                await useSchedulerStore.getState().reorderScheduleWithTimerReset(reordered, wasRunning);
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+      
       // Get task details for analytics logging
       const currentSession = get().currentSession;
       const task = currentSession?.tasks.find(t => t.id === taskId);
@@ -634,6 +708,75 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         sessions: state.sessions.map(s => ({...s, tasks: s.tasks?.map(t => t.id===taskId?updated:t) || []})),
         currentSession: state.currentSession ? { ...state.currentSession, tasks: state.currentSession.tasks.map(t => t.id===taskId?updated:t) } : null,
       }));
+
+      // If task's session is part of current schedule and task not present, insert it by session order
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const sched = useSchedulerStore.getState();
+        const currentSchedule = sched.currentSchedule;
+        if (!currentSchedule) return;
+
+        // Locate session and task details
+        const state = get();
+        let foundSession: Session | undefined;
+        let foundTask: Task | undefined;
+        if (state.currentSession && state.currentSession.tasks?.some(t => t.id === taskId)) {
+          foundSession = state.currentSession;
+          foundTask = state.currentSession.tasks.find(t => t.id === taskId);
+        }
+        if (!foundTask) {
+          for (const s of state.sessions) {
+            const ft = (s.tasks || []).find(t => t.id === taskId);
+            if (ft) { foundSession = s; foundTask = ft; break; }
+          }
+        }
+
+        if (foundSession && foundTask && sched.selectedSessionIds.includes(foundSession.id)) {
+          const alreadyInSchedule = currentSchedule.some(t => t.id === taskId);
+          if (!alreadyInSchedule) {
+            const sessionTasks = (foundSession.tasks || []);
+            const newIndexInSession = sessionTasks.findIndex(t => t.id === taskId);
+            const siblings = currentSchedule.filter(t => t.session_id === foundSession!.id);
+            let insertAt = currentSchedule.length;
+            if (siblings.length > 0) {
+              const siblingWithOrder = siblings.map(st => ({
+                st,
+                order: sessionTasks.findIndex(t => t.id === st.id)
+              })).filter(x => x.order !== -1);
+              const prev = siblingWithOrder
+                .filter(x => x.order < newIndexInSession)
+                .sort((a,b) => b.order - a.order)[0];
+              const next = siblingWithOrder
+                .filter(x => x.order > newIndexInSession)
+                .sort((a,b) => a.order - b.order)[0];
+              if (prev) {
+                insertAt = currentSchedule.findIndex(t => t.id === prev.st.id) + 1;
+              } else if (next) {
+                insertAt = currentSchedule.findIndex(t => t.id === next.st.id);
+              }
+            }
+
+            const newScheduledTask = {
+              id: foundTask.id,
+              name: (foundTask.name || '').trim() || 'Untitled Task',
+              estimated_completion_time: foundTask.estimated_completion_time,
+              session_id: foundSession.id,
+              category: foundTask.category || 'Uncategorized',
+              completed: !!foundTask.completed,
+              archived: false,
+            };
+
+            const reordered = [...currentSchedule];
+            reordered.splice(insertAt, 0, newScheduledTask);
+
+            try {
+              const { usePomodoroStore } = await import('./pomodoro');
+              const wasRunning = usePomodoroStore.getState().isRunning;
+              await useSchedulerStore.getState().reorderScheduleWithTimerReset(reordered, wasRunning);
+            } catch {}
+          }
+        }
+      } catch {}
     } catch (e) { console.error('unarchive task failed', e); }
   },
 
