@@ -233,14 +233,8 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
       });
     },
 
-    logTaskUncomplete: (taskId: number, taskName: string, sessionId?: number, sessionReset?: boolean) => {
-      get().logEvent('task_uncomplete_frontend', {
-        task_id: taskId,
-        task_name: taskName,
-        session_id: sessionId,
-        session_reset: sessionReset,
-        uncomplete_time: new Date().toISOString()
-      });
+    logTaskUncomplete: (_taskId: number, _taskName: string, _sessionId?: number, _sessionReset?: boolean) => {
+      // intentionally left blank — backend logs task_uncomplete; keep frontend silent to avoid duplication
     },
 
     logFeedbackSubmitted: (sessionId: number, focusLevel: string, reflection?: string) => {
