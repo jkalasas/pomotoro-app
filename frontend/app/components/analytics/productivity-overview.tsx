@@ -44,6 +44,9 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
   const currentStreak = calculateCurrentStreak(stats);
   const trend = calculateTrend(stats);
 
+  const displayHours = Math.floor(totalFocusHours);
+  const displayMinutes = Math.round((totalFocusHours - displayHours) * 60);
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
@@ -55,7 +58,7 @@ export function ProductivityOverview({ stats }: ProductivityOverviewProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {totalFocusHours.toFixed(1)}h
+            {displayHours > 0 ? `${displayHours}h ${displayMinutes}m` : `${displayMinutes}m`}
           </div>
           <p className="text-xs text-muted-foreground">
             Across {stats.length} days
