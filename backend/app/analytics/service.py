@@ -166,15 +166,82 @@ class AnalyticsService:
         day_start = datetime.combine(target_date, datetime.min.time())
         day_end = datetime.combine(target_date, datetime.max.time())
 
-        session_analytics = db.exec(
-            select(SessionAnalytics).where(
+        # Compute focus/break/interruptions using event timestamps so time is
+        # attributed to the actual day of usage, not the day a session started.
+        day_events: List[AnalyticsEvent] = db.exec(
+            select(AnalyticsEvent).where(
                 and_(
-                    SessionAnalytics.user_id == user_id,
-                    SessionAnalytics.session_started_at >= day_start,
-                    SessionAnalytics.session_started_at <= day_end,
+                    AnalyticsEvent.user_id == user_id,
+                    AnalyticsEvent.created_at >= day_start,
+                    AnalyticsEvent.created_at <= day_end,
                 )
             )
         ).all()
+
+        session_cfg_cache: Dict[int, PomodoroSession] = {}
+        def get_session_cfg(sid: Optional[int]) -> Optional[PomodoroSession]:
+            if not sid:
+                return None
+            if sid in session_cfg_cache:
+                return session_cfg_cache[sid]
+            sess = db.get(PomodoroSession, sid)
+            if sess:
+                session_cfg_cache[sid] = sess
+            return sess
+
+        total_focus_time = 0  # seconds
+        total_break_time = 0  # seconds
+        pomodoros_completed = 0
+        interruptions_count = 0
+
+        for ev in day_events:
+            etype = ev.event_type or ""
+            try:
+                data = json.loads(ev.event_data) if ev.event_data else {}
+            except Exception:
+                data = {}
+
+            if etype == "pomodoro_complete":
+                sid = data.get("session_id")
+                cfg = get_session_cfg(sid)
+                if cfg and cfg.focus_duration:
+                    total_focus_time += int(cfg.focus_duration) * 60
+                else:
+                    # Fallback to a default 25min if config missing
+                    total_focus_time += 25 * 60
+                pomodoros_completed += 1
+
+            elif etype == "break_start":
+                sid = data.get("session_id")
+                btype = data.get("break_type")
+                cfg = get_session_cfg(sid)
+                if cfg:
+                    if btype == "short_break" and cfg.short_break_duration is not None:
+                        total_break_time += int(cfg.short_break_duration) * 60
+                    elif btype == "long_break" and cfg.long_break_duration is not None:
+                        total_break_time += int(cfg.long_break_duration) * 60
+
+            elif etype == "timer_pause":
+                # Count interruptions when pausing during focus
+                if (data or {}).get("phase") == "focus":
+                    interruptions_count += 1
+
+        # Fallback for historical data without events: use SessionAnalytics for that day
+        if total_focus_time == 0 and pomodoros_completed == 0 and total_break_time == 0:
+            session_analytics = db.exec(
+                select(SessionAnalytics).where(
+                    and_(
+                        SessionAnalytics.user_id == user_id,
+                        SessionAnalytics.session_started_at >= day_start,
+                        SessionAnalytics.session_started_at <= day_end,
+                    )
+                )
+            ).all()
+            if session_analytics:
+                total_focus_time = sum(sa.total_focus_time or 0 for sa in session_analytics)
+                total_break_time = sum(sa.total_break_time or 0 for sa in session_analytics)
+                pomodoros_completed = sum(sa.pomodoros_completed or 0 for sa in session_analytics)
+                interruptions_count = sum(sa.interruptions_count or 0 for sa in session_analytics)
 
         # Robust sessions_completed
         completed_sessions_count = 0
@@ -184,7 +251,7 @@ class AnalyticsService:
                 and_(
                     PomodoroSession.user_id == user_id,
                     PomodoroSession.completed == True,  # noqa: E712
-                    PomodoroSession.completed_at.isnot(None),
+                    PomodoroSession.completed_at != None,  # noqa: E711
                     PomodoroSession.completed_at >= day_start,
                     PomodoroSession.completed_at <= day_end,
                     PomodoroSession.is_deleted == False,  # noqa: E712
@@ -231,11 +298,6 @@ class AnalyticsService:
                 )
             )
         ).all()
-
-        total_focus_time = sum(sa.total_focus_time for sa in session_analytics)
-        total_break_time = sum(sa.total_break_time for sa in session_analytics)
-        pomodoros_completed = sum(sa.pomodoros_completed for sa in session_analytics)
-        interruptions_count = sum(sa.interruptions_count for sa in session_analytics)
 
         average_focus_duration = None
         if pomodoros_completed > 0:
@@ -361,7 +423,7 @@ class AnalyticsService:
         
         if event_type:
             query = query.where(AnalyticsEvent.event_type == event_type)
-        
+
         events = db.exec(query.order_by(AnalyticsEvent.created_at.desc())).all()
         return events
     
