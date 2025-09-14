@@ -114,20 +114,10 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         }
       });
       
-      // Also listen for app hide events (when window is hidden but not closed)
+      // Intentionally do not pause on window hide; keep timer running in background.
+      // Previously we paused here, which caused unwanted interruptions.
       listen('tauri://window-hide', () => {
-        const state = get();
-        if (state.isRunning) {
-          // Window is being hidden - stop timer to prevent background running
-          apiClient.updateActiveSession({ 
-            time_remaining: state.time,
-            is_running: false
-          }).then(() => {
-            set({ isRunning: false });
-          }).catch(() => {
-            set({ isRunning: false });
-          });
-        }
+        // No-op: allow background ticker to continue running.
       });
     }
 
@@ -145,6 +135,23 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       _bgInterval = setInterval(async () => {
         try {
           const state = get();
+
+          // Auto-pause only when there are no active tasks in the schedule
+          if (state.isRunning) {
+            try {
+              const { useSchedulerStore } = await import('./scheduler');
+              const hasTasks = useSchedulerStore.getState().hasActiveTasks();
+              if (!hasTasks) {
+                await apiClient.updateActiveSession({ is_running: false, time_remaining: state.time });
+                set({ isRunning: false });
+                if (state.showRestOverlay) {
+                  set({ showRestOverlay: false });
+                  try { await useWindowStore.getState().closeOverlayWindow(); } catch {}
+                }
+                return; // Skip further ticking when no tasks
+              }
+            } catch { /* ignore scheduler lookup errors */ }
+          }
 
           if (state.isRunning && state.time > 0) {
             const newTime = state.time - 1;
@@ -195,20 +202,9 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     // Start the ticker
     startBackgroundTicker();
 
-    // Cleanup on page unload - CRITICAL: stop the timer
+    // Cleanup on page unload - do not force-pause; just clear local interval
     const handleBeforeUnload = () => {
-      // Stop the timer when app is closing
-      const state = get();
-      if (state.isRunning) {
-        // Immediately sync current state to backend and stop timer
-        apiClient.updateActiveSession({ 
-          time_remaining: state.time,
-          is_running: false  // Stop the timer when app closes
-        }).catch(() => {
-          // Even if sync fails, we want to stop the local timer
-        });
-      }
-      
+      // Best-effort: clear ticker to avoid leaks; backend state remains
       if (_bgInterval) {
         clearInterval(_bgInterval);
         _bgInterval = null;
@@ -218,66 +214,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     
     // Listen for Tauri window hide events (since close is prevented)
-    if (isTauri()) {
-      // For Tauri apps, we need special handling since close is prevented
-      let hideTimer: NodeJS.Timeout | null = null;
-      
-      const handleVisibilityChangeForTauri = () => {
-        if (document.hidden) {
-          // App is becoming hidden - start timer to detect if it's a real app hide vs tab switch
-          hideTimer = setTimeout(() => {
-            const state = get();
-            if (document.hidden && state.isRunning) {
-              // App has been hidden for 500ms and timer is running - stop it
-              apiClient.updateActiveSession({ 
-                time_remaining: state.time,
-                is_running: false
-              }).then(() => {
-                set({ isRunning: false });
-              }).catch(() => {
-                set({ isRunning: false });
-              });
-              
-              // Also close any overlay windows
-              if (state.showRestOverlay) {
-                useWindowStore.getState().closeOverlayWindow().catch(() => {});
-                set({ showRestOverlay: false });
-              }
-            }
-          }, 500);
-        } else {
-          // App is becoming visible - cancel hide timer and reload state
-          if (hideTimer) {
-            clearTimeout(hideTimer);
-            hideTimer = null;
-          }
-          get().loadActiveSession();
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChangeForTauri);
-    } else {
-      // For non-Tauri apps, use normal visibility handling
-      const handleVisibilityChange = () => {
-        if (document.hidden) {
-          // App is becoming hidden - sync current state
-          const state = get();
-          if (state.isRunning) {
-            apiClient.updateActiveSession({ 
-              time_remaining: state.time,
-              is_running: state.isRunning
-            }).catch(() => {
-              // Sync failed but continue
-            });
-          }
-        } else {
-          // App is becoming visible - reload state from backend
-          get().loadActiveSession();
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
+    // Do not pause on visibility change (Tauri or web). We skip visibility listeners
+    // to allow uninterrupted background operation.
   }
 
   // Notification helper function
