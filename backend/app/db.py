@@ -16,7 +16,7 @@ if DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
 engine = create_engine(
-    DATABASE_URL, echo=True, connect_args=connect_args
+    DATABASE_URL, echo=settings.database_echo, connect_args=connect_args
 )
 
 def get_session():

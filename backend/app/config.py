@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     """
 
     database_url: str = "sqlite:///database.db"
+    database_echo: bool = False
     environment: str = "development"
     log_level: str = "info"
     secret_key: str = "please_change_this"
