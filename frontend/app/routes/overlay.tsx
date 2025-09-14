@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { useSearchParams } from "react-router";
 import { Logo } from "~/components/ui/logo";
 import { useAppSettings } from "~/stores/settings";
@@ -31,18 +31,6 @@ export default function Overlay() {
     };
   }, []);
 
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        handleSkip();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   // Countdown timer
   useEffect(() => {
     if (timeRemaining <= 0) {
@@ -71,6 +59,24 @@ export default function Overlay() {
     return () => clearTimeout(timer);
   }, [timeRemaining]);
 
+  // Listen for break-extended events to keep countdown in sync
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    (async () => {
+      try {
+        unlisten = await listen<{ added_seconds: number; time_remaining: number }>('break-extended', (event) => {
+          const { time_remaining } = event.payload || { added_seconds: 0, time_remaining: timeRemaining };
+          if (typeof time_remaining === 'number' && time_remaining > 0) {
+            setTimeRemaining(time_remaining);
+          }
+        });
+      } catch {
+        // ignore if tauri not available
+      }
+    })();
+    return () => { try { unlisten && unlisten(); } catch {} };
+  }, []);
+
   const handleSkip = async () => {
     try {
       // Get the current window instance (this overlay window)
@@ -90,6 +96,18 @@ export default function Overlay() {
       } catch (closeError) {
         console.error("Failed to close overlay window:", closeError);
       }
+    }
+  };
+
+  // Extend the current break by N seconds, updating both main window and local timer
+  const handleExtend = async (seconds?: number) => {
+    try {
+      // Emit without payload; main window uses configured break duration
+      await emit('extend-rest');
+      // Optimistically update local countdown for snappy UX
+      if (typeof seconds === 'number') setTimeRemaining((prev) => prev + seconds);
+    } catch (error) {
+      console.error('Failed to extend rest:', error);
     }
   };
 
@@ -175,6 +193,22 @@ export default function Overlay() {
               </button>
 
               <button
+                onClick={() => handleExtend(60)}
+                className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
+                title="Add 1 minute"
+              >
+                +1m
+              </button>
+
+              <button
+                onClick={() => handleExtend(300)}
+                className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
+                title="Add 5 minutes"
+              >
+                +5m
+              </button>
+
+              <button
                 onClick={handleClose}
                 className="px-3 py-2 text-sm bg-primary-foreground/5 border border-primary-foreground/10 rounded hover:bg-primary-foreground/10 transition-colors"
                 title="Close overlay without skipping the rest"
@@ -185,10 +219,10 @@ export default function Overlay() {
           </div>
         </div>
         
-        {/* ESC hint at bottom */}
+        {/* Footer hint */}
         <div className="text-center mt-4">
             <p className="text-xs opacity-60">
-              Press ESC to skip this rest period — or press Close to simply dismiss the overlay
+              Use Skip to end rest early, or Close to hide this overlay
             </p>
         </div>
       </div>

@@ -66,6 +66,7 @@ export interface PomodoroState {
   }) => Promise<void>;
   setShowRestOverlay: (show: boolean) => Promise<void>;
   skipRest: () => Promise<void>;
+  extendRest: () => Promise<void>;
   triggerSessionCompletion: (sessionId: number, sessionName: string, totalTasks: number, completedTasks: number, focusDuration: number) => void;
   setShowFeedbackModal: (show: boolean) => void;
   submitSessionFeedback: (focusLevel: string, reflection?: string) => Promise<void>;
@@ -87,6 +88,11 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   if (typeof window !== "undefined") {
     listen('skip-rest', () => {
       get().skipRest();
+    });
+
+    // Allow extending current break by a given number of seconds
+    listen('extend-rest', () => {
+      get().extendRest();
     });
 
     // Listen for session completion events from task store
@@ -922,17 +928,84 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Analytics
       try {
         useAnalyticsStore.getState().logBreakSkip(sessionId, phase);
-        useAnalyticsStore.getState().logEvent('phase_change', {
-          session_id: sessionId,
-          from_phase: phase,
-          to_phase: 'focus',
-          change_time: new Date().toISOString(),
-          skipped: true,
-          was_running: isRunning
-        });
       } catch { /* ignore analytics errors */ }
     } catch (error) {
       // On failure, ensure timer doesn't get stuck; leave existing state
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  extendRest: async () => {
+    const state = get();
+    const { sessionId, phase, time, isRunning, settings, maxTime } = state;
+
+    if (!sessionId) {
+      console.error('No active session found for extend rest');
+      return;
+    }
+    if (!(phase === 'short_break' || phase === 'long_break')) {
+      // Only allow extending during breaks
+      return;
+    }
+
+    // Extend by the original configured break duration
+    const add = (phase === 'short_break' ? settings.short_break_duration : settings.long_break_duration) * 60;
+    const newRemaining = time + add;
+    const newMaxTime = (Number.isFinite(maxTime) && maxTime > 0 ? maxTime : add) + add;
+
+    set({ isLoading: true });
+    try {
+      // Suppress background ticker sync briefly to avoid races
+      _suppressSyncUntilMs = Date.now() + 1500;
+      await apiClient.updateActiveSession({
+        time_remaining: newRemaining,
+        is_running: isRunning,
+      });
+
+      // Update local remaining time and expand maxTime to keep progress consistent
+      set({ time: newRemaining, maxTime: newMaxTime });
+
+      // Emit an event so the overlay window (separate process) can update its countdown
+      try {
+        if (isTauri()) {
+          const { emit } = await import('@tauri-apps/api/event');
+          await emit('break-extended', { added_seconds: add, time_remaining: newRemaining, phase });
+        }
+      } catch { /* ignore event emission failures */ }
+
+      // Dispatch a DOM event for any in-page listeners (web)
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('break-extended', { detail: { added_seconds: add, time_remaining: newRemaining, phase } }));
+        }
+      } catch { /* ignore */ }
+
+      // Log analytics and refresh stats
+      try {
+        useAnalyticsStore.getState().logEvent('break_extended', {
+          session_id: sessionId,
+          phase,
+          added_seconds: add,
+          new_remaining: newRemaining,
+          at: new Date().toISOString(),
+        });
+        // Best-effort refresh for dashboards
+        useAnalyticsStore.getState().updateTodayStats();
+        useAnalyticsStore.getState().fetchEvents?.();
+      } catch { /* ignore analytics issues */ }
+
+      // Ensure the rest overlay stays open
+      if (!get().showRestOverlay && isRunning) {
+        try {
+          set({ showRestOverlay: true });
+          await useWindowStore.getState().createOverlayWindow(newRemaining);
+        } catch {
+          set({ showRestOverlay: false });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to extend rest:', error);
     } finally {
       set({ isLoading: false });
     }

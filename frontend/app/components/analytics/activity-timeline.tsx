@@ -22,6 +22,8 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
         return <LogoIcon />;
       case 'break_start':
         return '☕';
+      case 'break_skip':
+        return '⏭️';
       case 'timer_start':
         return '▶️';
       case 'timer_pause':
@@ -44,6 +46,8 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
       case 'timer_pause':
         return 'destructive';
       case 'break_start':
+        return 'secondary';
+      case 'break_skip':
         return 'secondary';
       default:
         return 'secondary';
@@ -115,6 +119,11 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
                         )}
                         {event.event_type === 'break_start' && eventData.break_type && (
                           <span>Started {eventData.break_type.replace('_', ' ')}</span>
+                        )}
+                        {event.event_type === 'break_skip' && (
+                          <span>
+                            Skipped{eventData.break_type ? ` ${eventData.break_type.replace('_', ' ')}` : ' break'}
+                          </span>
                         )}
                       </div>
                     )}

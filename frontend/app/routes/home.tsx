@@ -26,6 +26,7 @@ import {
   RotateCcw,
   Settings,
   Trash2,
+  SkipForward,
 } from "lucide-react";
 import { ScheduleGeneratorDialog } from "~/components/pomotoro/schedule-generator-dialog";
 import { ScheduledTasksList } from "~/components/pomotoro/scheduled-tasks-list";
@@ -621,6 +622,45 @@ export default function Home() {
                   <span>Mark Task Complete</span>
                 </Button>
               )}
+
+              {schedulerStore.getCurrentTask() &&
+                (pomodoroStore.phase === "short_break" ||
+                  pomodoroStore.phase === "long_break") && (
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex items-center gap-3"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await pomodoroStore.extendRest();
+                          toast.success("Break extended");
+                        } catch (error) {
+                          toast.error("Failed to extend break");
+                        }
+                      }}
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      <Plus />
+                      <span>Extend Break</span>
+                    </Button>
+
+                    <Button
+                      className="flex items-center gap-3"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await pomodoroStore.skipRest();
+                        } catch (error) {
+                          toast.error("Failed to skip break");
+                        }
+                      }}
+                      disabled={pomodoroStore.isLoading}
+                    >
+                      <SkipForward />
+                      <span>Skip Break</span>
+                    </Button>
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>
