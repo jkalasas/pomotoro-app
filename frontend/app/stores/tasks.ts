@@ -510,6 +510,33 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           ? { ...state.currentSession, tasks: [...(state.currentSession.tasks || []), newTask] }
           : state.currentSession,
       }));
+
+      // If this session is part of the current schedule, append the new task to the bottom
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const sched = useSchedulerStore.getState();
+        const currentSchedule = sched.currentSchedule;
+        if (currentSchedule && sched.selectedSessionIds.includes(sessionId)) {
+          const newScheduledTask = {
+            id: newTask.id,
+            name: (newTask.name || '').trim() || 'Untitled Task',
+            estimated_completion_time: newTask.estimated_completion_time,
+            session_id: sessionId,
+            category: newTask.category || 'Uncategorized',
+            completed: false,
+            archived: !!newTask.archived,
+          };
+
+          const reordered = [...currentSchedule, newScheduledTask];
+
+          // Persist reorder and keep Pomodoro state consistent
+          try {
+            const { usePomodoroStore } = await import('./pomodoro');
+            const wasRunning = usePomodoroStore.getState().isRunning;
+            await useSchedulerStore.getState().reorderScheduleWithTimerReset(reordered, wasRunning);
+          } catch {}
+        }
+      } catch {}
     } catch (error) {
       console.error("Failed to add task:", error);
       throw error;
