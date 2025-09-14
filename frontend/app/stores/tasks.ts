@@ -211,6 +211,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       
       await apiClient.completeTask(taskId, actualCompletionTime);
       
+      // Reflect completion in the current schedule if present (optimistic UI sync)
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const schedState = useSchedulerStore.getState();
+        const schedule = schedState.currentSchedule;
+        if (schedule && schedule.some(t => t.id === taskId && !t.completed)) {
+          const updated = schedule.map(t => t.id === taskId ? { ...t, completed: true } : t);
+          useSchedulerStore.setState({ currentSchedule: updated });
+        }
+      } catch {}
+
       // Handle next task transition for pomodoro configuration updates
       await get().handleNextTaskTransition(taskId);
       
@@ -276,6 +287,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   uncompleteTask: async (taskId: number) => {
     try {
       const response = await apiClient.uncompleteTask(taskId) as { message: string; session_reset: boolean };
+      // Reflect uncompletion in the current schedule if present (optimistic UI sync)
+      try {
+        const { useSchedulerStore } = await import('./scheduler');
+        const schedState = useSchedulerStore.getState();
+        const schedule = schedState.currentSchedule;
+        if (schedule && schedule.some(t => t.id === taskId && t.completed)) {
+          const updated = schedule.map(t => t.id === taskId ? { ...t, completed: false } : t);
+          useSchedulerStore.setState({ currentSchedule: updated });
+        }
+      } catch {}
       
       // Get task details for analytics logging
       const currentSession = get().currentSession;
@@ -318,6 +339,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-uncompleted'));
       }
+
+      // After uncompletion, ensure Pomodoro adopts the latest current task's config
+      try {
+        const { usePomodoroStore } = await import('./pomodoro');
+        await usePomodoroStore.getState().syncConfigWithCurrentTask();
+      } catch {}
     } catch (error) {
       console.error("Failed to uncomplete task:", error);
       throw error;

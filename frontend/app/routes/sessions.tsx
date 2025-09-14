@@ -23,6 +23,8 @@ import {
   ArchiveRestore,
   ArrowDown,
   Copy,
+  Check,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTaskStore, type Session, type Task } from "~/stores/tasks";
@@ -37,6 +39,7 @@ import {
   type DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
 import { SidebarTrigger } from "~/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 
 export default function Sessions() {
   const {
@@ -50,6 +53,8 @@ export default function Sessions() {
     archiveSession,
     unarchiveSession,
     addTaskToSession,
+    completeTask,
+    uncompleteTask,
     updateTask,
     deleteTask,
     reorderTasks,
@@ -321,19 +326,40 @@ export default function Sessions() {
   };
 
   const handleDeleteTask = async (taskId: number) => {
-    // Archive instead of delete
     try {
-      await archiveTask(taskId);
+      await deleteTask(taskId);
       if (selectedSession) {
-        const updatedTasks = selectedSession.tasks?.map((task) =>
-          task.id === taskId ? { ...task, archived: true } : task
+        const updatedTasks = (selectedSession.tasks || []).filter(
+          (task) => task.id !== taskId
         );
         setSelectedSession({ ...selectedSession, tasks: updatedTasks });
       }
-      toast.success("Task archived");
+      toast.success("Task deleted");
     } catch (error) {
-      console.error("Failed to archive task:", error);
-      toast.error("Failed to archive task");
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+    }
+  };
+
+  const handleToggleComplete = async (task: Task) => {
+    try {
+      if (!selectedSession) return;
+      if (task.completed) {
+        // If archived, unarchive first so task becomes visible/editable
+        if (task.archived) {
+          await unarchiveTask(task.id);
+        }
+        await uncompleteTask(task.id);
+        toast.success("Task marked as active");
+      } else {
+        await completeTask(task.id);
+        toast.success("Task marked as completed");
+      }
+      const refreshed = await getSession(selectedSession.id);
+      setSelectedSession(refreshed);
+    } catch (e) {
+      console.error("Failed to toggle task completion", e);
+      toast.error("Could not update task state");
     }
   };
 
@@ -595,14 +621,11 @@ export default function Sessions() {
               <div className="space-y-3">
                 {(() => {
                   const base = showArchived ? archivedSessions : sessions;
-                  // When not viewing archived sessions:
-                  // - If the "completed" toggle is OFF -> hide completed sessions
-                  // - If the "completed" toggle is ON  -> show all (including completed)
                   const filteredCompleted = showArchived
                     ? base
                     : showCompleted
-                    ? base // show all including completed
-                    : base.filter((s) => !s.completed); // hide completed by default
+                    ? base
+                    : base.filter((s) => !s.completed);
                   const searchLower = sessionSearch.toLowerCase();
                   const searched = searchLower
                     ? filteredCompleted.filter(
@@ -688,17 +711,24 @@ export default function Sessions() {
                         open={isEditingSession}
                         onOpenChange={setIsEditingSession}
                       >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={() => handleEditSession(selectedSession)}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </Button>
-                        </DialogTrigger>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full"
+                                onClick={() =>
+                                  handleEditSession(selectedSession)
+                                }
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit Session</TooltipContent>
+                        </Tooltip>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
                             <DialogTitle>Edit Session</DialogTitle>
@@ -822,59 +852,83 @@ export default function Sessions() {
                         </DialogContent>
                       </Dialog>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => handleDuplicateSession(selectedSession)}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Duplicate
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() =>
+                              handleDuplicateSession(selectedSession)
+                            }
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Duplicate Session</TooltipContent>
+                      </Tooltip>
 
                       {!selectedSession.archived ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full"
-                          onClick={async () => {
-                            await archiveSession(selectedSession.id);
-                            const refreshed = await getSession(
-                              selectedSession.id
-                            );
-                            setSelectedSession(refreshed);
-                          }}
-                        >
-                          <Archive className="h-4 w-4 mr-2" />
-                          Archive
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-full"
+                              onClick={async () => {
+                                await archiveSession(selectedSession.id);
+                                const refreshed = await getSession(
+                                  selectedSession.id
+                                );
+                                setSelectedSession(refreshed);
+                              }}
+                            >
+                              <Archive className="h-4 w-4 mr-2" />
+                              Archive
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Archive Session</TooltipContent>
+                        </Tooltip>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full"
-                          onClick={async () => {
-                            await unarchiveSession(selectedSession.id);
-                            const refreshed = await getSession(
-                              selectedSession.id
-                            );
-                            setSelectedSession(refreshed);
-                          }}
-                        >
-                          <ArchiveRestore className="h-4 w-4 mr-2" />
-                          Unarchive
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-full"
+                              onClick={async () => {
+                                await unarchiveSession(selectedSession.id);
+                                const refreshed = await getSession(
+                                  selectedSession.id
+                                );
+                                setSelectedSession(refreshed);
+                              }}
+                            >
+                              <ArchiveRestore className="h-4 w-4 mr-2" />
+                              Unarchive
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Unarchive Session</TooltipContent>
+                        </Tooltip>
                       )}
 
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => handleDeleteSession(selectedSession.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() =>
+                              handleDeleteSession(selectedSession.id)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Session</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
 
@@ -1140,6 +1194,8 @@ export default function Sessions() {
                                             <h4 className="font-medium">
                                               {task.name}
                                             </h4>
+                                          </div>
+                                          <div className="flex items-start gap-2 flex-wrap mb-1">
                                             <Badge variant="secondary">
                                               {task.category}
                                             </Badge>
@@ -1164,7 +1220,43 @@ export default function Sessions() {
                                             )}
                                           </div>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  handleToggleComplete(task)
+                                                }
+                                                aria-label={
+                                                  task.completed
+                                                    ? "Uncomplete task"
+                                                    : "Complete task"
+                                                }
+                                                title={
+                                                  task.completed
+                                                    ? "Uncomplete"
+                                                    : "Complete"
+                                                }
+                                                disabled={
+                                                  task.archived &&
+                                                  !task.completed
+                                                }
+                                              >
+                                                {task.completed ? (
+                                                  <Undo2 className="h-4 w-4" />
+                                                ) : (
+                                                  <Check className="h-4 w-4" />
+                                                )}
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              {task.completed
+                                                ? "Mark as Incomplete"
+                                                : "Mark as Complete"}
+                                            </TooltipContent>
+                                          </Tooltip>
                                           <Dialog
                                             open={
                                               isEditingTask &&
@@ -1172,17 +1264,22 @@ export default function Sessions() {
                                             }
                                             onOpenChange={setIsEditingTask}
                                           >
-                                            <DialogTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                  handleEditTask(task)
-                                                }
-                                              >
-                                                <Edit className="h-4 w-4" />
-                                              </Button>
-                                            </DialogTrigger>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <DialogTrigger asChild>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      handleEditTask(task)
+                                                    }
+                                                  >
+                                                    <Edit className="h-4 w-4" />
+                                                  </Button>
+                                                </DialogTrigger>
+                                              </TooltipTrigger>
+                                              <TooltipContent>Edit Task</TooltipContent>
+                                            </Tooltip>
                                             <DialogContent className="sm:max-w-[425px]">
                                               <DialogHeader>
                                                 <DialogTitle>
@@ -1269,49 +1366,64 @@ export default function Sessions() {
                                             </DialogContent>
                                           </Dialog>
 
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                              handleDeleteTask(task.id)
-                                            }
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  handleDeleteTask(task.id)
+                                                }
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Delete Task</TooltipContent>
+                                          </Tooltip>
                                           {!task.archived ? (
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={async () => {
-                                                await archiveTask(task.id);
-                                                if (selectedSession) {
-                                                  const refreshed =
-                                                    await getSession(
-                                                      selectedSession.id
-                                                    );
-                                                  setSelectedSession(refreshed);
-                                                }
-                                              }}
-                                            >
-                                              <Archive className="h-4 w-4" />
-                                            </Button>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={async () => {
+                                                    await archiveTask(task.id);
+                                                    if (selectedSession) {
+                                                      const refreshed =
+                                                        await getSession(
+                                                          selectedSession.id
+                                                        );
+                                                      setSelectedSession(refreshed);
+                                                    }
+                                                  }}
+                                                >
+                                                  <Archive className="h-4 w-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>Archive Task</TooltipContent>
+                                            </Tooltip>
                                           ) : (
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={async () => {
-                                                await unarchiveTask(task.id);
-                                                if (selectedSession) {
-                                                  const refreshed =
-                                                    await getSession(
-                                                      selectedSession.id
-                                                    );
-                                                  setSelectedSession(refreshed);
-                                                }
-                                              }}
-                                            >
-                                              <ArchiveRestore className="h-4 w-4" />
-                                            </Button>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={async () => {
+                                                    await unarchiveTask(task.id);
+                                                    if (selectedSession) {
+                                                      const refreshed =
+                                                        await getSession(
+                                                          selectedSession.id
+                                                        );
+                                                      setSelectedSession(refreshed);
+                                                    }
+                                                  }}
+                                                >
+                                                  <ArchiveRestore className="h-4 w-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>Unarchive Task</TooltipContent>
+                                            </Tooltip>
                                           )}
                                         </div>
                                       </div>
