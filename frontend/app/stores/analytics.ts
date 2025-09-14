@@ -69,7 +69,6 @@ interface AnalyticsState {
   // New comprehensive event tracking methods - now synchronous for performance  
   logUserAction: (action: string, context?: Record<string, any>) => void;
   logSessionGeneration: (projectDetails: string, success: boolean, taskCount?: number) => void;
-  logSettingsChange: (settingType: string, oldValue: any, newValue: any) => void;
   logScheduleGeneration: (taskCount: number, totalTime: number, success: boolean) => void;
   logTaskEdit: (taskId: number, changeType: string, details?: Record<string, any>) => void;
   logNavigationEvent: (fromPage: string, toPage: string) => void;
@@ -269,15 +268,6 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
         success,
         task_count: taskCount,
         generation_time: new Date().toISOString()
-      });
-    },
-
-    logSettingsChange: (settingType: string, oldValue: any, newValue: any) => {
-      get().logEvent('settings_change', {
-        setting_type: settingType,
-        old_value: oldValue,
-        new_value: newValue,
-        change_time: new Date().toISOString()
       });
     },
 

@@ -438,19 +438,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
     long_break_duration: number;
     long_break_per_pomodoros: number;
   }) => {
-    const oldSettings = get().settings;
     set({ settings: newSettings });
-    
-    // Log settings changes
-    Object.keys(newSettings).forEach(key => {
-      if (oldSettings[key as keyof typeof oldSettings] !== newSettings[key as keyof typeof newSettings]) {
-        useAnalyticsStore.getState().logSettingsChange(
-          key,
-          oldSettings[key as keyof typeof oldSettings],
-          newSettings[key as keyof typeof newSettings]
-        );
-      }
-    });
     
     // Only update timer with new focus duration if currently in focus phase AND timer is not running
     // This prevents resetting the timer during task transitions when the timer is actively running
