@@ -57,6 +57,8 @@ import {
 } from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
 import useElementSize from "~/hooks/use-element-size";
+import { useIsMobile } from "~/hooks/use-mobile";
+import { useIsXL } from "~/hooks/use-xl";
 import {
   SessionEditorDialog,
   type GeneratedSessionInfo,
@@ -99,6 +101,8 @@ export default function Home() {
   const authStore = useAuthStore();
   const analyticsStore = useAnalyticsStore();
   const schedulerStore = useSchedulerStore();
+  const isMobile = useIsMobile();
+  const isXL = useIsXL();
 
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
@@ -480,8 +484,11 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card className="flex-2 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl" style={{ maxHeight: pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : "auto" }}>
-          <CardContent className="max-h-full overflow-hidden ">
+        <Card
+          className="flex-2 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl"
+          style={{ maxHeight: isXL && pomodoroWidgetSize.height ? `${pomodoroWidgetSize.height}px` : undefined }}
+        >
+          <CardContent className={`max-h-full ${isXL ? "overflow-hidden" : ""}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-foreground">Schedule</h2>
               <div className="flex gap-3">
@@ -495,7 +502,7 @@ export default function Home() {
                 }} />
               </div>
             </div>
-            <ScrollArea className="h-full w-full p-3 pb-16">
+            <ScrollArea className={`${isXL ? "h-full w-full pb-16" : "w-full"} p-3`}>
               <ScheduledTasksList sessionSettings={pomodoroStore.settings} onOpenSettings={openSessionSettings} />
             </ScrollArea>
           </CardContent>
