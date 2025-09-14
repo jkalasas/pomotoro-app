@@ -9,10 +9,15 @@ from app.models import PomodoroSession
 from app.analytics.models import AnalyticsEvent, SessionAnalytics, DailyStats, WeeklyStats
 
 DATABASE_URL = settings.database_url
-engine = create_engine(
-    DATABASE_URL, echo=True, connect_args={"check_same_thread": False}
-)
 
+connect_args = {}
+
+if DATABASE_URL.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
+
+engine = create_engine(
+    DATABASE_URL, echo=True, connect_args=connect_args
+)
 
 def get_session():
     with Session(engine) as session:
