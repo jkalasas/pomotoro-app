@@ -824,8 +824,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         index > completedTaskIndex && !task.completed
       );
       
-      // Get the current pomodoro state BEFORE any updates
-      const pomodoroStore = usePomodoroStore.getState();
+  // Get the current pomodoro state BEFORE any updates
+  const pomodoroStore = usePomodoroStore.getState();
       
       // Reset the task timer after completing the previous task
       pomodoroStore.resetTaskTimer();
@@ -843,51 +843,29 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const currentSessionId = completedTask?.session_id;
       const nextSessionId = nextTask.session_id;
       
-      // If timer is running, preserve the current time regardless of session changes
+      // Build a single minimal backend update to avoid duplicate 'timer_start' logs
       if (isRunning && currentPhase === "focus") {
-        // We may need to adjust based on the next task's session focus duration
         let newTimeRemaining = currentTimeRemaining;
-        let nextSessionFocusSeconds: number | null = null;
-
         if (currentSessionId !== nextSessionId) {
-          // Update settings for the next session (this won't mutate running timer)
-            await pomodoroStore.updateSettingsFromTask(nextSessionId);
-            const updatedSettings = usePomodoroStore.getState().settings;
-            nextSessionFocusSeconds = updatedSettings.focus_duration * 60;
-            // Only reset (clamp) if remaining time is GREATER than the new focus duration
-            if (newTimeRemaining > nextSessionFocusSeconds) {
-              newTimeRemaining = nextSessionFocusSeconds;
-            }
-        } else {
-          // Same session; derive focus duration from existing settings for maxTime adjustment
-          const settings = usePomodoroStore.getState().settings;
-          nextSessionFocusSeconds = settings.focus_duration * 60;
+          await pomodoroStore.updateSettingsFromTask(nextSessionId);
+          const updatedSettings = usePomodoroStore.getState().settings;
+          const nextSessionFocusSeconds = updatedSettings.focus_duration * 60;
+          if (newTimeRemaining > nextSessionFocusSeconds) {
+            newTimeRemaining = nextSessionFocusSeconds;
+          }
         }
 
-        // Always push current (possibly clamped) time to backend to avoid rewind caused by stale backend time
         await pomodoroStore.updateTimer({
           current_task_id: nextTask.id,
-          is_running: true,
           time_remaining: newTimeRemaining,
         });
-        
-        // Start timer for the new task
-        pomodoroStore.startTaskTimer(nextTask.id);
-        
-        // Sync configuration after updating the timer
-        await pomodoroStore.syncConfigWithCurrentTask();
-      } else {
-        // Timer is not in focus phase (likely on a break) or not running.
-        // Preserve the current running state instead of forcing a pause.
 
-        // Update the current task while keeping whatever the current running state is
+        // Start local task timer without additional backend calls
+        pomodoroStore.startTaskTimer(nextTask.id);
+      } else {
         await pomodoroStore.updateTimer({
           current_task_id: nextTask.id,
-          is_running: isRunning,
         });
-
-        // Then sync configuration which will handle session differences
-        await pomodoroStore.syncConfigWithCurrentTask();
       }
     } catch (error) {
       // Failed to handle next task transition

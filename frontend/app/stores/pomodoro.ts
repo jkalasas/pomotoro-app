@@ -83,6 +83,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   let _bgInterval: NodeJS.Timeout | null = null;
   // Suppress background sync for a brief window after intentional updates to avoid races
   let _suppressSyncUntilMs = 0;
+  // Prevent re-entrant rapid timer starts that can double-log analytics
+  let _lastStartMs = 0;
   
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
@@ -283,6 +285,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   startTimer: async () => {
     set({ isLoading: true });
     try {
+      // Simple guard: ignore rapid double-invocations within 750ms
+      const now = Date.now();
+      if (now - _lastStartMs < 750 && get().isRunning) {
+        set({ isLoading: false });
+        return;
+      }
       // Initialize timer if not set
       const { time, maxTime, settings, sessionId } = get();
       if (time === 0 && maxTime === 0) {
@@ -315,6 +323,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       // Then update local state
       set({ isRunning: true });
+  _lastStartMs = now;
       
       // Start task timer tracking for focus phases
       const { phase, currentTaskId } = get();

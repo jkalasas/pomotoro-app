@@ -272,12 +272,9 @@ export const useSchedulerStore = create<SchedulerState>()(
       await useTaskStore.getState().completeTask(taskId);
 
       // Sync pomodoro config with the new current task after completion
-      try {
-        const { usePomodoroStore } = await import('./pomodoro');
-        await usePomodoroStore.getState().syncConfigWithCurrentTask();
-      } catch (syncError) {
-        // Don't block task completion if sync fails
-      }
+      // Note: tasks store handles next-task transition and timer syncing.
+      // Avoid calling syncConfigWithCurrentTask here to prevent duplicate
+      // backend updates and repeated analytics logs.
 
       toast.success('Task completed');
     } catch (error) {
