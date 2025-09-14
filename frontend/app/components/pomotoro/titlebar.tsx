@@ -14,7 +14,7 @@ export default function Titlebar() {
     <div
       data-tauri-drag-region
       className={cn(
-        "justify-between backdrop-blur items-center pl-3 h-10 fixed w-full top-0 left-0 z-99 bg-primary",
+        "justify-between backdrop-blur items-center pl-3 h-10 fixed w-full top-0 left-0 z-50 bg-primary",
         isFullscreen ? "hidden" : "flex"
       )}
     >

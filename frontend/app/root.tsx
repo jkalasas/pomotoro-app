@@ -22,6 +22,7 @@ import {
   SidebarTrigger,
 } from "./components/ui/sidebar";
 import AppSidebar from "./components/pomotoro/navs/AppSidebar";
+import { ScrollArea } from "./components/ui/scroll-area";
 import { Button } from "./components/ui/button";
 import { VolumeOff } from "lucide-react";
 import { AuthForm } from "./components/auth/AuthForm";
@@ -109,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Meta />
           <Links />
         </head>
-        <body onContextMenu={(e) => e.preventDefault()}>
+        <body className="overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
           {children}
           <Toaster />
           <ScrollRestoration />
@@ -129,7 +130,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Meta />
           <Links />
         </head>
-        <body onContextMenu={(e) => e.preventDefault()}>
+        <body className="overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
           <Titlebar />
           <AuthForm />
           <Toaster />
@@ -148,12 +149,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body onContextMenu={(e) => e.preventDefault()}>
+      <body className="overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
         <Titlebar />
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <main className="mt-8">{children}</main>
+            <ScrollArea className="mt-10 h-[calc(100svh-2.5rem)]">
+              <div className="px-4 md:px-6 pb-4">
+                {children}
+              </div>
+            </ScrollArea>
           </SidebarInset>
         </SidebarProvider>
         
