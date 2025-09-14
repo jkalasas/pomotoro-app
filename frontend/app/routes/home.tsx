@@ -707,8 +707,12 @@ export default function Home() {
                   Clear
                 </Button>
                 <ScheduleGeneratorDialog
-                  onScheduleGenerated={() => {
-                    // Optional: refresh sessions/schedule after generation
+                  onScheduleGenerated={async () => {
+                    try {
+                      await pomodoroStore.resetTimer();
+                    } catch (error) {
+                      console.error("Failed to reset timer after schedule generation", error);
+                    }
                     tasksStore.loadSessions();
                   }}
                 />
