@@ -515,14 +515,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
             current_task_id: currentTask.id,
             phase: mustReset ? 'focus' : undefined,
             time_remaining: newRemaining,
-            is_running: wasRunning,
           });
         } else {
           // During breaks, keep timer running state and just switch the task for UI/association
           set({ currentTaskId: currentTask.id });
           await get().updateTimer({
             current_task_id: currentTask.id,
-            is_running: wasRunning,
           });
         }
       }

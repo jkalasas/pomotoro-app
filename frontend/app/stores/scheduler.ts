@@ -82,8 +82,8 @@ export const useSchedulerStore = create<SchedulerState>()(
           // Don't automatically switch the backend session - just update the current task
           // and let the pomodoro store handle the configuration based on the current task
           if (!isRunning) {
-            // When timer is not running, we can safely update the current task
-            await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: false });
+            // When timer is not running, only update the current task id; avoid any is_running flags
+            await pomodoroStore.updateTimer({ current_task_id: firstTask.id });
           } else {
             // Timer running: update task and sync settings, apply reset rules and keep running
             await pomodoroStore.updateSettingsFromTask(firstTask.session_id);
@@ -98,12 +98,11 @@ export const useSchedulerStore = create<SchedulerState>()(
                 current_task_id: firstTask.id,
                 phase: 'focus',
                 time_remaining: newRemaining,
-                is_running: true,
               });
             } else {
               // During breaks, keep remaining time; still set the current task id for UI consistency
               usePomodoroStore.setState({ currentTaskId: firstTask.id });
-              await pomodoroStore.updateTimer({ current_task_id: firstTask.id, is_running: true });
+              await pomodoroStore.updateTimer({ current_task_id: firstTask.id });
             }
           }
           
@@ -215,7 +214,6 @@ export const useSchedulerStore = create<SchedulerState>()(
                 current_task_id: newFirstTask.id,
                 phase: 'focus',
                 time_remaining: newFocusSeconds,
-                is_running: wasRunning || wasTimerRunning,
               });
             } else {
               // If remaining time exceeds new max but we didn't detect switch (edge), clamp
@@ -224,7 +222,6 @@ export const useSchedulerStore = create<SchedulerState>()(
               await pomodoroStore.updateTimer({
                 current_task_id: newFirstTask.id,
                 time_remaining: clamped,
-                is_running: wasRunning || wasTimerRunning,
               });
             }
           } else {
@@ -232,12 +229,11 @@ export const useSchedulerStore = create<SchedulerState>()(
             usePomodoroStore.setState({ currentTaskId: newFirstTask.id });
             await pomodoroStore.updateTimer({
               current_task_id: newFirstTask.id,
-              is_running: wasRunning || wasTimerRunning,
             });
           }
         } catch (e) {
           // Best-effort: at least point timer to the new current task
-          await pomodoroStore.updateTimer({ current_task_id: newFirstTask.id, is_running: wasRunning || wasTimerRunning });
+          await pomodoroStore.updateTimer({ current_task_id: newFirstTask.id });
         }
       }
     } catch (error) {
