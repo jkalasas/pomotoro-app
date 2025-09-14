@@ -241,10 +241,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       // Get task details for analytics logging (from currentSession if available)
       const task = currentSession?.tasks.find(t => t.id === taskId);
 
-      if (task && currentSession && currentSession.id === targetSessionId) {
-        // Log task completion analytics
-        useAnalyticsStore.getState().logTaskComplete(taskId, task.name, currentSession.id);
-      }
+      // Task completion analytics logged by backend; skip client log to avoid duplicates
       
       // Independently verify completion on the ACTUAL session for this task (include archived tasks)
       try {

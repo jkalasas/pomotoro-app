@@ -322,11 +322,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         get().startTaskTimer(currentTaskId || undefined);
       }
       
-      // Log analytics event
-      const currentSessionId = get().sessionId;
-      if (currentSessionId) {
-        useAnalyticsStore.getState().logTimerStart(currentSessionId, get().phase);
-      }
+      // Analytics for timer start handled by backend via updateActiveSession
     } catch (error) {
       // Failed to start timer
       console.error("Failed to start timer:", error);
@@ -360,10 +356,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Then update local state
       set({ isRunning: false });
       
-      // Log analytics event
-      if (sessionId) {
-        useAnalyticsStore.getState().logTimerPause(sessionId, get().phase);
-      }
+      // Analytics for timer pause handled by backend
     } catch (error) {
       // Failed to pause timer
       console.error("Failed to pause timer:", error);
@@ -403,10 +396,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       // Reset time tracking
       get().resetTimeTracking();
       
-      // Log analytics event
-      if (sessionId) {
-        useAnalyticsStore.getState().logTimerReset(sessionId, phase, time);
-      }
+      // Optional: keep timer_reset as frontend-only if desired
     } catch (error) {
       // Failed to reset timer
       console.error("Failed to reset timer:", error);
@@ -564,13 +554,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       
       await get().loadActiveSession();
       
-      // Log analytics event
-      if (previousSessionId && previousSessionId !== sessionId) {
-        useAnalyticsStore.getState().logSessionSwitch(previousSessionId, sessionId);
-      } else {
-        // Get session name for logging (you might need to pass this as parameter)
-        useAnalyticsStore.getState().logSessionStart(sessionId, `Session ${sessionId}`);
-      }
+      // Session start/switch analytics handled by backend
     } catch (error) {
       // Failed to set session
       throw error; // Re-throw to allow UI to handle the error
@@ -744,12 +728,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           nextDuration = session.short_break_duration * 60;
         }
         
-        // Log pomodoro completion
-        try {
-          useAnalyticsStore.getState().logPomodoroComplete(sessionId, newPomodorosCompleted);
-        } catch (analyticsError) {
-          // Analytics error - continue with timer operation
-        }
+        // Pomodoro completion is logged by backend when pomodoros_completed increases
       } else {
         // Break phase completed - move back to focus
         nextPhase = "focus";
@@ -799,21 +778,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         localStorage.setItem('totalPomodorosCompleted', newTotalPomodorosCompleted.toString());
       }
       
-      // Log phase change analytics
-      try {
-        useAnalyticsStore.getState().logEvent('phase_change', {
-          session_id: sessionId,
-          from_phase: phase,
-          to_phase: nextPhase,
-          change_time: new Date().toISOString()
-        });
-        
-        if (nextPhase.includes('break')) {
-          useAnalyticsStore.getState().logBreakStart(sessionId, nextPhase);
-        }
-      } catch (analyticsError) {
-        // Analytics error - continue with timer operation
-      }
+      // Phase change and break start are logged by backend in update_active_session
       
     } catch (error) {
       // Failed to handle phase completion - fallback: just stop the timer
@@ -831,23 +796,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       await apiClient.updateActiveSession(updates);
       await get().loadActiveSession();
       
-      // Log analytics events for state changes
-      const newState = get();
-      const { sessionId } = newState;
-      
-      if (sessionId) {
-        // Log phase changes
-        if (updates.phase && updates.phase !== prevState.phase) {
-          if (updates.phase.includes('break')) {
-            useAnalyticsStore.getState().logBreakStart(sessionId, updates.phase);
-          }
-        }
-        
-        // Log pomodoro completion
-        if (updates.pomodoros_completed && updates.pomodoros_completed > prevState.pomodorosCompleted) {
-          useAnalyticsStore.getState().logPomodoroComplete(sessionId, updates.pomodoros_completed);
-        }
-      }
+      // Analytics for updates handled server-side
     } catch (error) {
       // Failed to update timer - keep UI in sync
     } finally {

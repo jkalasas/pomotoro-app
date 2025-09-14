@@ -193,72 +193,33 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => {
     },
 
     // Convenience methods for common events - now synchronous and non-blocking
-    logSessionStart: (sessionId: number, sessionName: string) => {
-      get().logEvent('session_start', {
-        session_id: sessionId,
-        session_name: sessionName,
-        start_time: new Date().toISOString()
-      });
-      
-      // Non-blocking session tracking
-      analyticsAPI.startSessionTracking(sessionId).catch(() => {
-        // Silently fail
-      });
+    // Backed by server logs; frontend no-op to avoid duplicates
+    logSessionStart: (_sessionId: number, _sessionName: string) => {
+      // intentionally left blank — backend logs session_start
     },
 
-    logSessionSwitch: (fromSessionId: number, toSessionId: number) => {
-      get().logEvent('session_switch', {
-        from_session_id: fromSessionId,
-        to_session_id: toSessionId,
-        switch_time: new Date().toISOString()
-      });
-      
-      // Non-blocking session tracking
-      Promise.allSettled([
-        analyticsAPI.endSessionTracking(fromSessionId),
-        analyticsAPI.startSessionTracking(toSessionId)
-      ]);
+    logSessionSwitch: (_fromSessionId: number, _toSessionId: number) => {
+      // intentionally left blank — backend logs session_switch
     },
 
-    logTaskComplete: (taskId: number, taskName: string, sessionId?: number) => {
-      get().logEvent('task_complete', {
-        task_id: taskId,
-        task_name: taskName,
-        session_id: sessionId,
-        completion_time: new Date().toISOString()
-      });
+    logTaskComplete: (_taskId: number, _taskName: string, _sessionId?: number) => {
+      // backend logs task_complete; keep frontend silent to avoid duplication
     },
 
-    logPomodoroComplete: (sessionId: number, pomodorosCompleted: number) => {
-      get().logEvent('pomodoro_complete', {
-        session_id: sessionId,
-        pomodoros_completed: pomodorosCompleted,
-        completion_time: new Date().toISOString()
-      });
+    logPomodoroComplete: (_sessionId: number, _pomodorosCompleted: number) => {
+      // backend logs pomodoro_complete
     },
 
-    logTimerStart: (sessionId: number, phase: string) => {
-      get().logEvent('timer_start', {
-        session_id: sessionId,
-        phase,
-        start_time: new Date().toISOString()
-      });
+    logTimerStart: (_sessionId: number, _phase: string) => {
+      // backend logs timer_start when is_running toggles
     },
 
-    logTimerPause: (sessionId: number, phase: string) => {
-      get().logEvent('timer_pause', {
-        session_id: sessionId,
-        phase,
-        pause_time: new Date().toISOString()
-      });
+    logTimerPause: (_sessionId: number, _phase: string) => {
+      // backend logs timer_pause
     },
 
-    logBreakStart: (sessionId: number, breakType: string) => {
-      get().logEvent('break_start', {
-        session_id: sessionId,
-        break_type: breakType,
-        start_time: new Date().toISOString()
-      });
+    logBreakStart: (_sessionId: number, _breakType: string) => {
+      // backend logs break_start on phase change
     },
 
     logSessionComplete: (sessionId: number, focusLevel: string, tasksCompleted: number, totalTasks: number) => {
