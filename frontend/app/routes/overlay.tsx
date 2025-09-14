@@ -99,13 +99,12 @@ export default function Overlay() {
     }
   };
 
-  // Extend the current break by N seconds, updating both main window and local timer
-  const handleExtend = async (seconds?: number) => {
+  // Extend the current break by the original break duration (handled in main window)
+  const handleExtend = async () => {
     try {
       // Emit without payload; main window uses configured break duration
       await emit('extend-rest');
-      // Optimistically update local countdown for snappy UX
-      if (typeof seconds === 'number') setTimeRemaining((prev) => prev + seconds);
+      // Do not adjust local timer here; will sync via 'break-extended' event
     } catch (error) {
       console.error('Failed to extend rest:', error);
     }
@@ -193,19 +192,11 @@ export default function Overlay() {
               </button>
 
               <button
-                onClick={() => handleExtend(60)}
+                onClick={handleExtend}
                 className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
-                title="Add 1 minute"
+                title="Extend by original break duration"
               >
-                +1m
-              </button>
-
-              <button
-                onClick={() => handleExtend(300)}
-                className="px-4 py-2 text-sm border border-primary-foreground/30 rounded hover:bg-primary-foreground/10 transition-colors"
-                title="Add 5 minutes"
-              >
-                +5m
+                Extend Break
               </button>
 
               <button
