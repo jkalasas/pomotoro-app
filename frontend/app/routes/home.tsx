@@ -61,6 +61,7 @@ import {
   SessionEditorDialog,
   type GeneratedSessionInfo,
 } from "~/components/pomotoro/session-editor-dialog";
+import { ScrollArea } from "~/components/ui/scroll-area";
 
 interface GeneratedTask {
   name: string;
@@ -494,9 +495,9 @@ export default function Home() {
                 }} />
               </div>
             </div>
-            <div className="max-h-full overflow-y-auto pb-4 custom-scrollbar">
+            <ScrollArea className="h-full w-full p-3 pb-16">
               <ScheduledTasksList sessionSettings={pomodoroStore.settings} onOpenSettings={openSessionSettings} />
-            </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
