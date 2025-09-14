@@ -660,8 +660,22 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
         newMaxTime = currentState.maxTime;
       }
       
+      // Prevent UI countdown from jumping backwards due to stale backend syncs.
+      // If both local and backend indicate the timer is running and the phase
+      // hasn't changed, keep the smaller (more progressed) remaining time.
+      const backendTime = Number.isFinite(activeSession.time_remaining) && activeSession.time_remaining >= 0
+        ? activeSession.time_remaining
+        : newMaxTime;
+      const keepLocalProgress = currentState.isRunning && activeSession.is_running && !phaseChanged;
+      const chosenTime = keepLocalProgress
+        ? Math.min(
+            Number.isFinite(currentState.time) && currentState.time >= 0 ? currentState.time : backendTime,
+            backendTime
+          )
+        : backendTime;
+
       set({
-        time: Number.isFinite(activeSession.time_remaining) && activeSession.time_remaining >= 0 ? activeSession.time_remaining : newMaxTime,
+        time: chosenTime,
         maxTime: Number.isFinite(newMaxTime) && newMaxTime > 0 ? newMaxTime : (get().settings.focus_duration * 60),
         isRunning: activeSession.is_running,
         phase: activeSession.phase,
