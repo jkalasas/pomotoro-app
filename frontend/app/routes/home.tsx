@@ -318,10 +318,10 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 border border-border/50 shadow-sm">
+    <main className="flex flex-col pb-4 sm:pb-6 gap-4 sm:gap-6 p-3 sm:p-6 bg-gradient-to-br from-background via-background to-muted/30 min-h-screen rounded-xl">
+      <div className="w-full flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 backdrop-blur-sm bg-card/60 rounded-2xl p-3 sm:p-4 border border-border/50 shadow-sm">
         <SidebarTrigger />
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
             <Clock className="h-4 w-4" />
             <span className="font-medium">
@@ -337,41 +337,44 @@ export default function Home() {
                 : "No schedule"}
             </span>
           </div>
-          {sessionInfo && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsSessionDialogOpen(true)}
-              className="rounded-full"
-            >
-              Session Details
-            </Button>
-          )}
-
-          <Dialog
-            open={isNewSessionDialogOpen}
-            onOpenChange={(open) => setIsNewSessionDialogOpen(open)}
-          >
-            <DialogTrigger disabled={isGenerating}>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {sessionInfo && (
               <Button
-                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-6"
-                disabled={isGenerating}
+                type="button"
+                variant="outline"
+                onClick={() => setIsSessionDialogOpen(true)}
+                className="rounded-full text-xs sm:text-sm px-3 sm:px-4"
               >
-                <Plus className="h-5 w-5" />
-                <span>{isGenerating ? "Generating..." : "New Session"}</span>
+                <span className="hidden sm:inline">Session Details</span>
+                <span className="sm:hidden">Details</span>
               </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl">
-              <SessionInfoForm
-                className="w-full"
-                onSubmit={({ data }) => {
-                  startGenerating(data.projectDetails);
-                  setIsNewSessionDialogOpen(false);
-                }}
-                disabled={isGenerating}
-              />
-            </DialogContent>
-          </Dialog>
+            )}
+
+            <Dialog
+              open={isNewSessionDialogOpen}
+              onOpenChange={(open) => setIsNewSessionDialogOpen(open)}
+            >
+              <DialogTrigger disabled={isGenerating}>
+                <Button
+                  className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-3 sm:px-6 text-xs sm:text-sm"
+                  disabled={isGenerating}
+                >
+                  <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span>{isGenerating ? "Generating..." : "New Session"}</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl mx-4 sm:mx-0">
+                <SessionInfoForm
+                  className="w-full"
+                  onSubmit={({ data }) => {
+                    startGenerating(data.projectDetails);
+                    setIsNewSessionDialogOpen(false);
+                  }}
+                  disabled={isGenerating}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -388,17 +391,17 @@ export default function Home() {
         open={isSessionSettingsOpen}
         onOpenChange={(open) => setIsSessionSettingsOpen(open)}
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Session Settings</DialogTitle>
-            <CardDescription>
+        <DialogContent className="max-w-md w-[95vw] sm:w-full mx-4 sm:mx-0 p-4 sm:p-6">
+          <DialogHeader className="space-y-2 sm:space-y-3">
+            <DialogTitle className="text-lg sm:text-xl">Session Settings</DialogTitle>
+            <CardDescription className="text-sm sm:text-base">
               Customize the timing for your Pomodoro session
             </CardDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="focus-duration">Focus Duration (minutes)</Label>
+              <Label htmlFor="focus-duration" className="text-sm sm:text-base">Focus Duration (minutes)</Label>
               <Input
                 id="focus-duration"
                 type="number"
@@ -416,11 +419,12 @@ export default function Home() {
                     focus_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="text-sm sm:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="short-break">
+              <Label htmlFor="short-break" className="text-sm sm:text-base">
                 Short Break Duration (minutes)
               </Label>
               <Input
@@ -440,11 +444,12 @@ export default function Home() {
                     short_break_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="text-sm sm:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break">Long Break Duration (minutes)</Label>
+              <Label htmlFor="long-break" className="text-sm sm:text-base">Long Break Duration (minutes)</Label>
               <Input
                 id="long-break"
                 type="number"
@@ -462,11 +467,12 @@ export default function Home() {
                     long_break_duration: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="text-sm sm:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="long-break-frequency">
+              <Label htmlFor="long-break-frequency" className="text-sm sm:text-base">
                 Long Break After (pomodoros)
               </Label>
               <Input
@@ -486,6 +492,7 @@ export default function Home() {
                     long_break_per_pomodoros: Number.isNaN(v) ? 0 : v,
                   });
                 }}
+                className="text-sm sm:text-base"
               />
             </div>
           </div>
@@ -494,23 +501,23 @@ export default function Home() {
             <Button
               variant="outline"
               onClick={cancelSessionSettings}
-              className="flex-1"
+              className="flex-1 text-sm sm:text-base py-2 sm:py-3"
             >
               Cancel
             </Button>
-            <Button onClick={saveSessionSettings} className="flex-1">
+            <Button onClick={saveSessionSettings} className="flex-1 text-sm sm:text-base py-2 sm:py-3">
               Save Settings
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-col xl:flex-row gap-8 w-full items-stretch h-full">
+      <div className="flex flex-col xl:flex-row gap-4 sm:gap-8 w-full items-stretch h-full">
         <Card className="flex-1 max-h-fit" ref={pomodoroWidgetRef}>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col items-center">
               <span className="font-bold text-center mb-1">Current Task</span>
-              <span className="font-normal text-center">
+              <span className="font-normal text-center text-sm sm:text-base">
                 {(() => {
                   const t = schedulerStore.getCurrentTask();
                   return t
@@ -525,7 +532,7 @@ export default function Home() {
                 endTime={pomodoroStore.maxTime}
               />
             </div>
-            <div className="-mt-4 mb-12 flex flex-col items-center">
+            <div className="-mt-4 mb-8 sm:mb-12 flex flex-col items-center">
               {schedulerStore.getCurrentTask() ? (
                 <>
                   <p className="text-center">
@@ -548,8 +555,7 @@ export default function Home() {
             </div>
 
             {pomodoroStore.showRestOverlay && (
-              <p className="text-center text-sm text-orange-600 font-medium">
-                <LogoIcon className="h-5 w-5 mr-2" />
+              <p className="text-center text-sm text-orange-600 font-medium flex items-center justify-center">
                 Rest Overlay Active
               </p>
             )}
@@ -557,9 +563,9 @@ export default function Home() {
             <div className="mt-3 flex flex-col gap-3">
               {schedulerStore.getCurrentTask() && (
                 <>
-                  <div className="flex gap-3">
+                  <div className="flex gap-2 sm:gap-3">
                     <Button
-                      className="flex flex-1 items-center gap-3"
+                      className="flex flex-1 items-center gap-2 sm:gap-3 text-sm sm:text-base"
                       variant="default"
                       onClick={async () => {
                         try {
@@ -580,18 +586,20 @@ export default function Home() {
                     >
                       {pomodoroStore.isRunning ? (
                         <>
-                          <Pause />
-                          <span>Pause Task</span>
+                          <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="hidden sm:inline">Pause Task</span>
+                          <span className="sm:hidden">Pause</span>
                         </>
                       ) : (
                         <>
-                          <Play />
-                          <span>Start Task</span>
+                          <Play className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="hidden sm:inline">Start Task</span>
+                          <span className="sm:hidden">Start</span>
                         </>
                       )}
                     </Button>
                     <Button
-                      className="flex items-center gap-3"
+                      className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4"
                       variant="outline"
                       onClick={async () => {
                         try {
@@ -602,14 +610,14 @@ export default function Home() {
                       }}
                       disabled={pomodoroStore.isLoading}
                     >
-                      <RotateCcw />
+                      <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </div>
                 </>
               )}
               {schedulerStore.getCurrentTask() && (
                 <Button
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
                   variant="outline"
                   onClick={() => {
                     if (
@@ -629,17 +637,18 @@ export default function Home() {
                     pomodoroStore.phase === 'long_break'
                   }
                 >
-                  <Check />
-                  <span>Mark Task Complete</span>
+                  <Check className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Mark Task Complete</span>
+                  <span className="sm:hidden">Complete</span>
                 </Button>
               )}
 
               {schedulerStore.getCurrentTask() &&
                 (pomodoroStore.phase === "short_break" ||
                   pomodoroStore.phase === "long_break") && (
-                  <div className="flex gap-3">
+                  <div className="flex gap-2 sm:gap-3">
                     <Button
-                      className="flex-1 flex items-center gap-3"
+                      className="flex-1 flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
                       variant="outline"
                       onClick={async () => {
                         try {
@@ -651,12 +660,13 @@ export default function Home() {
                       }}
                       disabled={pomodoroStore.isLoading}
                     >
-                      <Plus />
-                      <span>Extend Break</span>
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">Extend Break</span>
+                      <span className="sm:hidden">Extend</span>
                     </Button>
 
                     <Button
-                      className="flex-1 flex items-center gap-3"
+                      className="flex-1 flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
                       variant="outline"
                       onClick={async () => {
                         try {
@@ -667,8 +677,9 @@ export default function Home() {
                       }}
                       disabled={pomodoroStore.isLoading}
                     >
-                      <SkipForward />
-                      <span>Skip Break</span>
+                      <SkipForward className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">Skip Break</span>
+                      <span className="sm:hidden">Skip</span>
                     </Button>
                   </div>
                 )}
@@ -686,13 +697,13 @@ export default function Home() {
           }}
         >
           <CardContent
-            className={`max-h-full ${isXL ? "overflow-hidden" : ""}`}
+            className={`max-h-full p-4 sm:p-6 ${isXL ? "overflow-hidden" : ""}`}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-foreground">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">
                 Schedule
               </h2>
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
@@ -701,9 +712,9 @@ export default function Home() {
                     !schedulerStore.currentSchedule ||
                     schedulerStore.currentSchedule.length === 0
                   }
-                  className="rounded-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all duration-300"
+                  className="rounded-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all duration-300 text-xs sm:text-sm flex-1 sm:flex-none"
                 >
-                  <Trash2 className="size-4 mr-2" />
+                  <Trash2 className="size-3 sm:size-4 mr-1 sm:mr-2" />
                   Clear
                 </Button>
                 <ScheduleGeneratorDialog
@@ -718,7 +729,7 @@ export default function Home() {
                 />
               </div>
             </div>
-            <ScrollArea className={cn(["p-3 w-full", isXL && "h-full pb-16"])}>
+            <ScrollArea className={cn(["p-2 sm:p-3 w-full", isXL && "h-full pb-16"])}>
               <ScheduledTasksList
                 sessionSettings={pomodoroStore.settings}
                 onOpenSettings={openSessionSettings}
@@ -728,18 +739,18 @@ export default function Home() {
         </Card>
       </div>
 
-      <div className="flex gap-6 w-full mt-4">
+      <div className="flex gap-4 sm:gap-6 w-full mt-3 sm:mt-4">
         <Card className="flex-1 backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-          <CardContent className="">
-            <h3 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-foreground flex items-center gap-2">
               Quick Checklist
             </h3>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:gap-3">
               {visibleSchedule.length > 0 ? (
                 visibleSchedule.slice(0, 5).map((task: any, index: number) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group cursor-pointer"
+                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-all duration-200 group cursor-pointer"
                     onClick={() => {
                       if (task.completed) {
                         schedulerStore.uncompleteScheduledTask(task.id);
@@ -774,7 +785,7 @@ export default function Home() {
                       className="rounded-md"
                     />
                     <span
-                      className={`flex-1 transition-all duration-200 ${
+                      className={`flex-1 transition-all duration-200 text-sm sm:text-base ${
                         task.completed
                           ? "line-through text-muted-foreground"
                           : "group-hover:text-foreground"
@@ -788,12 +799,12 @@ export default function Home() {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
-                    <PlusCircle className="h-8 w-8" />
+                <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                    <PlusCircle className="h-6 w-6 sm:h-8 sm:w-8" />
                   </div>
-                  <p className="font-medium">No tasks yet</p>
-                  <p className="text-sm">
+                  <p className="font-medium text-sm sm:text-base">No tasks yet</p>
+                  <p className="text-xs sm:text-sm">
                     Generate a schedule to see tasks here
                   </p>
                 </div>

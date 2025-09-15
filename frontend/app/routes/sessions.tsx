@@ -428,13 +428,13 @@ export default function Sessions() {
   }
 
   return (
-    <main className="flex flex-col pb-6 gap-6 p-6 min-h-screen rounded-xl">
-      <div className="w-full flex justify-between items-center backdrop-blur-sm bg-card/60 rounded-2xl p-4 py-4.5 border border-border/50 shadow-sm">
-        <div className="flex items-center gap-4">
+    <main className="flex flex-col pb-4 sm:pb-6 gap-4 sm:gap-6 p-3 sm:p-6 min-h-screen rounded-xl">
+      <div className="w-full flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 backdrop-blur-sm bg-card/60 rounded-2xl p-3 sm:p-4 py-3 sm:py-4.5 border border-border/50 shadow-sm">
+        <div className="flex items-center gap-3 sm:gap-4">
           <SidebarTrigger />
-          <h1 className="text-xl font-bold">Sessions</h1>
+          <h1 className="text-lg sm:text-xl font-bold">Sessions</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
             <Clock className="h-4 w-4" />
             <span className="font-medium">Sessions</span>
@@ -457,18 +457,19 @@ export default function Sessions() {
             }}
           >
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="rounded-full">
-                <Plus className="h-4 w-4 mr-2" />
-                New Session
+              <Button size="sm" variant="outline" className="rounded-full text-xs sm:text-sm px-3 sm:px-4 flex-1 sm:flex-none">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">New Session</span>
+                <span className="sm:hidden">New</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Create New Session</DialogTitle>
+            <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-[425px] mx-4 sm:mx-auto p-4 sm:p-6">
+              <DialogHeader className="space-y-2 sm:space-y-3">
+                <DialogTitle className="text-base sm:text-lg">Create New Session</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 mt-6">
+              <div className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                 <div>
-                  <Label htmlFor="newName">Session Name</Label>
+                  <Label htmlFor="newName" className="text-sm">Session Name</Label>
                   <Input
                     id="newName"
                     value={sessionForm.name}
@@ -476,10 +477,11 @@ export default function Sessions() {
                       setSessionForm({ ...sessionForm, name: e.target.value })
                     }
                     placeholder="Enter session name"
+                    className="text-sm mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="newDescription">Description</Label>
+                  <Label htmlFor="newDescription" className="text-sm">Description</Label>
                   <Textarea
                     id="newDescription"
                     value={sessionForm.description}
@@ -490,11 +492,13 @@ export default function Sessions() {
                       })
                     }
                     placeholder="Enter session description"
+                    className="text-sm mt-1 min-h-[60px] sm:min-h-[80px]"
+                    rows={2}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <div>
-                    <Label htmlFor="newFocus">Focus Duration (min)</Label>
+                    <Label htmlFor="newFocus" className="text-sm">Focus Duration (min)</Label>
                     <Input
                       id="newFocus"
                       type="number"
@@ -506,10 +510,11 @@ export default function Sessions() {
                           focus_duration: Number.isNaN(v) ? 0 : v,
                         });
                       }}
+                      className="text-sm mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="newShort">Short Break (min)</Label>
+                    <Label htmlFor="newShort" className="text-sm">Short Break (min)</Label>
                     <Input
                       id="newShort"
                       type="number"
@@ -521,12 +526,13 @@ export default function Sessions() {
                           short_break_duration: Number.isNaN(v) ? 0 : v,
                         });
                       }}
+                      className="text-sm mt-1"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <div>
-                    <Label htmlFor="newLong">Long Break (min)</Label>
+                    <Label htmlFor="newLong" className="text-sm">Long Break (min)</Label>
                     <Input
                       id="newLong"
                       type="number"
@@ -538,10 +544,11 @@ export default function Sessions() {
                           long_break_duration: Number.isNaN(v) ? 0 : v,
                         });
                       }}
+                      className="text-sm mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="newCycles">Cycles for Long Break</Label>
+                    <Label htmlFor="newCycles" className="text-sm">Cycles for Long Break</Label>
                     <Input
                       id="newCycles"
                       type="number"
@@ -553,16 +560,18 @@ export default function Sessions() {
                           long_break_per_pomodoros: Number.isNaN(v) ? 0 : v,
                         });
                       }}
+                      className="text-sm mt-1"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={handleCreateSession} className="flex-1">
+                <div className="flex flex-col sm:flex-row gap-2 pt-2 sm:pt-3">
+                  <Button onClick={handleCreateSession} className="flex-1 text-sm h-9 sm:h-10">
                     Create Session
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setIsCreatingSession(false)}
+                    className="text-sm h-9 sm:h-10"
                   >
                     Cancel
                   </Button>
@@ -573,28 +582,30 @@ export default function Sessions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Sessions List */}
         <div className="lg:col-span-1">
           <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden">
-            <CardHeader className="pb-3 border-b border-border/50">
+            <CardHeader className="pb-3 border-b border-border/50 p-4 sm:p-6">
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col items-start justify-between">
-                  <CardTitle className="text-xl">Your Sessions</CardTitle>
-                  <div className="flex flex-col items-start gap-2">
-                    <div className="text-sm text-muted-foreground hidden sm:block">
+                  <CardTitle className="text-lg sm:text-xl">Your Sessions</CardTitle>
+                  <div className="flex flex-col items-start gap-2 w-full">
+                    <div className="text-sm text-muted-foreground">
                       {sessions.length}{" "}
                       {sessions.length === 1 ? "session" : "sessions"}
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 w-full">
                       <Button
                         variant={showCompleted ? "default" : "outline"}
                         size="sm"
                         onClick={() => {
                           setShowCompleted((c) => !c);
                         }}
+                        className="text-xs sm:text-sm px-2 sm:px-3 flex-1 sm:flex-none"
                       >
-                        {showCompleted ? "Showing Completed" : "Completed"}
+                        <span className="hidden sm:inline">{showCompleted ? "Hide Completed" : "Completed"}</span>
+                        <span className="sm:hidden">{showCompleted ? "Hide Completed" : "Completed"}</span>
                       </Button>
                       <Button
                         variant={showArchived ? "default" : "outline"}
@@ -603,8 +614,10 @@ export default function Sessions() {
                           setShowArchived((a) => !a);
                           setShowCompleted(false);
                         }}
+                        className="text-xs sm:text-sm px-2 sm:px-3 flex-1 sm:flex-none"
                       >
-                        {showArchived ? "Archived" : "Archive"}
+                        <span className="hidden sm:inline">{showArchived ? "Archived" : "Archive"}</span>
+                        <span className="sm:hidden">{showArchived ? "Archived" : "Archive"}</span>
                       </Button>
                     </div>
                   </div>
@@ -613,11 +626,11 @@ export default function Sessions() {
                   placeholder="Search sessions..."
                   value={sessionSearch}
                   onChange={(e) => setSessionSearch(e.target.value)}
-                  className="h-9"
+                  className="h-8 sm:h-9 text-sm sm:text-base"
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="space-y-3">
                 {(() => {
                   const base = showArchived ? archivedSessions : sessions;
@@ -647,23 +660,23 @@ export default function Sessions() {
                     }`}
                     onClick={() => handleSelectSession(session.id)}
                   >
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{session.name}</CardTitle>
+                    <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-4">
+                      <CardTitle className="text-base sm:text-lg">{session.name}</CardTitle>
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {session.description}
                       </p>
                     </CardHeader>
-                    <CardContent className="pt-0">
+                    <CardContent className="pt-0 p-3 sm:p-4 sm:pt-0">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         <span>{session.focus_duration}m focus</span>
                         {session.completed && (
-                          <Badge variant="secondary" className="ml-auto">
+                          <Badge variant="secondary" className="ml-auto text-xs">
                             Completed
                           </Badge>
                         )}
                         {session.archived && (
-                          <Badge variant="outline" className="ml-auto">
+                          <Badge variant="outline" className="ml-auto text-xs">
                             Archived
                           </Badge>
                         )}
@@ -673,16 +686,17 @@ export default function Sessions() {
                 ))}
 
                 {sessions.length === 0 && (
-                  <div className="text-center text-muted-foreground py-8">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <div>No sessions found</div>
+                  <div className="text-center text-muted-foreground py-6 sm:py-8">
+                    <Target className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
+                    <div className="text-sm sm:text-base">No sessions found</div>
                     <Button
                       variant="outline"
-                      className="mt-4"
+                      className="mt-3 sm:mt-4 text-sm sm:text-base"
                       onClick={() => setIsCreatingSession(true)}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create your first session
+                      <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Create your first session</span>
+                      <span className="sm:hidden">Create session</span>
                     </Button>
                   </div>
                 )}
@@ -694,19 +708,19 @@ export default function Sessions() {
         {/* Session Details */}
         <div className="lg:col-span-2">
           <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl h-full">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               {selectedSession ? (
                 <div>
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
                     <div>
-                      <h2 className="text-2xl font-bold">
+                      <h2 className="text-xl sm:text-2xl font-bold">
                         {selectedSession.name}
                       </h2>
-                      <p className="text-muted-foreground">
+                      <p className="text-sm sm:text-base text-muted-foreground">
                         {selectedSession.description}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Dialog
                         open={isEditingSession}
                         onOpenChange={setIsEditingSession}
@@ -717,25 +731,25 @@ export default function Sessions() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="rounded-full"
+                                className="rounded-full text-xs sm:text-sm"
                                 onClick={() =>
                                   handleEditSession(selectedSession)
                                 }
                               >
-                                <Edit className="h-4 w-4 mr-2" />
+                                <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                 Edit
                               </Button>
                             </DialogTrigger>
                           </TooltipTrigger>
                           <TooltipContent>Edit Session</TooltipContent>
                         </Tooltip>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="max-w-xs sm:max-w-[425px]">
                           <DialogHeader>
-                            <DialogTitle>Edit Session</DialogTitle>
+                            <DialogTitle className="text-lg sm:text-xl">Edit Session</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4 mt-6">
+                          <div className="space-y-3 sm:space-y-4 mt-4 sm:mt-6">
                             <div>
-                              <Label htmlFor="name">Name</Label>
+                              <Label htmlFor="name" className="text-sm sm:text-base">Name</Label>
                               <Input
                                 id="name"
                                 value={sessionForm.name}
@@ -745,10 +759,11 @@ export default function Sessions() {
                                     name: e.target.value,
                                   })
                                 }
+                                className="text-sm sm:text-base"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="description">Description</Label>
+                              <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
                               <Textarea
                                 id="description"
                                 value={sessionForm.description}
@@ -758,11 +773,12 @@ export default function Sessions() {
                                     description: e.target.value,
                                   })
                                 }
+                                className="text-sm sm:text-base"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                               <div>
-                                <Label htmlFor="focus">
+                                <Label htmlFor="focus" className="text-sm sm:text-base">
                                   Focus Duration (min)
                                 </Label>
                                 <Input
@@ -776,10 +792,11 @@ export default function Sessions() {
                                       focus_duration: Number.isNaN(v) ? 0 : v,
                                     });
                                   }}
+                                  className="text-sm sm:text-base"
                                 />
                               </div>
                               <div>
-                                <Label htmlFor="short">Short Break (min)</Label>
+                                <Label htmlFor="short" className="text-sm sm:text-base">Short Break (min)</Label>
                                 <Input
                                   id="short"
                                   type="number"
@@ -793,12 +810,13 @@ export default function Sessions() {
                                         : v,
                                     });
                                   }}
+                                  className="text-sm sm:text-base"
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                               <div>
-                                <Label htmlFor="long">Long Break (min)</Label>
+                                <Label htmlFor="long" className="text-sm sm:text-base">Long Break (min)</Label>
                                 <Input
                                   id="long"
                                   type="number"
@@ -812,10 +830,11 @@ export default function Sessions() {
                                         : v,
                                     });
                                   }}
+                                  className="text-sm sm:text-base"
                                 />
                               </div>
                               <div>
-                                <Label htmlFor="cycles">
+                                <Label htmlFor="cycles" className="text-sm sm:text-base">
                                   Cycles for Long Break
                                 </Label>
                                 <Input
@@ -831,19 +850,21 @@ export default function Sessions() {
                                         : v,
                                     });
                                   }}
+                                  className="text-sm sm:text-base"
                                 />
                               </div>
                             </div>
-                            <div className="flex gap-2 pt-4">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-3 sm:pt-4">
                               <Button
                                 onClick={handleSaveSession}
-                                className="flex-1"
+                                className="flex-1 text-sm sm:text-base py-2 sm:py-3"
                               >
                                 Save Changes
                               </Button>
                               <Button
                                 variant="outline"
                                 onClick={() => setIsEditingSession(false)}
+                                className="text-sm sm:text-base py-2 sm:py-3"
                               >
                                 Cancel
                               </Button>
@@ -857,13 +878,14 @@ export default function Sessions() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="rounded-full"
+                            className="rounded-full text-xs sm:text-sm"
                             onClick={() =>
                               handleDuplicateSession(selectedSession)
                             }
                           >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Duplicate
+                            <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            <span className="hidden sm:inline">Duplicate</span>
+                            <span className="sm:hidden">Copy</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Duplicate Session</TooltipContent>
@@ -875,7 +897,7 @@ export default function Sessions() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-full"
+                              className="rounded-full text-xs sm:text-sm"
                               onClick={async () => {
                                 await archiveSession(selectedSession.id);
                                 const refreshed = await getSession(
@@ -884,8 +906,9 @@ export default function Sessions() {
                                 setSelectedSession(refreshed);
                               }}
                             >
-                              <Archive className="h-4 w-4 mr-2" />
-                              Archive
+                              <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              <span className="hidden sm:inline">Archive</span>
+                              <span className="sm:hidden">Archive</span>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Archive Session</TooltipContent>
@@ -896,7 +919,7 @@ export default function Sessions() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-full"
+                              className="rounded-full text-xs sm:text-sm"
                               onClick={async () => {
                                 await unarchiveSession(selectedSession.id);
                                 const refreshed = await getSession(
@@ -905,8 +928,9 @@ export default function Sessions() {
                                 setSelectedSession(refreshed);
                               }}
                             >
-                              <ArchiveRestore className="h-4 w-4 mr-2" />
-                              Unarchive
+                              <ArchiveRestore className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              <span className="hidden sm:inline">Unarchive</span>
+                              <span className="sm:hidden">Restore</span>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Unarchive Session</TooltipContent>
@@ -918,13 +942,13 @@ export default function Sessions() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            className="rounded-full"
+                            className="rounded-full text-xs sm:text-sm"
                             onClick={() =>
                               handleDeleteSession(selectedSession.id)
                             }
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
+                            <Trash2 className="h-3 w-3 mr-1 " />
+                            <span className="hidden sm:inline">Delete</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Delete Session</TooltipContent>
@@ -933,44 +957,45 @@ export default function Sessions() {
                   </div>
 
                   {/* Session Config */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold">
                           {selectedSession.focus_duration}m
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
                           Focus Duration
                         </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold">
                           {selectedSession.short_break_duration}m
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
                           Short Break
                         </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold">
                           {selectedSession.long_break_duration}m
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
                           Long Break
                         </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-bold">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold">
                           {selectedSession.long_break_per_pomodoros}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Cycles for Long Break
+                        <div className="text-xs sm:text-sm text-muted-foreground">
+                          <span className="hidden sm:inline">Cycles for Long Break</span>
+                          <span className="sm:hidden">Long Break Cycles</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -978,8 +1003,8 @@ export default function Sessions() {
 
                   {/* Tasks */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-semibold">Tasks</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
+                      <h3 className="text-lg sm:text-xl font-semibold">Tasks</h3>
                       <Dialog
                         open={isAddingTask}
                         onOpenChange={setIsAddingTask}
@@ -987,20 +1012,20 @@ export default function Sessions() {
                         <DialogTrigger asChild>
                           <Button
                             onClick={() => setIsAddingTask(true)}
-                            className="rounded-full"
+                            className="rounded-full text-xs sm:text-sm"
                             size="sm"
                           >
-                            <Plus className="h-4 w-4 mr-2" />
+                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                             Add Task
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="max-w-xs sm:max-w-[425px]">
                           <DialogHeader>
-                            <DialogTitle>Add New Task</DialogTitle>
+                            <DialogTitle className="text-lg sm:text-xl">Add New Task</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4 mt-6">
+                          <div className="space-y-3 sm:space-y-4 mt-4 sm:mt-6">
                             <div>
-                              <Label htmlFor="taskName">Task Name</Label>
+                              <Label htmlFor="taskName" className="text-sm sm:text-base">Task Name</Label>
                               <Input
                                 id="taskName"
                                 value={taskForm.name}
@@ -1011,10 +1036,11 @@ export default function Sessions() {
                                   })
                                 }
                                 placeholder="Enter task name"
+                                className="text-sm sm:text-base"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="category">Category</Label>
+                              <Label htmlFor="category" className="text-sm sm:text-base">Category</Label>
                               <Input
                                 id="category"
                                 value={taskForm.category}
@@ -1025,10 +1051,11 @@ export default function Sessions() {
                                   })
                                 }
                                 placeholder="Enter category"
+                                className="text-sm sm:text-base"
                               />
                             </div>
                             <div>
-                              <Label htmlFor="duration">
+                              <Label htmlFor="duration" className="text-sm sm:text-base">
                                 Estimated Duration (minutes)
                               </Label>
                               <Input
@@ -1048,18 +1075,20 @@ export default function Sessions() {
                                       : v,
                                   });
                                 }}
+                                className="text-sm sm:text-base"
                               />
                             </div>
-                            <div className="flex gap-2 pt-4">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-3 sm:pt-4">
                               <Button
                                 onClick={handleAddTask}
-                                className="flex-1"
+                                className="flex-1 text-sm sm:text-base py-2 sm:py-3"
                               >
                                 Add Task
                               </Button>
                               <Button
                                 variant="outline"
                                 onClick={() => setIsAddingTask(false)}
+                                className="text-sm sm:text-base py-2 sm:py-3"
                               >
                                 Cancel
                               </Button>
@@ -1071,14 +1100,16 @@ export default function Sessions() {
                   </div>
 
                   {/* Task Filters */}
-                  <div className="flex flex-col gap-2 mb-4">
-                    <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 mb-3 sm:mb-4">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         variant={taskFilter === "all" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setTaskFilter("all")}
+                        className="text-xs sm:text-sm"
                       >
-                        All Tasks ({selectedSession.tasks?.length || 0})
+                        <span className="hidden sm:inline">All Tasks ({selectedSession.tasks?.length || 0})</span>
+                        <span className="sm:hidden">All ({selectedSession.tasks?.length || 0})</span>
                       </Button>
                       <Button
                         variant={
@@ -1086,12 +1117,16 @@ export default function Sessions() {
                         }
                         size="sm"
                         onClick={() => setTaskFilter("active")}
+                        className="text-xs sm:text-sm"
                       >
-                        Active (
+                        <span className="hidden sm:inline">Active (
                         {selectedSession.tasks?.filter(
                           (t) => !t.completed && !t.archived
                         ).length || 0}
-                        )
+                        )</span>
+                        <span className="sm:hidden">Active ({selectedSession.tasks?.filter(
+                          (t) => !t.completed && !t.archived
+                        ).length || 0})</span>
                       </Button>
                       <Button
                         variant={
@@ -1099,11 +1134,14 @@ export default function Sessions() {
                         }
                         size="sm"
                         onClick={() => setTaskFilter("completed")}
+                        className="text-xs sm:text-sm"
                       >
-                        Completed (
+                        <span className="hidden sm:inline">Completed (
                         {selectedSession.tasks?.filter((t) => t.completed)
                           .length || 0}
-                        )
+                        )</span>
+                        <span className="sm:hidden">Done ({selectedSession.tasks?.filter((t) => t.completed)
+                          .length || 0})</span>
                       </Button>
                       <Button
                         variant={
@@ -1111,14 +1149,17 @@ export default function Sessions() {
                         }
                         size="sm"
                         onClick={() => setTaskFilter("archived")}
+                        className="text-xs sm:text-sm"
                       >
-                        Archived (
+                        <span className="hidden sm:inline">Archived (
                         {selectedSession.tasks?.filter((t) => t.archived)
                           .length || 0}
-                        )
+                        )</span>
+                        <span className="sm:hidden">Arc ({selectedSession.tasks?.filter((t) => t.archived)
+                          .length || 0})</span>
                       </Button>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                       {taskFilter !== "all" && (
                         <p className="text-xs text-muted-foreground">
                           Task reordering is only available when viewing all
@@ -1134,10 +1175,11 @@ export default function Sessions() {
                             variant="outline"
                             size="sm"
                             onClick={handleMoveCompletedToBottom}
-                            className="ml-auto"
+                            className="ml-auto text-xs sm:text-sm"
                           >
-                            <ArrowDown className="h-4 w-4 mr-2" />
-                            Move Completed/Archived to Bottom
+                            <ArrowDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            <span className="hidden sm:inline">Move Completed/Archived to Bottom</span>
+                            <span className="sm:hidden">Move Done to Bottom</span>
                           </Button>
                         )}
                     </div>
@@ -1178,41 +1220,40 @@ export default function Sessions() {
                                         : ""
                                     }`}
                                   >
-                                    <CardContent className="p-4">
-                                      <div className="flex items-center gap-3">
-                                        <div {...provided.dragHandleProps}>
+                                    <CardContent className="p-3 sm:p-4">
+                                      <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+                                        <div {...provided.dragHandleProps} className="mt-1 sm:mt-0">
                                           <GripVertical
-                                            className={`h-5 w-5 ${
+                                            className={`h-4 w-4 sm:h-5 sm:w-5 ${
                                               taskFilter === "all"
                                                 ? "text-muted-foreground cursor-grab"
                                                 : "text-muted-foreground/30 cursor-not-allowed"
                                             }`}
                                           />
                                         </div>
-                                        <div className="flex-1">
+                                        <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="font-medium">
+                                            <h4 className="font-medium text-sm sm:text-base truncate">
                                               {task.name}
                                             </h4>
                                           </div>
-                                          <div className="flex items-start gap-2 flex-wrap mb-1">
-                                            <Badge variant="secondary">
+                                          <div className="flex items-start gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
+                                            <Badge variant="secondary" className="text-xs">
                                               {task.category}
                                             </Badge>
                                             {task.completed && (
-                                              <Badge variant="default">
+                                              <Badge variant="default" className="text-xs">
                                                 Completed
                                               </Badge>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                          <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
                                             <Target className="h-3 w-3" />
                                             <span>
-                                              {task.estimated_completion_time}{" "}
-                                              minutes
+                                              {task.estimated_completion_time}min
                                             </span>
                                             {task.actual_completion_time && (
-                                              <span>
+                                              <span className="hidden sm:inline">
                                                 • Actual:{" "}
                                                 {task.actual_completion_time}{" "}
                                                 minutes
@@ -1220,7 +1261,7 @@ export default function Sessions() {
                                             )}
                                           </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-1 sm:gap-2">
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <Button
@@ -1243,11 +1284,12 @@ export default function Sessions() {
                                                   task.archived &&
                                                   !task.completed
                                                 }
+                                                className="h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
                                               >
                                                 {task.completed ? (
-                                                  <Undo2 className="h-4 w-4" />
+                                                  <Undo2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 ) : (
-                                                  <Check className="h-4 w-4" />
+                                                  <Check className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 )}
                                               </Button>
                                             </TooltipTrigger>
@@ -1273,22 +1315,23 @@ export default function Sessions() {
                                                     onClick={() =>
                                                       handleEditTask(task)
                                                     }
+                                                    className="h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
                                                   >
-                                                    <Edit className="h-4 w-4" />
+                                                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                                                   </Button>
                                                 </DialogTrigger>
                                               </TooltipTrigger>
                                               <TooltipContent>Edit Task</TooltipContent>
                                             </Tooltip>
-                                            <DialogContent className="sm:max-w-[425px]">
+                                            <DialogContent className="max-w-xs sm:max-w-[425px]">
                                               <DialogHeader>
-                                                <DialogTitle>
+                                                <DialogTitle className="text-lg sm:text-xl">
                                                   Edit Task
                                                 </DialogTitle>
                                               </DialogHeader>
-                                              <div className="space-y-4 mt-6">
+                                              <div className="space-y-3 sm:space-y-4 mt-4 sm:mt-6">
                                                 <div>
-                                                  <Label htmlFor="editTaskName">
+                                                  <Label htmlFor="editTaskName" className="text-sm sm:text-base">
                                                     Task Name
                                                   </Label>
                                                   <Input
@@ -1300,10 +1343,11 @@ export default function Sessions() {
                                                         name: e.target.value,
                                                       })
                                                     }
+                                                    className="text-sm sm:text-base"
                                                   />
                                                 </div>
                                                 <div>
-                                                  <Label htmlFor="editCategory">
+                                                  <Label htmlFor="editCategory" className="text-sm sm:text-base">
                                                     Category
                                                   </Label>
                                                   <Input
@@ -1316,10 +1360,11 @@ export default function Sessions() {
                                                           e.target.value,
                                                       })
                                                     }
+                                                    className="text-sm sm:text-base"
                                                   />
                                                 </div>
                                                 <div>
-                                                  <Label htmlFor="editDuration">
+                                                  <Label htmlFor="editDuration" className="text-sm sm:text-base">
                                                     Estimated Duration (minutes)
                                                   </Label>
                                                   <Input
@@ -1344,12 +1389,13 @@ export default function Sessions() {
                                                             : v,
                                                       });
                                                     }}
+                                                    className="text-sm sm:text-base"
                                                   />
                                                 </div>
-                                                <div className="flex gap-2 pt-4">
+                                                <div className="flex flex-col sm:flex-row gap-2 pt-3 sm:pt-4">
                                                   <Button
                                                     onClick={handleSaveTask}
-                                                    className="flex-1"
+                                                    className="flex-1 text-sm sm:text-base py-2 sm:py-3"
                                                   >
                                                     Save Changes
                                                   </Button>
@@ -1358,6 +1404,7 @@ export default function Sessions() {
                                                     onClick={() =>
                                                       setIsEditingTask(false)
                                                     }
+                                                    className="text-sm sm:text-base py-2 sm:py-3"
                                                   >
                                                     Cancel
                                                   </Button>
@@ -1374,8 +1421,9 @@ export default function Sessions() {
                                                 onClick={() =>
                                                   handleDeleteTask(task.id)
                                                 }
+                                                className="h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
                                               >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                               </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>Delete Task</TooltipContent>
@@ -1396,8 +1444,9 @@ export default function Sessions() {
                                                       setSelectedSession(refreshed);
                                                     }
                                                   }}
+                                                  className="h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
                                                 >
-                                                  <Archive className="h-4 w-4" />
+                                                  <Archive className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 </Button>
                                               </TooltipTrigger>
                                               <TooltipContent>Archive Task</TooltipContent>
@@ -1418,8 +1467,9 @@ export default function Sessions() {
                                                       setSelectedSession(refreshed);
                                                     }
                                                   }}
+                                                  className="h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
                                                 >
-                                                  <ArchiveRestore className="h-4 w-4" />
+                                                  <ArchiveRestore className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 </Button>
                                               </TooltipTrigger>
                                               <TooltipContent>Unarchive Task</TooltipContent>
@@ -1440,9 +1490,9 @@ export default function Sessions() {
                   </DragDropContext>
 
                   {getFilteredTasks(selectedSession.tasks)?.length === 0 && (
-                    <div className="text-center text-muted-foreground py-8">
-                      <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <div>
+                    <div className="text-center text-muted-foreground py-6 sm:py-8">
+                      <Target className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
+                      <div className="text-sm sm:text-base">
                         {taskFilter === "all"
                           ? "No tasks yet. Add some tasks to get started!"
                           : taskFilter === "active"
@@ -1454,10 +1504,10 @@ export default function Sessions() {
                       {taskFilter === "all" && (
                         <Button
                           variant="outline"
-                          className="mt-4"
+                          className="mt-3 sm:mt-4 text-sm sm:text-base"
                           onClick={() => setIsAddingTask(true)}
                         >
-                          <Plus className="h-4 w-4 mr-2" />
+                          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                           Add your first task
                         </Button>
                       )}
@@ -1465,10 +1515,10 @@ export default function Sessions() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-64">
+                <div className="flex items-center justify-center h-48 sm:h-64">
                   <div className="text-center text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <div>Select a session to view details</div>
+                    <Target className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
+                    <div className="text-sm sm:text-base">Select a session to view details</div>
                   </div>
                 </div>
               )}
