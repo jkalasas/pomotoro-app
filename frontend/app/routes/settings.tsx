@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [selectedVideoName, setSelectedVideoName] = useState<string | null>(
     null
   );
+  const [pendingAudioFile, setPendingAudioFile] = useState<File | null>(null);
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(
     null
@@ -48,12 +50,30 @@ export default function SettingsPage() {
   useEffect(() => {
     setFocusSound(settings.focusResumeSound);
     setWaitingVideo(settings.waitingVideo);
+    if (settings.focusResumeSound.startsWith('blob:')) {
+      setSelectedAudioName(settings.focusResumeSoundName || selectedAudioName);
+    }
+    if (settings.waitingVideo.startsWith('blob:')) {
+      setSelectedVideoName(settings.waitingVideoName || selectedVideoName);
+    }
   }, [settings.focusResumeSound, settings.waitingVideo]);
 
   const handleSave = async () => {
-    await settings.setFocusResumeSound(focusSound);
-    await settings.setWaitingVideo(waitingVideo);
+    // Save selected files if present; else persist paths
+    if (pendingAudioFile) {
+      await settings.setFocusResumeSoundFile(pendingAudioFile);
+    } else {
+      await settings.setFocusResumeSound(focusSound);
+    }
+
+    if (pendingVideoFile) {
+      await settings.setWaitingVideoFile(pendingVideoFile);
+    } else {
+      await settings.setWaitingVideo(waitingVideo);
+    }
     toast.success("Settings saved");
+    setPendingAudioFile(null);
+    setPendingVideoFile(null);
   };
 
   const handlePreview = () => {
@@ -122,6 +142,7 @@ export default function SettingsPage() {
                   return;
                 }
                 setFocusSound(val);
+                setPendingAudioFile(null);
                 if (!val.startsWith("blob:")) setSelectedAudioName(null);
               }}
             >
@@ -141,7 +162,7 @@ export default function SettingsPage() {
                   ))}
                 {focusSound.startsWith("blob:") && (
                   <SelectItem value={focusSound}>
-                    {selectedAudioName || "Custom audio"}
+                    {selectedAudioName || settings.focusResumeSoundName || "Custom audio"}
                   </SelectItem>
                 )}
                 <SelectItem value="__pick__">
@@ -162,24 +183,25 @@ export default function SettingsPage() {
                     toast.error("Must be an mp3 file");
                     return;
                   }
-                  // Create an object URL for immediate playback; store pseudo path with prefix
+                  // Store as blob in IndexedDB and use object URL for preview
                   const objectUrl = URL.createObjectURL(file);
                   setFocusSound(objectUrl);
                   setSelectedAudioName(file.name);
+                  setPendingAudioFile(file);
                 }
                 setAudioFileInputKey((k) => k + 1);
               }}
             />
             <p className="text-xs text-muted-foreground mb-4">
-              Choose default, recent, or pick an mp3 from your files (not
-              persisted across restarts unless you save). Object URLs won't
-              persist after reload.
+              Choose default, recent, or pick an mp3 from your files. Your
+              selection is saved locally in the browser so it persists across
+              reloads on this device.
             </p>
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setFocusSound("/audio/teleleleng.mp3")}
+                onClick={() => { setFocusSound("/audio/teleleleng.mp3"); setPendingAudioFile(null); }}
               >
                 Default
               </Button>
@@ -208,6 +230,7 @@ export default function SettingsPage() {
                   return;
                 }
                 setWaitingVideo(val);
+                setPendingVideoFile(null);
                 if (!val.startsWith("blob:")) setSelectedVideoName(null);
               }}
             >
@@ -227,7 +250,7 @@ export default function SettingsPage() {
                   ))}
                 {waitingVideo.startsWith("blob:") && (
                   <SelectItem value={waitingVideo}>
-                    {selectedVideoName || "Custom video"}
+                    {selectedVideoName || settings.waitingVideoName || "Custom video"}
                   </SelectItem>
                 )}
                 <SelectItem value="__pick_video__">
@@ -251,13 +274,14 @@ export default function SettingsPage() {
                   const objectUrl = URL.createObjectURL(file);
                   setWaitingVideo(objectUrl);
                   setSelectedVideoName(file.name);
+                  setPendingVideoFile(file);
                 }
                 setVideoFileInputKey((k) => k + 1);
               }}
             />
             <p className="text-xs text-muted-foreground mb-4">
-              Looping video displayed in overlay. Selecting a local file uses an
-              in-memory URL until saved & app remains open.
+              Looping video displayed in overlay. Selecting a local file saves
+              it locally so it persists across reloads on this device.
             </p>
 
             <div className="mt-2">
@@ -281,7 +305,7 @@ export default function SettingsPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setWaitingVideo("/videos/waiting.mp4")}
+                onClick={() => { setWaitingVideo("/videos/waiting.mp4"); setPendingVideoFile(null); }}
               >
                 Default
               </Button>
@@ -300,6 +324,8 @@ export default function SettingsPage() {
               onClick={() => {
                 setFocusSound(settings.focusResumeSound);
                 setWaitingVideo(settings.waitingVideo);
+                setPendingAudioFile(null);
+                setPendingVideoFile(null);
               }}
             >
               <X className="mr-2" size={16} />
@@ -308,23 +334,7 @@ export default function SettingsPage() {
             <Button
               className="rounded-full"
               type="button"
-              onClick={async () => {
-                // Only persist if not object URLs (blob:). For object URLs user must choose again next session.
-                if (focusSound.startsWith("blob:"))
-                  toast.message(
-                    "Local audio will not persist unless you copy it to public/audio"
-                  );
-                if (waitingVideo.startsWith("blob:"))
-                  toast.message(
-                    "Local video will not persist unless you copy it to public/videos"
-                  );
-                await handleSave();
-                // Persist to history arrays
-                if (!focusSound.startsWith("blob:"))
-                  await settings.setFocusResumeSound(focusSound);
-                if (!waitingVideo.startsWith("blob:"))
-                  await settings.setWaitingVideo(waitingVideo);
-              }}
+              onClick={handleSave}
             >
               <Save className="mr-2" size={16} />
               Save

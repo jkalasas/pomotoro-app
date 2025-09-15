@@ -138,6 +138,12 @@ export default function Overlay() {
     }
   };
 
+  const videoSrc = appSettings.waitingVideo.startsWith('blob:')
+    ? appSettings.waitingVideo
+    : appSettings.waitingVideo.startsWith('/')
+    ? appSettings.waitingVideo
+    : `/videos/${appSettings.waitingVideo}`;
+
   return (
     <div 
       className="fixed inset-0 z-[9999] flex flex-col bg-gray-100"
@@ -160,7 +166,7 @@ export default function Overlay() {
         <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden shadow-lg border border-black/5 bg-black/60">
           <video
             key={appSettings.waitingVideo}
-            src={appSettings.waitingVideo.startsWith('/') ? appSettings.waitingVideo : `/videos/${appSettings.waitingVideo}`}
+            src={videoSrc}
             className="w-full h-full object-cover"
             autoPlay
             muted
