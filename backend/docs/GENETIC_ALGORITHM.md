@@ -76,24 +76,33 @@ F(C) = w_u × S_urgency(C) + w_m × S_momentum(C) + w_v × S_variety(C)
 
 ### Urgency Score
 ```
+Let e_i be estimated minutes, d_i the due date (optional), and t_0 = now.
+Finish time f_i = t_0 + Σ_{k=1..i} e_k.
+Per-task tardiness T_i = max(0, minutes(f_i - d_i)), treating T_i = 0 if d_i is missing.
+Total tardiness T_total(C) = Σ_{i=1..n} T_i.
+
 S_urgency(C) = 1 / (1 + T_total(C))
-where T_total(C) = Σ max(0, E_C(t_i) - D(t_i))
 ```
 
 ### Momentum Score
 ```
-S_momentum(C) = Σ (n-i+1) / E_t(t_i)
+Raw: M_raw(C) = Σ_{i=1..n} (n - i) / max(1, e_i)
+Normalized: S_momentum(C) = M_raw(C) / n
 ```
 
 ### Variety Score
 ```
-S_variety(C) = Σ |E_t(t_{i+1}) - E_t(t_i)|
+Raw: V_raw(C) = Σ_{i=1..n-1} | max(1, e_{i+1}) - max(1, e_i) |
+Let e_max = max_i max(1, e_i) and n > 1.
+Normalized: S_variety(C) = V_raw(C) / (e_max · (n - 1))
 ```
 
 ### Adaptive Weights
 ```
-w_m = k_m × (1 - R_comp)
-w_v = k_v × (F_max - F̄_feedback) / (F_max - F_min)
+w_u = 1.0
+w_m = k_m × (1 - R_comp), with k_m = 1.0
+w_v = k_v × (F_max - F̄_feedback) / (F_max - F_min), with k_v = 1.0,
+      F_max = 5.0, F_min = 1.0
 ```
 
 ## Implementation Files

@@ -14,12 +14,12 @@ Where $w_u$​, $w_m$​, and $w_v$​ are the adaptive weights for urgency, mom
 
 **Urgency Score ($S_{urgency}$)**
 This component measures how well a schedule respects task due dates. It is designed to heavily penalize schedules where tasks are completed after their deadline. The score is calculated based on the total **tardiness** of the schedule.
-First, the scheduled completion time, $E_c​(t_i​)$, for each task in the chromosome $C$ is determined:
-$$E_c(t_i) = \sum_{j=1}^i E_i(t_j)$$
-where $E_t​(t_j)$ is the estimated time to complete task $t_j$.
+First, the cumulative completion time, $E_C(t_i)$, for each task in the chromosome $C$ is determined:
+$$E_C(t_i) = \sum_{j=1}^i E_t(t_j)$$
+where $E_t(t_j)$ is the estimated time to complete task $t_j$.
 
 Next, the tardiness $T_d​(t_i$) for each task is calculated as the amount of time by which its completion exceeds its due date, $D(t_i)$.
-	$$T_d(t_i) = max(0, E_C(t_i) - D(t_i))$$
+	$$T_d(t_i) = \max(0, E_C(t_i) - D(t_i))$$
 The total tardiness for the schedule, $T_{total}​(C)$, is the sum of individual task tardiness values.
 $$T_{total}(C) = \sum_{i=1}^n T_d(t_i)$$
 
@@ -30,22 +30,30 @@ $$S_{urgency}(C) = \frac{1}{1 + T_{total}(C)}$$
 This score promotes schedules that are easier for the user to initiate and adhere to, which is particularly important if the user has a low historical task completion rate. It gives a higher value to schedules that place shorter, less demanding tasks at the beginning of the session.
 
 The score is calculated as a weighted sum, where tasks scheduled earlier in the sequence receive a higher weight.
-$$S_{momentum}(C) = \sum_{i=1}^n \frac{n-i+1}{E_t(t_i)}$$
-Here, $(n−i+1)$ provides the weight, which decreases as the task's position i increases. This is divided by the task's estimated completion time $E_t​(t_i​)$, thus rewarding the early placement of shorter tasks.
+Raw momentum uses decreasing weights with earlier positions favored:
+$$M_{raw}(C) = \sum_{i=1}^n \frac{n-i}{\max(1, E_t(t_i))}$$
+We normalize by sequence length as in code:
+$$S_{momentum}(C) = \frac{M_{raw}(C)}{n}$$
+Here, $(n-i)$ provides the weight, which decreases as the task's position $i$ increases, and durations are clamped to at least 1 minute.
 
-**Variety Score ($S_{variety})$**
+**Variety Score ($S_{variety}$)**
 This component addresses the risk of cognitive fatigue by encouraging schedules that vary the cognitive load. It is based on the principle that alternating between long and short tasks can improve focus, a factor that becomes more critical when a user's session feedback indicates frequent distraction.
 
 The score is calculated as the sum of the absolute differences in estimated completion times between adjacent tasks in the schedule.
-$$S_{variety}(C) = \sum_{i=1}^{n-1} |E_t(t_{i+1}) - E_t(t(i)|$$
+Raw adjacent-duration differences:
+$$V_{raw}(C) = \sum_{i=1}^{n-1} |\max(1, E_t(t_{i+1})) - \max(1, E_t(t_i))|$$
+With $e_{max} = \max_i \max(1, E_t(t_i))$ and $n>1$ the normalized score is:
+$$S_{variety}(C) = \frac{V_{raw}(C)}{e_{max}(n-1)}$$
 A higher score indicates greater variation in task duration throughout the schedule, which is hypothesized to reduce monotony and improve engagement.
 
 **Adaptive Weighting**
 The GA "learns" from the user's past behavior by dynamically adjusting the weights ($w_m$​,$w_v$​) of the fitness function based on historical data. The urgency weight ($w_u$​) remains constant, as deadlines are a consistently high priority.
 - **Momentum Weight ($w_m$​)**: This weight is inversely proportional to the user's historical task completion rate, $R_{comp}​\in[0,1]$. If the user frequently fails to complete tasks, the system prioritizes building momentum.
-$$w_m = k_m \cdot (1 - R_{comp}) $$
+$$w_m = k_m \cdot (1 - R_{comp}) \quad (k_m = 1.0)$$
 - **Variety Weight ($w_v$​)**: This weight is influenced by the user's average perceived productivity feedback, $\bar{F}$ feedback​. Feedback values are mapped numerically (e.g., HIGHLY_FOCUSED=5, HIGHLY_DISTRACTED=1). If the user reports being distracted, the system prioritizes schedule variety.
-$$w_v = k_v * (\frac{F_{max} - \bar{F}_{feedback}}{F_{max} - F_{min}})$$
+$$w_v = k_v \cdot \frac{F_{max} - \bar{F}_{feedback}}{F_{max} - F_{min}} \quad (k_v = 1.0,\ F_{max}=5.0,\ F_{min}=1.0)$$
+
+Set $w_u = 1.0$ (constant) to reflect deadline importance.
 
 Here, $k_m$​ and $k_v$​ are scaling constants, and $F_{max}$​ and $F_{min}$​ are the maximum and minimum possible feedback values, respectively.
 
