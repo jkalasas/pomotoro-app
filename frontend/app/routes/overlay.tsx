@@ -4,9 +4,11 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { useSearchParams } from "react-router";
 import { Logo } from "~/components/ui/logo";
 import { useAppSettings } from "~/stores/settings";
+import { useAnalyticsStore } from "~/stores/analytics";
 
 export default function Overlay() {
   const appSettings = useAppSettings();
+  const analyticsStore = useAnalyticsStore();
   const [searchParams] = useSearchParams();
   
   // Get time from URL parameters, fallback to 300 seconds (5 minutes)
@@ -41,6 +43,14 @@ export default function Overlay() {
       // race with the main store's phase transition logic that should
       // set is_running: true when moving back to focus. Only emit
       // 'skip-rest' for user-initiated skips (button / ESC).
+      try {
+        analyticsStore.logEvent('break_overlay_auto_closed', {
+          reason: 'timer_expired',
+          initial_time: initialTime,
+          time_remaining: 0,
+          closed_at: new Date().toISOString(),
+        });
+      } catch {}
       (async () => {
         try {
           const currentWindow = getCurrentWindow();
@@ -114,6 +124,13 @@ export default function Overlay() {
   // This only closes the overlay window and does not emit 'skip-rest'.
   const handleClose = async () => {
     try {
+      try {
+        analyticsStore.logEvent('break_overlay_closed', {
+          reason: 'manual',
+          time_remaining: timeRemaining,
+          closed_at: new Date().toISOString(),
+        });
+      } catch {}
       const currentWindow = getCurrentWindow();
       await currentWindow.close();
     } catch (error) {
