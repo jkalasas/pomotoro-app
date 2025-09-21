@@ -83,6 +83,7 @@ def create_session(
             categories=[category],
             session_id=db_session.id,
             order=idx,
+            due_date=task_data.due_date,
         )
         db.add(db_task)
         # Keep in-memory relationship collection in sync so tasks are present without a second refresh
@@ -102,6 +103,7 @@ def create_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            due_date=task.due_date,
             archived=task.archived,
             archived_at=task.archived_at,
         )
@@ -166,6 +168,7 @@ def read_sessions(
                 category=category_name,
                 completed=task.completed,
                 actual_completion_time=task.actual_completion_time,
+                due_date=task.due_date,
                 archived=task.archived,
                 archived_at=task.archived_at,
             ))
@@ -679,6 +682,7 @@ def read_session(
             category=task.categories[0].name if task.categories else "Uncategorized",
             completed=task.completed,
             actual_completion_time=task.actual_completion_time,
+            due_date=task.due_date,
             archived=task.archived,
             archived_at=task.archived_at,
         )
@@ -856,6 +860,7 @@ def add_task_to_session(
         session_id=session_id,
         completed=False,
         order=next_order,
+        due_date=task_data.due_date,
     )
     # Add the category to the task through the many-to-many relationship
     db_task.categories = [category]
@@ -870,6 +875,7 @@ def add_task_to_session(
         category=category.name,
         completed=db_task.completed,
         actual_completion_time=db_task.actual_completion_time,
+        due_date=db_task.due_date,
     )
 
 
@@ -894,6 +900,8 @@ def update_task(
         task.name = task_data.name
     if task_data.estimated_completion_time is not None:
         task.estimated_completion_time = task_data.estimated_completion_time
+    if task_data.due_date is not None:
+        task.due_date = task_data.due_date
     
     # Update category if provided
     if task_data.category is not None:
@@ -919,6 +927,7 @@ def update_task(
         category=category_name,
         completed=task.completed,
         actual_completion_time=task.actual_completion_time,
+        due_date=task.due_date,
     )
 
 
@@ -979,6 +988,7 @@ def archive_task(
         category=task.categories[0].name if task.categories else "Uncategorized",
         completed=task.completed,
         actual_completion_time=task.actual_completion_time,
+        due_date=task.due_date,
         archived=task.archived,
         archived_at=task.archived_at,
     )
@@ -1005,6 +1015,7 @@ def unarchive_task(
         category=task.categories[0].name if task.categories else "Uncategorized",
         completed=task.completed,
         actual_completion_time=task.actual_completion_time,
+        due_date=task.due_date,
         archived=task.archived,
         archived_at=task.archived_at,
     )

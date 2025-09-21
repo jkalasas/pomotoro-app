@@ -1,14 +1,3 @@
-"""
-Pygad-based Genetic Algorithm for task scheduling that respects
-the natural order of tasks within each session (precedence constraints).
-
-Encoding: Random-keys (one float priority per task). A decoder builds
-the final sequence by repeatedly selecting the next feasible task
-from the heads of each session's task list based on the task's priority.
-
-This ensures only the order within a session is preserved while allowing
-interleaving across sessions, e.g. A,B,C and X,Y can produce A,X,B,C,Y.
-"""
 from __future__ import annotations
 
 from typing import Dict, List, Tuple, Optional
@@ -24,11 +13,6 @@ from ..services.analytics import UserAnalyticsService
 
 
 class GeneticScheduler:
-    """
-    Schedules tasks using a GA with random-keys encoding while enforcing
-    the order of tasks inside each session.
-    """
-
     def __init__(
         self,
         population_size: int = 80,
@@ -56,7 +40,6 @@ class GeneticScheduler:
         self.k_m = 1.0
         self.k_v = 1.0
 
-    # --------- Public API ---------
     def schedule_tasks(
         self,
         tasks: List[Task],
@@ -122,18 +105,12 @@ class GeneticScheduler:
         best_schedule = decode(solution)
         return best_schedule, float(best_fitness)
 
-    # --------- Decoder & Fitness ---------
     def _decode_random_keys(
         self,
         solution: np.ndarray,
         session_queues: Dict[int, List[Task]],
         index_by_task_id: Dict[int, int],
     ) -> List[Task]:
-        """
-        K-way merge across sessions. At each step choose the head task of any
-        session with the highest priority according to the random-keys vector.
-        This enforces in-session order while allowing interleaving across sessions.
-        """
         # Maintain pointers for each session queue
         ptrs: Dict[int, int] = {sid: 0 for sid in session_queues}
         total = sum(len(q) for q in session_queues.values())
@@ -207,7 +184,6 @@ class GeneticScheduler:
 
         return w_u * urgency + w_m * momentum + w_v * variety
 
-    # --------- Component Scores ---------
     def _urgency_score(self, chromosome: List[Task]) -> float:
         """
         Inverse of total tardiness (minutes) relative to due_date, accumulated
@@ -247,7 +223,6 @@ class GeneticScheduler:
             s += abs(a - b)
         return s
 
-    # --------- Adaptive weights ---------
     def _calculate_adaptive_weights(self, user: User, db: DBSession) -> Tuple[float, float, float]:
         try:
             completion_rate = UserAnalyticsService.calculate_completion_rate(user, db)

@@ -23,6 +23,7 @@ class TaskResponse(BaseModel):
     name: str
     category: str
     estimated_completion_time: int
+    due_date: Optional[datetime] = None
 
 
 class SessionCreate(BaseModel):
@@ -57,6 +58,7 @@ class TaskPublic(BaseModel):
     category: str
     completed: bool
     actual_completion_time: Optional[int] = None
+    due_date: Optional[datetime] = None
     archived: Optional[bool] = False
     archived_at: Optional[datetime] = None
 
@@ -123,12 +125,14 @@ class TaskCreate(BaseModel):
     name: str
     category: str
     estimated_completion_time: int
+    due_date: Optional[datetime] = None
 
 
 class TaskUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
     estimated_completion_time: Optional[int] = None
+    due_date: Optional[datetime] = None
 
 
 class TaskReorder(BaseModel):

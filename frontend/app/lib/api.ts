@@ -210,6 +210,7 @@ class ApiClient {
       name: string;
       category: string;
       estimated_completion_time: number;
+      due_date?: string | null;
     }>;
   }) {
     return this.request('/sessions/', {
@@ -318,6 +319,7 @@ class ApiClient {
     name: string;
     category: string;
     estimated_completion_time: number;
+    due_date?: string | null;
   }) {
     return this.request(`/sessions/${sessionId}/tasks`, {
       method: 'POST',
@@ -329,6 +331,7 @@ class ApiClient {
     name?: string;
     category?: string;
     estimated_completion_time?: number;
+    due_date?: string | null;
   }) {
     return this.request(`/sessions/tasks/${taskId}`, {
       method: 'PUT',

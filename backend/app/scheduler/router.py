@@ -11,7 +11,7 @@ from .schemas import (
     ScheduledTaskResponse,
     ScheduleReorderRequest,
 )
-from .pygad_scheduler import GeneticScheduler
+from .genetic_scheduler import GeneticScheduler
 
 router = APIRouter(prefix="/scheduler", tags=["Scheduler"])
 

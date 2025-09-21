@@ -93,6 +93,7 @@ export default function Sessions() {
     name: "",
     category: "",
     estimated_completion_time: 30,
+    due_date: "",
   });
 
   useEffect(() => {
@@ -180,6 +181,7 @@ export default function Sessions() {
         name: t.name,
         category: (t as any).category || "Uncategorized",
         estimated_completion_time: t.estimated_completion_time,
+        due_date: (t as any).due_date || undefined,
       }));
       const copyNameBase = session.name || "Session";
       let copyName = `${copyNameBase} (Copy)`;
@@ -279,10 +281,20 @@ export default function Sessions() {
         return;
       }
       await addTaskToSession(selectedSession.id, taskForm);
+      const payload = {
+        name: taskForm.name,
+        category: taskForm.category,
+        estimated_completion_time: taskForm.estimated_completion_time,
+        due_date: taskForm.due_date
+          ? new Date(`${taskForm.due_date}T00:00:00`).toISOString()
+          : undefined,
+      };
+      await addTaskToSession(selectedSession.id, payload);
       // Refresh the selected session
       const updatedSession = await getSession(selectedSession.id);
       setSelectedSession(updatedSession);
-      setTaskForm({ name: "", category: "", estimated_completion_time: 30 });
+  setTaskForm({ name: "", category: "", estimated_completion_time: 30, due_date: "" });
+  setTaskForm({ name: "", category: "", estimated_completion_time: 30, due_date: "" });
       setIsAddingTask(false);
     } catch (error) {
       console.error("Failed to add task:", error);
@@ -294,6 +306,7 @@ export default function Sessions() {
       name: task.name,
       category: task.category,
       estimated_completion_time: task.estimated_completion_time,
+      due_date: (task as any).due_date ? (task as any).due_date.slice(0, 10) : "",
     });
     setEditingTask(task);
     setIsEditingTask(true);
@@ -311,10 +324,21 @@ export default function Sessions() {
         return;
       }
       await updateTask(editingTask.id, taskForm);
+      const payload = {
+        name: taskForm.name,
+        category: taskForm.category,
+        estimated_completion_time: taskForm.estimated_completion_time,
+        due_date: taskForm.due_date
+          ? new Date(`${taskForm.due_date}T00:00:00`).toISOString()
+          : undefined,
+      };
+      await updateTask(editingTask.id, payload);
       // Update the selected session
       if (selectedSession) {
         const updatedTasks = selectedSession.tasks?.map((task) =>
-          task.id === editingTask.id ? { ...task, ...taskForm } : task
+          task.id === editingTask.id
+            ? { ...task, ...payload }
+            : task
         );
         setSelectedSession({ ...selectedSession, tasks: updatedTasks });
       }
@@ -1055,6 +1079,21 @@ export default function Sessions() {
                               />
                             </div>
                             <div>
+                              <Label htmlFor="dueDate" className="text-sm sm:text-base">Due Date</Label>
+                              <Input
+                                id="dueDate"
+                                type="date"
+                                value={taskForm.due_date}
+                                onChange={(e) =>
+                                  setTaskForm({
+                                    ...taskForm,
+                                    due_date: e.target.value,
+                                  })
+                                }
+                                className="text-sm sm:text-base"
+                              />
+                            </div>
+                            <div>
                               <Label htmlFor="duration" className="text-sm sm:text-base">
                                 Estimated Duration (minutes)
                               </Label>
@@ -1252,6 +1291,9 @@ export default function Sessions() {
                                             <span>
                                               {task.estimated_completion_time}min
                                             </span>
+                                            {task.due_date && (
+                                              <span className="ml-2">• Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                                            )}
                                             {task.actual_completion_time && (
                                               <span className="hidden sm:inline">
                                                 • Actual:{" "}
@@ -1358,6 +1400,23 @@ export default function Sessions() {
                                                         ...taskForm,
                                                         category:
                                                           e.target.value,
+                                                      })
+                                                    }
+                                                    className="text-sm sm:text-base"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <Label htmlFor="editDueDate" className="text-sm sm:text-base">
+                                                    Due Date
+                                                  </Label>
+                                                  <Input
+                                                    id="editDueDate"
+                                                    type="date"
+                                                    value={taskForm.due_date}
+                                                    onChange={(e) =>
+                                                      setTaskForm({
+                                                        ...taskForm,
+                                                        due_date: e.target.value,
                                                       })
                                                     }
                                                     className="text-sm sm:text-base"

@@ -19,6 +19,7 @@ export interface Task {
   category: string;
   completed: boolean;
   actual_completion_time: number | null;
+  due_date?: string | null;
   archived?: boolean;
   archived_at?: string | null;
 }
@@ -82,11 +83,13 @@ interface TaskState {
     name: string;
     category: string;
     estimated_completion_time: number;
+    due_date?: string | null;
   }) => Promise<void>;
   updateTask: (taskId: number, taskData: {
     name?: string;
     category?: string;
     estimated_completion_time?: number;
+    due_date?: string | null;
   }) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   reorderTasks: (sessionId: number, taskIds: number[]) => Promise<void>;
@@ -524,6 +527,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             category: newTask.category || 'Uncategorized',
             completed: false,
             archived: !!newTask.archived,
+              due_date: newTask.due_date || undefined,
           };
 
           const reordered = [...currentSchedule, newScheduledTask];
@@ -580,6 +584,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
                   estimated_completion_time: updatedTask.estimated_completion_time,
                   category: updatedTask.category,
                   archived: updatedTask.archived,
+                  due_date: updatedTask.due_date || undefined,
                 }
               : t
           );
