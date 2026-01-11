@@ -12,50 +12,29 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { LogoIcon } from "~/components/ui/logo";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
-  Check,
   Clock,
-  FilePenLine,
-  Pause,
-  Play,
   Plus,
-  PlusCircle,
-  RotateCcw,
-  Settings,
   Trash2,
-  SkipForward,
 } from "lucide-react";
 import { ScheduleGeneratorDialog } from "~/components/pomotoro/schedule-generator-dialog";
 import { ScheduledTasksList } from "~/components/pomotoro/scheduled-tasks-list";
 import { Checkbox } from "~/components/ui/checkbox";
-import TaskCheckItem from "~/components/pomotoro/tasks/task-check-item";
-import { TaskScheduler } from "~/components/pomotoro/tasks/task-scheduler";
 import { SessionInfoForm } from "~/components/pomotoro/forms/SessionInfoForm";
-import type { Session } from "~/types/session";
 import { TaskDifficulty } from "~/types/task";
-import type { Task } from "~/stores/tasks";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { DialogTitle } from "@radix-ui/react-dialog";
-import { TaskItem } from "~/components/pomotoro/tasks/task-item";
 import { toast } from "sonner";
-import { formatMinutes } from "~/lib/time";
 import { usePomodoroStore } from "~/stores/pomodoro";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { useAuthStore } from "~/stores/auth";
-import { PomodoroTimer } from "~/components/pomotoro/charts/pomodoro-timer";
-import {
-  SessionFeedbackModal,
-  type FocusLevel,
-} from "~/components/pomodoro/session-feedback-modal";
 import { apiClient } from "~/lib/api";
 import useElementSize from "~/hooks/use-element-size";
 import { useIsMobile } from "~/hooks/use-mobile";
@@ -66,6 +45,8 @@ import {
 } from "~/components/pomotoro/session-editor-dialog";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { cn } from "~/lib/utils";
+import { TimerDisplay } from "~/components/pomotoro/home/TimerDisplay";
+import { TimerControls } from "~/components/pomotoro/home/TimerControls";
 
 interface GeneratedTask {
   name: string;
@@ -99,12 +80,20 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
   const tasksStore = useTaskStore();
-  const pomodoroStore = usePomodoroStore();
   const authStore = useAuthStore();
   const analyticsStore = useAnalyticsStore();
   const schedulerStore = useSchedulerStore();
   const isMobile = useIsMobile();
   const isXL = useIsXL();
+
+  // Access specific pomodoro state needed for layout/logic, BUT NOT timer ticks
+  const pomodoroSettings = usePomodoroStore(state => state.settings);
+  const pomodoroPhase = usePomodoroStore(state => state.phase);
+  const updatePomodoroSettings = usePomodoroStore(state => state.updateSettings); 
+  // We need to trigger these actions but they don't cause renders themselves
+  const loadActiveSession = usePomodoroStore(state => state.loadActiveSession);
+  const resetPomodoroTimer = usePomodoroStore(state => state.resetTimer);
+  const pomodoroSessionId = usePomodoroStore(state => state.sessionId);
 
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
@@ -136,20 +125,25 @@ export default function Home() {
     if (authStore.user) {
       tasksStore.loadSessions();
       // loadActiveSession already syncs settings with the current task/session
-      pomodoroStore.loadActiveSession();
+      // Only load active session if the timer is NOT running locally to avoid race conditions
+      // where stale backend data overwrites the running timer
+      const isRunning = usePomodoroStore.getState().isRunning;
+      if (!isRunning) {
+        loadActiveSession();
+      }
     }
-  }, [authStore.user]);
+  }, [authStore.user, loadActiveSession]);
 
   useEffect(() => {
     if (
-      pomodoroStore.sessionId &&
-      Number.isInteger(pomodoroStore.sessionId) &&
-      pomodoroStore.sessionId > 0 &&
+      pomodoroSessionId &&
+      Number.isInteger(pomodoroSessionId) &&
+      pomodoroSessionId > 0 &&
       !tasksStore.currentSession
     ) {
-      tasksStore.loadSession(pomodoroStore.sessionId);
+      tasksStore.loadSession(pomodoroSessionId);
     }
-  }, [pomodoroStore.sessionId]);
+  }, [pomodoroSessionId]);
 
   // Listen for session completion events to refresh data
   useEffect(() => {
@@ -190,22 +184,6 @@ export default function Home() {
     };
   }, [tasksStore]);
 
-  // Timer ticking, backend sync and completion handling are performed by
-  // the centralized pomodoro store background ticker. The Home page just
-  // renders the current store state.
-
-  const totalPomodoros = useMemo(() => {
-    if (!sessionInfo) return 0;
-    return Math.ceil(
-      sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0) /
-        sessionInfo.pomodoroSetup.duration
-    );
-  }, [sessionInfo]);
-
-  const totalTimeMinutes = useMemo(() => {
-    if (!sessionInfo) return 0;
-    return sessionInfo.tasks.reduce((acc, task) => acc + task.estimatedTime, 0);
-  }, [sessionInfo]);
 
   // Visible schedule: exclude archived tasks (centralized filter)
   const visibleSchedule = useMemo(() => {
@@ -213,6 +191,13 @@ export default function Home() {
       (t: any) => !t.archived
     );
   }, [schedulerStore.currentSchedule]);
+  
+  const scheduleRemainingHours = useMemo(() => {
+     const incomplete = visibleSchedule.filter((t: any) => !t.completed);
+     if (incomplete.length === 0) return 0;
+     const totalMin = incomplete.reduce((acc: number, task: any) => acc + task.estimated_completion_time, 0);
+     return Math.floor(totalMin / 60);
+  }, [visibleSchedule]);
 
   // Generate session from plain text project details using recommendations API
   const startGenerating = async (projectDetails: string) => {
@@ -291,7 +276,7 @@ export default function Home() {
 
   const cancelSessionSettings = () => {
     setIsSessionSettingsOpen(false);
-    setSessionSettings(pomodoroStore.settings);
+    setSessionSettings(pomodoroSettings);
   };
 
   const saveSessionSettings = () => {
@@ -312,7 +297,7 @@ export default function Home() {
       );
       return;
     }
-    pomodoroStore.updateSettings(sessionSettings);
+    updatePomodoroSettings(sessionSettings);
     setIsSessionSettingsOpen(false);
     toast.success("Session settings saved");
   };
@@ -325,15 +310,8 @@ export default function Home() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-full">
             <Clock className="h-4 w-4" />
             <span className="font-medium">
-              {visibleSchedule.filter((t) => !t.completed).length > 0
-                ? `${Math.floor(
-                    visibleSchedule
-                      .filter((task) => !task.completed)
-                      .reduce(
-                        (acc, task) => acc + task.estimated_completion_time,
-                        0
-                      ) / 60
-                  )} hours remaining`
+              {visibleSchedule.filter((t: any) => !t.completed).length > 0
+                ? `${scheduleRemainingHours} hours remaining`
                 : "No schedule"}
             </span>
           </div>
@@ -354,7 +332,7 @@ export default function Home() {
               open={isNewSessionDialogOpen}
               onOpenChange={(open) => setIsNewSessionDialogOpen(open)}
             >
-              <DialogTrigger disabled={isGenerating}>
+              <DialogTrigger asChild disabled={isGenerating}>
                 <Button
                   className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-3 sm:px-6 text-xs sm:text-sm"
                   disabled={isGenerating}
@@ -526,164 +504,13 @@ export default function Home() {
                 })()}
               </span>
             </div>
-            <div className="mx-auto">
-              <PomodoroTimer
-                time={pomodoroStore.time}
-                endTime={pomodoroStore.maxTime}
-              />
-            </div>
-            <div className="-mt-4 mb-8 sm:mb-12 flex flex-col items-center">
-              {schedulerStore.getCurrentTask() ? (
-                <>
-                  <p className="text-center">
-                    {pomodoroStore.phase === "focus"
-                      ? "Stay focused!"
-                      : pomodoroStore.phase === "short_break"
-                      ? "Short break"
-                      : "Long break"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {(() => {
-                      const t = pomodoroStore.time;
-                      const mins =
-                        Number.isFinite(t) && t >= 0 ? Math.floor(t / 60) : 0;
-                      return `${mins} minute${mins === 1 ? "" : "s"} remaining`;
-                    })()}
-                  </p>
-                </>
-              ) : null}
-            </div>
+            
+            {/* ISOLATED TIMER DISPLAY */}
+            <TimerDisplay />
 
-            {pomodoroStore.showRestOverlay && (
-              <p className="text-center text-sm text-orange-600 font-medium flex items-center justify-center">
-                Rest Overlay Active
-              </p>
-            )}
-
-            <div className="mt-3 flex flex-col gap-3">
-              {schedulerStore.getCurrentTask() && (
-                <>
-                  <div className="flex gap-2 sm:gap-3">
-                    <Button
-                      className="flex flex-1 items-center gap-2 sm:gap-3 text-sm sm:text-base"
-                      variant="default"
-                      onClick={async () => {
-                        try {
-                          if (pomodoroStore.isRunning) {
-                            await pomodoroStore.pauseTimer();
-                          } else {
-                            await pomodoroStore.startTimer();
-                          }
-                        } catch (error) {
-                          toast.error(
-                            error instanceof Error
-                              ? error.message
-                              : "Failed to start timer"
-                          );
-                        }
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      {pomodoroStore.isRunning ? (
-                        <>
-                          <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="hidden sm:inline">Pause Task</span>
-                          <span className="sm:hidden">Pause</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="hidden sm:inline">Start Task</span>
-                          <span className="sm:hidden">Start</span>
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await pomodoroStore.resetTimer();
-                        } catch (error) {
-                          toast.error("Failed to reset timer");
-                        }
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                  </div>
-                </>
-              )}
-              {schedulerStore.getCurrentTask() && (
-                <Button
-                  className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
-                  variant="outline"
-                  onClick={() => {
-                    if (
-                      pomodoroStore.phase === 'short_break' ||
-                      pomodoroStore.phase === 'long_break'
-                    ) {
-                      toast.info('Finish your break before completing tasks.');
-                      return;
-                    }
-                    const currentTask = schedulerStore.getCurrentTask();
-                    if (currentTask) {
-                      schedulerStore.completeScheduledTask(currentTask.id);
-                    }
-                  }}
-                  disabled={
-                    pomodoroStore.phase === 'short_break' ||
-                    pomodoroStore.phase === 'long_break'
-                  }
-                >
-                  <Check className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="hidden sm:inline">Mark Task Complete</span>
-                  <span className="sm:hidden">Complete</span>
-                </Button>
-              )}
-
-              {schedulerStore.getCurrentTask() &&
-                (pomodoroStore.phase === "short_break" ||
-                  pomodoroStore.phase === "long_break") && (
-                  <div className="flex gap-2 sm:gap-3">
-                    <Button
-                      className="flex-1 flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await pomodoroStore.extendRest();
-                          toast.success("Break extended");
-                        } catch (error) {
-                          toast.error("Failed to extend break");
-                        }
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">Extend Break</span>
-                      <span className="sm:hidden">Extend</span>
-                    </Button>
-
-                    <Button
-                      className="flex-1 flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await pomodoroStore.skipRest();
-                        } catch (error) {
-                          toast.error("Failed to skip break");
-                        }
-                      }}
-                      disabled={pomodoroStore.isLoading}
-                    >
-                      <SkipForward className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">Skip Break</span>
-                      <span className="sm:hidden">Skip</span>
-                    </Button>
-                  </div>
-                )}
-            </div>
+            {/* ISOLATED TIMER CONTROLS */}
+            <TimerControls />
+            
           </CardContent>
         </Card>
 
@@ -720,7 +547,7 @@ export default function Home() {
                 <ScheduleGeneratorDialog
                   onScheduleGenerated={async () => {
                     try {
-                      await pomodoroStore.resetTimer();
+                      await resetPomodoroTimer();
                     } catch (error) {
                       console.error("Failed to reset timer after schedule generation", error);
                     }
@@ -731,7 +558,7 @@ export default function Home() {
             </div>
             <ScrollArea className={cn(["p-2 sm:p-3 w-full", isXL && "h-full pb-16"])}>
               <ScheduledTasksList
-                sessionSettings={pomodoroStore.settings}
+                sessionSettings={pomodoroSettings}
                 onOpenSettings={openSessionSettings}
               />
             </ScrollArea>
@@ -756,8 +583,8 @@ export default function Home() {
                         schedulerStore.uncompleteScheduledTask(task.id);
                       } else {
                         if (
-                          pomodoroStore.phase === 'short_break' ||
-                          pomodoroStore.phase === 'long_break'
+                          pomodoroPhase === 'short_break' ||
+                          pomodoroPhase === 'long_break'
                         ) {
                           toast.info('Cannot complete tasks during a break.');
                           return;
@@ -773,8 +600,8 @@ export default function Home() {
                           schedulerStore.uncompleteScheduledTask(task.id);
                         } else {
                           if (
-                            pomodoroStore.phase === 'short_break' ||
-                            pomodoroStore.phase === 'long_break'
+                            pomodoroPhase === 'short_break' ||
+                            pomodoroPhase === 'long_break'
                           ) {
                             toast.info('Cannot complete tasks during a break.');
                             return;
@@ -799,48 +626,14 @@ export default function Home() {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-6 sm:py-8 text-muted-foreground">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-muted/30 flex items-center justify-center">
-                    <PlusCircle className="h-6 w-6 sm:h-8 sm:w-8" />
-                  </div>
-                  <p className="font-medium text-sm sm:text-base">No tasks yet</p>
-                  <p className="text-xs sm:text-sm">
-                    Generate a schedule to see tasks here
-                  </p>
-                </div>
-              )}
-              {visibleSchedule.length > 5 && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  +{visibleSchedule.length - 5} more tasks in full schedule
+                <div className="text-center text-muted-foreground py-2 text-sm sm:text-base">
+                  No tasks in schedule
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Session Feedback Modal */}
-      {pomodoroStore.pendingSessionCompletion && (
-        <SessionFeedbackModal
-          isOpen={pomodoroStore.showFeedbackModal}
-          onClose={() => pomodoroStore.setShowFeedbackModal(false)}
-          onSubmit={async (focusLevel: FocusLevel, reflection?: string) => {
-            try {
-              await pomodoroStore.submitSessionFeedback(focusLevel, reflection);
-              toast.success("Session feedback submitted successfully!");
-              // Refresh analytics after successful submission
-              analyticsStore.fetchEvents();
-              analyticsStore.updateTodayStats();
-            } catch (error) {
-              toast.error("Failed to submit feedback. Please try again.");
-            }
-          }}
-          sessionName={pomodoroStore.pendingSessionCompletion.sessionName}
-          focusDuration={pomodoroStore.pendingSessionCompletion.focusDuration}
-          tasksCompleted={pomodoroStore.pendingSessionCompletion.completedTasks}
-          tasksTotal={pomodoroStore.pendingSessionCompletion.totalTasks}
-        />
-      )}
     </main>
   );
 }

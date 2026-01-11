@@ -593,8 +593,23 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const isRunningOnBackend = activeSession.is_running;
       
       // Always respect backend state for is_running to prevent phantom timers
-      if (wasRunningLocally && !isRunningOnBackend) {
-        // Backend says timer stopped - respect that
+      // UNLESS we are currently running locally on this client for the same session.
+      // This prevents "flicker" where a navigation fetches a stale "stopped" state
+      // from the backend before the next sync beat.
+      const isSameSession = activeSession.session_id === currentState.sessionId;
+      const trustLocalRunning = wasRunningLocally && isSameSession;
+
+      if (trustLocalRunning && !isRunningOnBackend) {
+        // We are running, backend says stopped. Trust local, but try to repair backend.
+        // Do NOT set isRunning: false.
+        apiClient.updateActiveSession({ 
+          is_running: true, 
+          time_remaining: currentState.time 
+        }).catch(() => {});
+        // Mock backend being running for the rest of this function
+        activeSession.is_running = true;
+      } else if (wasRunningLocally && !isRunningOnBackend) {
+        // Different session, or some other mismatch - respect backend stop
         set({ isRunning: false });
       }
       
@@ -666,7 +681,7 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
       const backendTime = Number.isFinite(activeSession.time_remaining) && activeSession.time_remaining >= 0
         ? activeSession.time_remaining
         : newMaxTime;
-      const keepLocalProgress = currentState.isRunning && activeSession.is_running && !phaseChanged;
+      const keepLocalProgress = (currentState.isRunning || trustLocalRunning) && activeSession.is_running && !phaseChanged;
       const chosenTime = keepLocalProgress
         ? Math.min(
             Number.isFinite(currentState.time) && currentState.time >= 0 ? currentState.time : backendTime,

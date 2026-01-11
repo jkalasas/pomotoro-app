@@ -278,8 +278,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       } catch {}
 
-  // Avoid redundant full refresh here; UI is updated optimistically and
-  // specific reloads happen via events and scheduler/pomodoro sync.
+      // Avoid redundant full refresh here; UI is updated optimistically and
+      // specific reloads happen via events and scheduler/pomodoro sync.
       
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('task-completed'));
@@ -402,7 +402,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       
       // Refresh current session to get updated task status
       if (currentSession) {
-        await get().refreshAllData();
+         // Optimistic update handled above. Deep refresh only for session-level side effects.
+         if (response.session_reset) {
+            await get().refreshAllData();
+         } else {
+            // For simple uncompletion without reset, we might not need full refresh if we trust optimistic update
+            // But to be safe on task fields, we can just load the session silently
+             get().loadSession(currentSession.id);
+         }
         
         // Check if session was reset due to uncompleting the task
         if (response.session_reset) {
