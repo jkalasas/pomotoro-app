@@ -14,7 +14,7 @@ async def call_gemini_for_tasks(description: str) -> dict:
 
     Analyze the goal and provide a response in a strict JSON format. The JSON object must have three keys:
     1. "session": A JSON object with "name" (string), "description" (string).
-    2. "tasks": A list of JSON objects, where each object has "name" (string), "category" (string), and "estimated_completion_time" (integer in minutes).
+    2. "tasks": A list of JSON objects, where each object has "name" (string), "category" (string), "estimated_completion_time" (integer in minutes), and "cognitive_load" (integer 1-5, where 1 means low mental effort and 5 means very high mental effort).
     3. "pomodoro_setup": A JSON object with "focus_duration", "short_break_duration", "long_break_duration" (all integers in minutes), and "long_break_per_pomodoros" (integer).
 
 

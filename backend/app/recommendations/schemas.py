@@ -13,6 +13,7 @@ class TaskResponse(BaseModel):
     name: str
     category: str
     estimated_completion_time: int
+    cognitive_load: int = 1
 
 
 class PomodoroConfig(BaseModel):

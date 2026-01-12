@@ -16,6 +16,7 @@ export interface Task {
   id: number;
   name: string;
   estimated_completion_time: number;
+  cognitive_load?: number;
   category: string;
   completed: boolean;
   actual_completion_time: number | null;
@@ -61,6 +62,7 @@ interface TaskState {
       name: string;
       category: string;
       estimated_completion_time: number;
+      cognitive_load?: number;
     }>;
   }) => Promise<Session>;
   updateSession: (sessionId: number, updates: { 

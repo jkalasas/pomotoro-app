@@ -5,8 +5,14 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from sqlalchemy import text
 from app.config import settings
 from app.models import PomodoroSession
+
 # Import analytics models to ensure they're registered
-from app.analytics.models import AnalyticsEvent, SessionAnalytics, DailyStats, WeeklyStats
+from app.analytics.models import (
+    AnalyticsEvent,
+    SessionAnalytics,
+    DailyStats,
+    WeeklyStats,
+)
 
 DATABASE_URL = settings.database_url
 
@@ -18,6 +24,7 @@ if DATABASE_URL.startswith("sqlite"):
 engine = create_engine(
     DATABASE_URL, echo=settings.database_echo, connect_args=connect_args
 )
+
 
 def get_session():
     with Session(engine) as session:
@@ -31,11 +38,15 @@ def create_db_and_tables():
     with Session(engine) as session:
         try:
             # Check if name column exists by trying to query it
-            session.exec(select(PomodoroSession).where(PomodoroSession.name == "")).first()
+            session.exec(
+                select(PomodoroSession).where(PomodoroSession.name == "")
+            ).first()
         except Exception:
             # If there's an error, the column might not exist, try to add it
             try:
-                session.exec(text("ALTER TABLE session ADD COLUMN name TEXT DEFAULT ''"))
+                session.exec(
+                    text("ALTER TABLE session ADD COLUMN name TEXT DEFAULT ''")
+                )
                 session.commit()
                 print("Added name column to session table")
             except Exception as e:
@@ -46,8 +57,12 @@ def create_db_and_tables():
             session.exec(text("SELECT archived FROM session LIMIT 1"))
         except Exception:
             try:
-                session.exec(text("ALTER TABLE session ADD COLUMN archived BOOLEAN DEFAULT 0"))
-                session.exec(text("ALTER TABLE session ADD COLUMN archived_at TIMESTAMP NULL"))
+                session.exec(
+                    text("ALTER TABLE session ADD COLUMN archived BOOLEAN DEFAULT 0")
+                )
+                session.exec(
+                    text("ALTER TABLE session ADD COLUMN archived_at TIMESTAMP NULL")
+                )
                 session.commit()
                 print("Added archived columns to session table")
             except Exception as e:
@@ -58,8 +73,12 @@ def create_db_and_tables():
             session.exec(text("SELECT is_deleted FROM session LIMIT 1"))
         except Exception:
             try:
-                session.exec(text("ALTER TABLE session ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
-                session.exec(text("ALTER TABLE session ADD COLUMN deleted_at TIMESTAMP NULL"))
+                session.exec(
+                    text("ALTER TABLE session ADD COLUMN is_deleted BOOLEAN DEFAULT 0")
+                )
+                session.exec(
+                    text("ALTER TABLE session ADD COLUMN deleted_at TIMESTAMP NULL")
+                )
                 session.commit()
                 print("Added soft delete columns to session table")
             except Exception as e:
@@ -69,8 +88,12 @@ def create_db_and_tables():
             session.exec(text("SELECT archived FROM task LIMIT 1"))
         except Exception:
             try:
-                session.exec(text("ALTER TABLE task ADD COLUMN archived BOOLEAN DEFAULT 0"))
-                session.exec(text("ALTER TABLE task ADD COLUMN archived_at TIMESTAMP NULL"))
+                session.exec(
+                    text("ALTER TABLE task ADD COLUMN archived BOOLEAN DEFAULT 0")
+                )
+                session.exec(
+                    text("ALTER TABLE task ADD COLUMN archived_at TIMESTAMP NULL")
+                )
                 session.commit()
                 print("Added archived columns to task table")
             except Exception as e:
@@ -81,12 +104,29 @@ def create_db_and_tables():
             session.exec(text("SELECT is_deleted FROM task LIMIT 1"))
         except Exception:
             try:
-                session.exec(text("ALTER TABLE task ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
-                session.exec(text("ALTER TABLE task ADD COLUMN deleted_at TIMESTAMP NULL"))
+                session.exec(
+                    text("ALTER TABLE task ADD COLUMN is_deleted BOOLEAN DEFAULT 0")
+                )
+                session.exec(
+                    text("ALTER TABLE task ADD COLUMN deleted_at TIMESTAMP NULL")
+                )
                 session.commit()
                 print("Added soft delete columns to task table")
             except Exception as e:
                 print(f"Could not add soft delete columns to task: {e}")
+
+        # Add cognitive_load column if it doesn't exist (task)
+        try:
+            session.exec(text("SELECT cognitive_load FROM task LIMIT 1"))
+        except Exception:
+            try:
+                session.exec(
+                    text("ALTER TABLE task ADD COLUMN cognitive_load INTEGER DEFAULT 1")
+                )
+                session.commit()
+                print("Added cognitive_load column to task table")
+            except Exception as e:
+                print(f"Could not add cognitive_load column to task: {e}")
 
     # seed basic categories if empty
     from .models import Category

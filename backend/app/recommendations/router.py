@@ -27,10 +27,15 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
         name: str
         category: str
         estimated_completion_time: int
+        cognitive_load: int = 1
 
     initial_tasks = [LlmTask(**task) for task in llm_output.get("tasks", [])]
     pomodoro_config = PomodoroConfig(**llm_output.get("pomodoro_setup", {}))
-    session_info = SessionInfo(**llm_output.get("session", {"name": "Generated Session", "description": description}))
+    session_info = SessionInfo(
+        **llm_output.get(
+            "session", {"name": "Generated Session", "description": description}
+        )
+    )
 
     final_tasks: List[TaskResponse] = []
     total_time = 0
@@ -61,11 +66,18 @@ async def get_recommendations(description: str, db: Session) -> RecommendationRe
         if len(results) >= SIMILARITY_THRESHOLD:
             final_estimate = round(statistics.mean(results))
 
+        # Adjust for cognitive load
+        # For high cognitive load (4-5), extend the time estimate
+        if task.cognitive_load > 3:
+            multiplier = 1.0 + (task.cognitive_load - 3) * 0.25
+            final_estimate = int(final_estimate * multiplier)
+
         final_tasks.append(
             TaskResponse(
                 name=task.name,
                 category=task.category,
                 estimated_completion_time=final_estimate,
+                cognitive_load=task.cognitive_load,
             )
         )
         total_time += final_estimate
