@@ -21,6 +21,7 @@ export interface Task {
   completed: boolean;
   actual_completion_time: number | null;
   due_date?: string | null;
+  suggested_break_duration?: number;
   archived?: boolean;
   archived_at?: string | null;
 }

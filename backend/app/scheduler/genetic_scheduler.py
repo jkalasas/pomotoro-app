@@ -64,20 +64,46 @@ class GeneticScheduler:
         for t in tasks_sorted:
             session_queues.setdefault(t.session_id or -1, []).append(t)
 
-        index_by_task_id: Dict[int, int] = {t.id: i for i, t in enumerate(tasks_sorted) if t.id is not None}
+        index_by_task_id: Dict[int, int] = {
+            t.id: i for i, t in enumerate(tasks_sorted) if t.id is not None
+        }
 
         # Adaptive weights based on analytics
         weights = self._calculate_adaptive_weights(user, db)
 
-        # Gene space: priorities in [0, 1]
-        num_genes = len(tasks_sorted)
-        gene_space = [{"low": 0.0, "high": 1.0}] * num_genes
+        # Gene space:
+        # First N genes: priorities in [0, 1]
+        # Next N genes: break durations based on cognitive load
+        num_tasks = len(tasks_sorted)
+
+        # Priority genes
+        gene_space = [{"low": 0.0, "high": 1.0}] * num_tasks
+
+        # Break duration genes
+        complexity_ranges = {
+            1: {"low": 2, "high": 5},
+            2: {"low": 3, "high": 8},
+            3: {"low": 5, "high": 10},
+            4: {"low": 8, "high": 15},
+            5: {"low": 10, "high": 20},
+        }
+
+        for t in tasks_sorted:
+            load = t.cognitive_load if t.cognitive_load else 1
+            # Ensure load is within 1-5
+            load = max(1, min(5, load))
+            r = complexity_ranges.get(load, {"low": 5, "high": 10})
+            gene_space.append(r)
+
+        num_genes = len(gene_space)
 
         # Prepare closure context for fitness/decoder
         def decode(solution: np.ndarray) -> List[Task]:
             return self._decode_random_keys(solution, session_queues, index_by_task_id)
 
-        def fitness_func(ga_instance: pygad.GA, solution: np.ndarray, solution_idx: int) -> float:  # PyGAD expects (ga, solution, idx)
+        def fitness_func(
+            ga_instance: pygad.GA, solution: np.ndarray, solution_idx: int
+        ) -> float:  # PyGAD expects (ga, solution, idx)
             schedule = decode(solution)
             return float(self._fitness(schedule, weights))
 
@@ -111,6 +137,9 @@ class GeneticScheduler:
         session_queues: Dict[int, List[Task]],
         index_by_task_id: Dict[int, int],
     ) -> List[Task]:
+        # Number of tasks is half the solution length
+        num_tasks = len(index_by_task_id)
+
         # Maintain pointers for each session queue
         ptrs: Dict[int, int] = {sid: 0 for sid in session_queues}
         total = sum(len(q) for q in session_queues.values())
@@ -126,7 +155,18 @@ class GeneticScheduler:
                 task = queue[p]
                 idx = index_by_task_id.get(task.id)  # type: ignore[arg-type]
                 # If something is off (shouldn't), fallback priority
+                # If something is off (shouldn't), fallback priority
                 priority = float(solution[idx]) if idx is not None else 0.0
+
+                # Extract break duration gene
+                # The break genes start at index num_tasks
+                break_duration = 5
+                if idx is not None and (num_tasks + idx) < len(solution):
+                    break_duration = int(solution[num_tasks + idx])
+
+                # Temporarily attach suggested break to task (careful with side effects if objects shared)
+                # Since we are running sequentially, setting it here allows fitness to see it.
+                task.suggested_break_duration = break_duration
 
                 # Ties are broken by earlier due date or shorter duration
                 if candidate is None:
@@ -167,7 +207,9 @@ class GeneticScheduler:
         # fallback: smaller id
         return (a.id or 0) < (b.id or 0)
 
-    def _fitness(self, chromosome: List[Task], weights: Tuple[float, float, float]) -> float:
+    def _fitness(
+        self, chromosome: List[Task], weights: Tuple[float, float, float]
+    ) -> float:
         w_u, w_m, w_v = weights
 
         urgency = self._urgency_score(chromosome)
@@ -194,6 +236,10 @@ class GeneticScheduler:
         tardiness = 0.0
         for t in chromosome:
             elapsed += max(0, int(t.estimated_completion_time))
+            # Include the suggested break time in the schedule accumulation
+            if t.suggested_break_duration:
+                elapsed += t.suggested_break_duration
+
             if t.due_date:
                 finish = now + timedelta(minutes=elapsed)
                 td = (finish - t.due_date).total_seconds() / 60.0
@@ -208,7 +254,7 @@ class GeneticScheduler:
             return 0.0
         score = 0.0
         for i, t in enumerate(chromosome):
-            weight = (n - i)
+            weight = n - i
             score += weight / max(1, t.estimated_completion_time)
         return score
 
@@ -223,10 +269,14 @@ class GeneticScheduler:
             s += abs(a - b)
         return s
 
-    def _calculate_adaptive_weights(self, user: User, db: DBSession) -> Tuple[float, float, float]:
+    def _calculate_adaptive_weights(
+        self, user: User, db: DBSession
+    ) -> Tuple[float, float, float]:
         try:
             completion_rate = UserAnalyticsService.calculate_completion_rate(user, db)
-            avg_focus_level = UserAnalyticsService.calculate_average_focus_level(user, db)
+            avg_focus_level = UserAnalyticsService.calculate_average_focus_level(
+                user, db
+            )
         except Exception as e:
             print(f"Analytics error: {e}; using default adaptive weights")
             completion_rate = 0.5

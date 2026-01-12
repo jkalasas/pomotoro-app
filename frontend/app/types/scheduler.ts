@@ -8,6 +8,7 @@ export interface ScheduledTask {
   completed?: boolean;
   actual_completion_time?: number | null;
   archived?: boolean; // optional flag if backend starts returning it
+  suggested_break_duration?: number;
 }
 
 export interface ScheduleResponse {

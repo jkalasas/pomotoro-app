@@ -764,7 +764,26 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
           nextDuration = session.long_break_duration * 60;
         } else {
           nextPhase = "short_break";
-          nextDuration = session.short_break_duration * 60;
+          // Check if the COMPLETED task (which was just active) has a suggested break duration
+          // We need to look up the task that was just paused/completed.
+          // In handlePhaseCompletion, we don't strictly know which task was "active" if currentTaskId is null,
+          // but usually currentTaskId is set.
+          const { currentTaskId } = get();
+          let dynamicBreak = 0;
+          
+          if (currentTaskId) {
+             try {
+                // We need to import scheduler lazily to avoid circular deps if any
+                const { useSchedulerStore } = await import('./scheduler');
+                const task = useSchedulerStore.getState().getCurrentTask(); 
+                // Note: getCurrentTask() gets the task with currentTaskId.
+                if (task && task.suggested_break_duration) {
+                    dynamicBreak = task.suggested_break_duration * 60;
+                }
+             } catch {}
+          }
+
+          nextDuration = dynamicBreak > 0 ? dynamicBreak : (session.short_break_duration * 60);
         }
         
         // Pomodoro completion is logged by backend when pomodoros_completed increases

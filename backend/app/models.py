@@ -80,6 +80,7 @@ class Task(SQLModel, table=True):
     )
     estimated_completion_time: int
     cognitive_load: int = SQLField(default=1)  # 1-5 scale
+    suggested_break_duration: Optional[int] = None  # Dynamic break duration in minutes
     actual_completion_time: Optional[int] = None
     due_date: Optional[datetime] = None  # Add due date for urgency calculations
     completed: bool = SQLField(default=False)
