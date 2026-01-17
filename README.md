@@ -36,6 +36,7 @@ pomotoro/
 ### Prerequisites
 
 - Python 3.12+
+- uv (Python package and project manager)
 - Bun.js
 - Rust (for Tauri)
 - Follow [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
@@ -49,12 +50,12 @@ pomotoro/
 
 2. Install dependencies:
    ```bash
-   pip install -e .
+   uv sync
    ```
 
 3. Run the backend server:
    ```bash
-   python main.py
+   uv run run_server.py
    ```
 
 The backend will start on `http://localhost:8000`.
