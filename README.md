@@ -1,5 +1,9 @@
 # Pomotoro
 
+This is the implementation of the thesis titled: "Invasive Hybrid Recommendation-Based Scheduling with Pomodoro and Genetic Algorithm for Improving Office Worker Productivity".
+
+The subjects of the thesis during it's implementation phase are developers.
+
 ## Tech Stack
 
 ### Backend
