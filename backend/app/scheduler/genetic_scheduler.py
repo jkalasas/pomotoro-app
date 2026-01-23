@@ -45,12 +45,17 @@ class GeneticScheduler:
         tasks: List[Task],
         user: User,
         db: DBSession,
+        session_break_durations: Optional[Dict[int, int]] = None,
     ) -> Tuple[List[Task], float]:
         """
         Returns (best_schedule, fitness_score).
+        session_break_durations: mapping of session_id -> short_break_duration in minutes
         """
         if not tasks:
             return [], 0.0
+
+        if session_break_durations is None:
+            session_break_durations = {}
 
         # Stable input ordering to map genes -> tasks
         # Keep tasks grouped by session and then by their in-session order to make decoding fast.
@@ -79,27 +84,29 @@ class GeneticScheduler:
         # Priority genes
         gene_space = [{"low": 0.0, "high": 1.0}] * num_tasks
 
-        # Break duration genes
-        complexity_ranges = {
-            1: {"low": 2, "high": 5},
-            2: {"low": 3, "high": 8},
-            3: {"low": 5, "high": 10},
-            4: {"low": 8, "high": 15},
-            5: {"low": 10, "high": 20},
+        # Break duration multiplier genes (applied to session's short_break_duration)
+        # Higher cognitive load allows for larger break multipliers
+        multiplier_ranges = {
+            1: {"low": 0.8, "high": 1.0},  # Low intensity: 80%-100% of base break
+            2: {"low": 0.9, "high": 1.1},  # Light: 90%-110%
+            3: {"low": 1.0, "high": 1.2},  # Moderate: 100%-120%
+            4: {"low": 1.1, "high": 1.4},  # High: 110%-140%
+            5: {"low": 1.2, "high": 1.5},  # Very high: 120%-150%
         }
 
         for t in tasks_sorted:
             load = t.cognitive_load if t.cognitive_load else 1
-            # Ensure load is within 1-5
             load = max(1, min(5, load))
-            r = complexity_ranges.get(load, {"low": 5, "high": 10})
+            r = multiplier_ranges.get(load, {"low": 1.0, "high": 1.2})
             gene_space.append(r)
 
         num_genes = len(gene_space)
 
         # Prepare closure context for fitness/decoder
         def decode(solution: np.ndarray) -> List[Task]:
-            return self._decode_random_keys(solution, session_queues, index_by_task_id)
+            return self._decode_random_keys(
+                solution, session_queues, index_by_task_id, session_break_durations
+            )
 
         def fitness_func(
             ga_instance: pygad.GA, solution: np.ndarray, solution_idx: int
@@ -136,11 +143,11 @@ class GeneticScheduler:
         solution: np.ndarray,
         session_queues: Dict[int, List[Task]],
         index_by_task_id: Dict[int, int],
+        session_break_durations: Dict[int, int],
     ) -> List[Task]:
-        # Number of tasks is half the solution length
         num_tasks = len(index_by_task_id)
+        default_break = 5
 
-        # Maintain pointers for each session queue
         ptrs: Dict[int, int] = {sid: 0 for sid in session_queues}
         total = sum(len(q) for q in session_queues.values())
         out: List[Task] = []
@@ -154,19 +161,13 @@ class GeneticScheduler:
                     continue
                 task = queue[p]
                 idx = index_by_task_id.get(task.id)  # type: ignore[arg-type]
-                # If something is off (shouldn't), fallback priority
-                # If something is off (shouldn't), fallback priority
                 priority = float(solution[idx]) if idx is not None else 0.0
 
-                # Extract break duration gene
-                # The break genes start at index num_tasks
-                break_duration = 5
+                base_break = session_break_durations.get(sid, default_break)
+                multiplier = 1.0
                 if idx is not None and (num_tasks + idx) < len(solution):
-                    break_duration = int(solution[num_tasks + idx])
-
-                # Temporarily attach suggested break to task (careful with side effects if objects shared)
-                # Since we are running sequentially, setting it here allows fitness to see it.
-                task.suggested_break_duration = break_duration
+                    multiplier = float(solution[num_tasks + idx])
+                task.suggested_break_duration = int(round(base_break * multiplier))
 
                 # Ties are broken by earlier due date or shorter duration
                 if candidate is None:

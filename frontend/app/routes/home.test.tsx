@@ -107,7 +107,9 @@ vi.mock('~/stores/scheduler', () => ({
      currentSchedule: [],
      clearSchedule: vi.fn(),
      getCurrentTask: () => ({ id: 1, name: 'Task 1' }),
+     getAdjustedSchedule: () => [],
   })),
+  AdjustedScheduledTask: {},
 }));
 
 describe('Home Route', () => {

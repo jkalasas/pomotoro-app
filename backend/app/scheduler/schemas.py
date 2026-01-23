@@ -15,6 +15,7 @@ class ScheduledTaskResponse(BaseModel):
     category: str
     due_date: Optional[str] = None  # ISO format datetime string
     completed: bool = False
+    cognitive_load: int = 1  # 1-5 scale for cognitive intensity
 
 
 class ScheduleResponse(BaseModel):
@@ -25,3 +26,8 @@ class ScheduleResponse(BaseModel):
 
 class ScheduleReorderRequest(BaseModel):
     task_ids: List[int]
+
+
+class RescheduleRemainingRequest(BaseModel):
+    session_ids: List[int]
+    current_task_id: int

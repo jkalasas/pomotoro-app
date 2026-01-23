@@ -414,6 +414,13 @@ class ApiClient {
       body: JSON.stringify({ task_ids: taskIds }),
     });
   }
+
+  async rescheduleRemaining(sessionIds: number[], currentTaskId: number) {
+    return this.request('/scheduler/reschedule-remaining', {
+      method: 'POST',
+      body: JSON.stringify({ session_ids: sessionIds, current_task_id: currentTaskId }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

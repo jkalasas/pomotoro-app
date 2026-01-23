@@ -2,18 +2,23 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Check, RotateCcw, Clock, GripVertical, Trash2, Calendar, Settings } from "lucide-react";
+import { Check, RotateCcw, Clock, GripVertical, Trash2, Calendar, Settings, Brain, Coffee } from "lucide-react";
 import { toast } from "sonner";
-import { useSchedulerStore } from "~/stores/scheduler";
+import { useSchedulerStore, type AdjustedScheduledTask } from "~/stores/scheduler";
 import { useTaskStore } from "~/stores/tasks";
 import { usePomodoroStore } from "~/stores/pomodoro";
-import type { ScheduledTask } from "~/types/scheduler";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   type DropResult,
 } from "@hello-pangea/dnd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 interface ScheduledTasksListProps {
   sessionSettings: {
@@ -37,12 +42,14 @@ export function ScheduledTasksList({
     completeScheduledTask,
     uncompleteScheduledTask,
     clearSchedule,
+    getAdjustedSchedule,
   } = useSchedulerStore();
 
   const { sessions } = useTaskStore();
   const { isRunning, phase } = usePomodoroStore();
 
-  const visible = (currentSchedule || []).filter(t => !t.archived);
+  const adjustedSchedule = getAdjustedSchedule();
+  const visible = (adjustedSchedule || []).filter(t => !t.archived);
 
   if (!visible || visible.length === 0) {
     return (
@@ -84,7 +91,9 @@ export function ScheduledTasksList({
   const totalTasks = visible.length;
   const completedTime = visible
     .filter((task) => task.completed)
-    .reduce((total, task) => total + task.estimated_completion_time, 0);
+    .reduce((total, task) => total + task.adjusted_completion_time, 0);
+  const adjustedTotalTime = visible
+    .reduce((total, task) => total + task.adjusted_completion_time, 0);
 
   return (
     <>
@@ -99,12 +108,12 @@ export function ScheduledTasksList({
         <div className="space-y-1">
           <span className="text-muted-foreground">Time Left</span>
           <div className="font-medium">
-            {totalScheduleTime - completedTime} min
+            {adjustedTotalTime - completedTime} min
           </div>
         </div>
         <div className="space-y-1">
           <span className="text-muted-foreground">Total Time</span>
-          <div className="font-medium">{totalScheduleTime} min</div>
+          <div className="font-medium">{adjustedTotalTime} min</div>
         </div>
       </div>
 
@@ -173,10 +182,50 @@ export function ScheduledTasksList({
                           </div>
 
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="size-3" />
-                              {task.estimated_completion_time} min
-                            </span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="size-3" />
+                                    {task.adjusted_completion_time} min
+                                    {task.fatigue_multiplier > 1.0 && (
+                                      <span className="text-amber-500 flex items-center gap-0.5">
+                                        <Brain className="size-3" />
+                                        +{Math.round((task.fatigue_multiplier - 1) * 100)}%
+                                      </span>
+                                    )}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {task.fatigue_multiplier > 1.0 ? (
+                                    <p>
+                                      Base: {task.estimated_completion_time} min, 
+                                      adjusted for cognitive fatigue from preceding high-intensity tasks
+                                    </p>
+                                  ) : (
+                                    <p>Estimated completion time</p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {task.suggested_break_duration && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center gap-1">
+                                      <Coffee className="size-3" />
+                                      {task.suggested_break_duration} min break
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>
+                                      GA-optimized break duration based on cognitive load 
+                                      (intensity: {task.cognitive_load ?? 1}/5)
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                             {task.due_date && (
                               <span className="flex items-center gap-1">
                                 <Calendar className="size-3" />

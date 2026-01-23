@@ -7,6 +7,7 @@ import {
   SkipForward,
   Plus,
   Check,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePomodoroStore } from "~/stores/pomodoro";
@@ -26,6 +27,8 @@ export const TimerControls = memo(function TimerControls() {
 
   const currentTask = useSchedulerStore((state) => state.getCurrentTask());
   const completeScheduledTask = useSchedulerStore((state) => state.completeScheduledTask);
+  const rescheduleRemaining = useSchedulerStore((state) => state.rescheduleRemaining);
+  const isRescheduling = useSchedulerStore((state) => state.isLoading);
 
   if (!currentTask) return null;
 
@@ -104,6 +107,24 @@ export const TimerControls = memo(function TimerControls() {
         <span className="hidden sm:inline">Mark Task Complete</span>
         <span className="sm:hidden">Complete</span>
       </Button>
+
+      {/* I'm Stuck Button - shows during focus phase */}
+      {!isBreak && (
+        <Button
+          className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
+          variant="ghost"
+          onClick={async () => {
+            if (currentTask) {
+              await rescheduleRemaining(currentTask.id);
+            }
+          }}
+          disabled={isLoading || isRescheduling}
+        >
+          <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="hidden sm:inline">I'm Stuck - Reschedule</span>
+          <span className="sm:hidden">Stuck</span>
+        </Button>
+      )}
 
       {/* Break Controls */}
       {isBreak && (

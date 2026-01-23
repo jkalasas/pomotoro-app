@@ -87,6 +87,8 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
   let _lastStartMs = 0;
   // Prevent duplicate timer_pause logs from near-simultaneous callers
   let _lastPauseMs = 0;
+  // Track if stuck suggestion has been shown for current task to avoid spam
+  let _stuckSuggestionShownForTaskId: number | null = null;
   
   // Set up event listeners for overlay communication
   if (typeof window !== "undefined") {
@@ -181,6 +183,29 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => {
             // Handle timer completion
             if (newTime === 0) {
               get().handlePhaseCompletion();
+            }
+
+            // Stuck detection: if focus phase and elapsed time > 2x estimated, show suggestion
+            if (state.phase === 'focus' && state.taskStartTime && state.currentTaskId) {
+              try {
+                const { useSchedulerStore } = await import('./scheduler');
+                const currentTask = useSchedulerStore.getState().getCurrentTask();
+                if (currentTask && currentTask.id !== _stuckSuggestionShownForTaskId) {
+                  const elapsedSeconds = Math.floor((Date.now() - state.taskStartTime) / 1000);
+                  const estimatedSeconds = currentTask.estimated_completion_time * 60;
+                  if (elapsedSeconds > estimatedSeconds * 2) {
+                    _stuckSuggestionShownForTaskId = currentTask.id;
+                    const { toast } = await import('sonner');
+                    toast.info('Taking longer than expected? Consider rescheduling remaining tasks.', {
+                      action: {
+                        label: 'Reschedule',
+                        onClick: () => useSchedulerStore.getState().rescheduleRemaining(currentTask.id),
+                      },
+                      duration: 10000,
+                    });
+                  }
+                }
+              } catch { /* ignore stuck detection errors */ }
             }
           }
 

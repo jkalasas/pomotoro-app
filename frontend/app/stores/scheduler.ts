@@ -4,6 +4,41 @@ import { apiClient } from "~/lib/api";
 import { toast } from "sonner";
 import type { ScheduledTask, ScheduleResponse, UserAnalytics } from "~/types/scheduler";
 
+export interface AdjustedScheduledTask extends ScheduledTask {
+  adjusted_completion_time: number;
+  fatigue_multiplier: number;
+}
+
+const COGNITIVE_LOAD_MULTIPLIERS: Record<number, { fatigue: number; recovery: number }> = {
+  1: { fatigue: 0.00, recovery: 0.025 },  // Low: no fatigue, slight recovery
+  2: { fatigue: 0.00, recovery: 0.0125 }, // Light: no fatigue, minimal recovery
+  3: { fatigue: 0.00, recovery: 0.00 },   // Moderate: neutral
+  4: { fatigue: 0.05, recovery: 0.00 },   // High: 5% fatigue per task
+  5: { fatigue: 0.075, recovery: 0.00 },  // Very high: 7.5% fatigue per task
+};
+const MAX_FATIGUE_MULTIPLIER = 0.3;
+
+function calculateCumulativeFatigue(
+  precedingTasks: ScheduledTask[],
+  currentTaskIndex: number
+): number {
+  if (currentTaskIndex === 0) return 1.0;
+
+  let cumulativeFatigue = 0;
+
+  for (let i = 0; i < currentTaskIndex; i++) {
+    const task = precedingTasks[i];
+    if (task.completed) continue;
+    
+    const load = Math.max(1, Math.min(5, task.cognitive_load ?? 1));
+    const { fatigue, recovery } = COGNITIVE_LOAD_MULTIPLIERS[load];
+    
+    cumulativeFatigue = Math.max(0, cumulativeFatigue + fatigue - recovery);
+  }
+
+  return 1.0 + Math.min(cumulativeFatigue, MAX_FATIGUE_MULTIPLIER);
+}
+
 interface SchedulerState {
   currentSchedule: ScheduledTask[] | null;
   selectedSessionIds: number[];
@@ -19,6 +54,7 @@ interface SchedulerState {
   clearSchedule: () => void;
   reorderSchedule: (reorderedTasks: ScheduledTask[]) => void;
   reorderScheduleWithTimerReset: (reorderedTasks: ScheduledTask[], wasTimerRunning: boolean) => void;
+  rescheduleRemaining: (currentTaskId: number) => Promise<void>;
   completeScheduledTask: (taskId: number) => Promise<void>;
   uncompleteScheduledTask: (taskId: number) => Promise<void>;
   loadUserAnalytics: () => Promise<void>;
@@ -28,6 +64,7 @@ interface SchedulerState {
   getCurrentTask: () => ScheduledTask | null;
   getNextTask: () => ScheduledTask | null;
   hasActiveTasks: () => boolean;
+  getAdjustedSchedule: () => AdjustedScheduledTask[] | null;
 }
 
 export const useSchedulerStore = create<SchedulerState>()(
@@ -244,6 +281,39 @@ export const useSchedulerStore = create<SchedulerState>()(
     }
   },
 
+  rescheduleRemaining: async (currentTaskId: number) => {
+    const { selectedSessionIds } = get();
+    if (selectedSessionIds.length === 0) {
+      toast.error('No sessions selected for rescheduling');
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await apiClient.rescheduleRemaining(selectedSessionIds, currentTaskId) as ScheduleResponse;
+      const visibleTasks = response.scheduled_tasks
+        .filter(t => !t.archived)
+        .map(t => ({ ...t, name: (t.name || '').trim() || 'Untitled Task' }));
+
+      set({
+        currentSchedule: visibleTasks,
+        totalScheduleTime: response.total_schedule_time,
+        fitnessScore: response.fitness_score,
+        isLoading: false,
+      });
+
+      toast.success('Schedule optimized for remaining tasks');
+    } catch (error) {
+      console.error("Failed to reschedule remaining tasks:", error);
+      set({
+        error: error instanceof Error ? error.message : "Failed to reschedule",
+        isLoading: false,
+      });
+      toast.error('Failed to reschedule remaining tasks');
+    }
+  },
+
   completeScheduledTask: async (taskId: number) => {
     // Prevent completing tasks while on a break to avoid disrupting Pomodoro state
     try {
@@ -347,6 +417,21 @@ export const useSchedulerStore = create<SchedulerState>()(
   hasActiveTasks: (): boolean => {
   const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
   return !!(currentSchedule && currentSchedule.some(task => !task.completed));
+  },
+
+  getAdjustedSchedule: (): AdjustedScheduledTask[] | null => {
+    const currentSchedule = get().currentSchedule?.filter(t => !t.archived) || null;
+    if (!currentSchedule) return null;
+
+    return currentSchedule.map((task, index) => {
+      const fatigueMultiplier = calculateCumulativeFatigue(currentSchedule, index);
+      const adjustedTime = Math.ceil(task.estimated_completion_time * fatigueMultiplier);
+      return {
+        ...task,
+        adjusted_completion_time: adjustedTime,
+        fatigue_multiplier: fatigueMultiplier,
+      };
+    });
   },
 }),
 {
