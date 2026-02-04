@@ -35,10 +35,9 @@ class GeneticScheduler:
         self.keep_parents = keep_parents
         self.random_seed = random_seed
 
-        # Fitness weights base constants; w_u adapted dynamically, w_m/w_v via analytics
-        self.base_w_u = 1.0
-        self.k_m = 1.0
-        self.k_v = 1.0
+        self.base_w_u = 3.0
+        self.k_m = 0.5
+        self.k_v = 0.5
 
     def schedule_tasks(
         self,
@@ -148,50 +147,28 @@ class GeneticScheduler:
         num_tasks = len(index_by_task_id)
         default_break = 5
 
-        ptrs: Dict[int, int] = {sid: 0 for sid in session_queues}
-        total = sum(len(q) for q in session_queues.values())
-        out: List[Task] = []
+        all_tasks = []
+        for queue in session_queues.values():
+            all_tasks.extend(queue)
 
-        while len(out) < total:
-            candidate: Optional[Tuple[Task, float]] = None
+        task_priorities = []
+        for task in all_tasks:
+            idx = index_by_task_id.get(task.id)
+            priority = float(solution[idx]) if idx is not None else 0.0
 
-            for sid, queue in session_queues.items():
-                p = ptrs[sid]
-                if p >= len(queue):
-                    continue
-                task = queue[p]
-                idx = index_by_task_id.get(task.id)  # type: ignore[arg-type]
-                priority = float(solution[idx]) if idx is not None else 0.0
+            base_break = session_break_durations.get(
+                task.session_id or -1, default_break
+            )
+            multiplier = 1.0
+            if idx is not None and (num_tasks + idx) < len(solution):
+                multiplier = float(solution[num_tasks + idx])
+            task.suggested_break_duration = int(round(base_break * multiplier))
 
-                base_break = session_break_durations.get(sid, default_break)
-                multiplier = 1.0
-                if idx is not None and (num_tasks + idx) < len(solution):
-                    multiplier = float(solution[num_tasks + idx])
-                task.suggested_break_duration = int(round(base_break * multiplier))
+            task_priorities.append((task, priority))
 
-                # Ties are broken by earlier due date or shorter duration
-                if candidate is None:
-                    candidate = (task, priority)
-                else:
-                    _, best_prio = candidate
-                    if priority > best_prio:
-                        candidate = (task, priority)
-                    elif priority == best_prio:
-                        cand_task = candidate[0]
-                        if self._is_better_tiebreak(task, cand_task):
-                            candidate = (task, priority)
+        task_priorities.sort(key=lambda x: (-x[1], x[0].due_date or datetime.max))
 
-            if candidate is None:
-                # Should not happen, but guard
-                break
-
-            chosen_task = candidate[0]
-            out.append(chosen_task)
-            # advance pointer of its session
-            sid = chosen_task.session_id or -1
-            ptrs[sid] += 1
-
-        return out
+        return [t for t, _ in task_priorities]
 
     def _is_better_tiebreak(self, a: Task, b: Task) -> bool:
         """Prefer earlier due date, then shorter duration, then lower id."""
@@ -215,38 +192,42 @@ class GeneticScheduler:
 
         urgency = self._urgency_score(chromosome)
         momentum = self._momentum_score(chromosome)
-        variety = self._variety_score(chromosome)
+        smoothness = self._variety_score(chromosome)
 
-        # Normalize momentum and variety to comparable ranges
         n = len(chromosome)
         if n > 0:
-            momentum /= n  # rough normalization
-        if n > 1:
-            max_dur = max(max(1, t.estimated_completion_time) for t in chromosome)
-            variety = variety / (max_dur * (n - 1))
+            momentum /= n
 
-        return w_u * urgency + w_m * momentum + w_v * variety
+        return w_u * urgency + w_m * momentum + w_v * smoothness
 
     def _urgency_score(self, chromosome: List[Task]) -> float:
-        """
-        Inverse of total tardiness (minutes) relative to due_date, accumulated
-        over the sequence.
-        """
         now = datetime.now()
         elapsed = 0
-        tardiness = 0.0
+        weighted_tardiness = 0.0
+        total_weight = 0.0
+        tasks_with_due = 0
+
         for t in chromosome:
             elapsed += max(0, int(t.estimated_completion_time))
-            # Include the suggested break time in the schedule accumulation
             if t.suggested_break_duration:
                 elapsed += t.suggested_break_duration
 
             if t.due_date:
+                tasks_with_due += 1
                 finish = now + timedelta(minutes=elapsed)
                 td = (finish - t.due_date).total_seconds() / 60.0
+
+                weight = (t.cognitive_load or 3) ** 2
+                total_weight += weight
+
                 if td > 0:
-                    tardiness += td
-        return 1.0 / (1.0 + tardiness)
+                    weighted_tardiness += weight * td
+
+        if tasks_with_due == 0 or total_weight == 0:
+            return 1.0
+
+        avg_weighted_tardiness = weighted_tardiness / total_weight
+        return 1.0 / (1.0 + avg_weighted_tardiness / 100.0)
 
     def _momentum_score(self, chromosome: List[Task]) -> float:
         """Prefer shorter tasks earlier (weighted by position)."""
@@ -260,15 +241,18 @@ class GeneticScheduler:
         return score
 
     def _variety_score(self, chromosome: List[Task]) -> float:
-        """Encourage duration variety between adjacent tasks."""
         if len(chromosome) <= 1:
-            return 0.0
-        s = 0.0
+            return 1.0
+
+        total_switch_cost = 0.0
         for i in range(len(chromosome) - 1):
-            a = max(1, chromosome[i].estimated_completion_time)
-            b = max(1, chromosome[i + 1].estimated_completion_time)
-            s += abs(a - b)
-        return s
+            load_curr = chromosome[i].cognitive_load or 3
+            load_next = chromosome[i + 1].cognitive_load or 3
+            total_switch_cost += abs(load_curr - load_next)
+
+        max_possible_cost = 4 * (len(chromosome) - 1)
+        smoothness = 1.0 - (total_switch_cost / max_possible_cost)
+        return smoothness
 
     def _calculate_adaptive_weights(
         self, user: User, db: DBSession
